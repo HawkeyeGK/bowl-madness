@@ -5,7 +5,7 @@ namespace BowlPoolManager.Core.Domain
     public class UserProfile
     {
         [JsonPropertyName("id")]
-        public string Id { get; set; } = string.Empty; // Will match the Auth Provider ID
+        public string Id { get; set; } = string.Empty; // This will be the SWA User ID
 
         [JsonPropertyName("email")]
         public string Email { get; set; } = string.Empty;
@@ -13,10 +13,14 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("displayName")]
         public string DisplayName { get; set; } = string.Empty;
 
-        [JsonPropertyName("roles")]
-        public List<string> Roles { get; set; } = new List<string>();
+        // Roles: "SuperAdmin", "Admin", "Player"
+        [JsonPropertyName("appRole")]
+        public string AppRole { get; set; } = "Player";
 
         [JsonPropertyName("type")]
         public string Type { get; set; } = "UserProfile";
+        
+        [JsonPropertyName("createdOn")]
+        public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
     }
 }

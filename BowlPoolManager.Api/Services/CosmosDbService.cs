@@ -8,6 +8,8 @@ namespace BowlPoolManager.Api.Services
     {
         Task AddPoolAsync(BowlPool pool);
         Task<List<BowlPool>> GetPoolsAsync();
+        Task<UserProfile?> GetUserAsync(string id);
+        Task UpsertUserAsync(UserProfile user);
     }
 
     public class CosmosDbService : ICosmosDbService
@@ -48,6 +50,26 @@ namespace BowlPoolManager.Api.Services
                 results.AddRange(response.ToList());
             }
             return results;
+        }
+
+        public async Task<UserProfile?> GetUserAsync(string id)
+        {
+            if (_container == null) return null;
+            try
+            {
+                ItemResponse<UserProfile> response = await _container.ReadItemAsync<UserProfile>(id, new PartitionKey(id));
+                return response.Resource;
+            }
+            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+        }
+
+        public async Task UpsertUserAsync(UserProfile user)
+        {
+            if (_container == null) throw new InvalidOperationException("Database connection not initialized.");
+            await _container.UpsertItemAsync(user, new PartitionKey(user.Id));
         }
     }
 }
