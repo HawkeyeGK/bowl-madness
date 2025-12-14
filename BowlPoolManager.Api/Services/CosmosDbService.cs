@@ -12,11 +12,19 @@ namespace BowlPoolManager.Api.Services
 
     public class CosmosDbService : ICosmosDbService
     {
-        private readonly Container _container;
+        private readonly Container? _container;
 
         public CosmosDbService(IConfiguration configuration)
         {
             var connectionString = configuration["CosmosDbConnectionString"];
+            
+            // Graceful fallback for build environments
+            if (string.IsNullOrEmpty(connectionString)) 
+            {
+                 _container = null;
+                 return;
+            }
+
             var client = new CosmosClient(connectionString);
             var database = client.GetDatabase("BowlMadnessDb");
             _container = database.GetContainer("MainContainer");
@@ -24,11 +32,14 @@ namespace BowlPoolManager.Api.Services
 
         public async Task AddPoolAsync(BowlPool pool)
         {
+            if (_container == null) throw new InvalidOperationException("Database connection not initialized.");
             await _container.CreateItemAsync(pool, new PartitionKey(pool.Id));
         }
 
         public async Task<List<BowlPool>> GetPoolsAsync()
         {
+            if (_container == null) throw new InvalidOperationException("Database connection not initialized.");
+            
             var query = _container.GetItemQueryIterator<BowlPool>(new QueryDefinition("SELECT * FROM c WHERE c.type = 'BowlPool'"));
             var results = new List<BowlPool>();
             while (query.HasMoreResults)
