@@ -11,6 +11,9 @@ namespace BowlPoolManager.Api.Services
         Task<List<BowlPool>> GetPoolsAsync();
         Task<UserProfile?> GetUserAsync(string id);
         Task UpsertUserAsync(UserProfile user);
+        Task AddGameAsync(BowlGame game);
+        Task UpdateGameAsync(BowlGame game);
+        Task<List<BowlGame>> GetGamesAsync();
     }
 
     public class CosmosDbService : ICosmosDbService
@@ -64,6 +67,24 @@ namespace BowlPoolManager.Api.Services
         {
             if (_container == null) throw new InvalidOperationException("Database connection not initialized.");
             await _container.UpsertItemAsync(user, new PartitionKey(user.Id));
+        }
+
+        public async Task AddGameAsync(BowlGame game)
+        {
+            if (_container == null) throw new InvalidOperationException("Database connection not initialized.");
+            await _container.CreateItemAsync(game, new PartitionKey(game.Id));
+        }
+
+        public async Task UpdateGameAsync(BowlGame game)
+        {
+            if (_container == null) throw new InvalidOperationException("Database connection not initialized.");
+            await _container.UpsertItemAsync(game, new PartitionKey(game.Id));
+        }
+
+        public async Task<List<BowlGame>> GetGamesAsync()
+        {
+            var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BowlGame}'";
+            return await QueryAsync<BowlGame>(sql);
         }
 
         // Generic Helper for all future list queries
