@@ -18,7 +18,7 @@ namespace BowlPoolManager.Api.Services
         {
             var connectionString = configuration["CosmosDbConnectionString"];
             
-            // Graceful fallback for build environments
+            // Graceful fallback for build environments (GitHub Actions)
             if (string.IsNullOrEmpty(connectionString)) 
             {
                  _container = null;

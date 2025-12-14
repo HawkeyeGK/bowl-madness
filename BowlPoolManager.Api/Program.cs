@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Azure.Cosmos;
 using BowlPoolManager.Api.Services;
 
+// MODERN SETUP: Uses FunctionsApplication instead of HostBuilder
 var builder = FunctionsApplication.CreateBuilder(args);
 
 builder.ConfigureFunctionsWebApplication();
