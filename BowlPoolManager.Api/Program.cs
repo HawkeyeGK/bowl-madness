@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Azure.Cosmos;
 using BowlPoolManager.Api.Services;
+using BowlPoolManager.Core; // Added reference
 
 // MODERN SETUP: Uses FunctionsApplication instead of HostBuilder
 var builder = FunctionsApplication.CreateBuilder(args);
@@ -29,8 +30,9 @@ if (!string.IsNullOrEmpty(connStr))
     try 
     {
         var client = new CosmosClient(connStr);
-        var db = client.CreateDatabaseIfNotExistsAsync("BowlMadnessDb").GetAwaiter().GetResult();
-        db.Database.CreateContainerIfNotExistsAsync("MainContainer", "/id").GetAwaiter().GetResult();
+        // UPDATED: Using Constants
+        var db = client.CreateDatabaseIfNotExistsAsync(Constants.Database.DbName).GetAwaiter().GetResult();
+        db.Database.CreateContainerIfNotExistsAsync(Constants.Database.ContainerName, Constants.Database.PartitionKeyPath).GetAwaiter().GetResult();
     }
     catch (Exception ex)
     {

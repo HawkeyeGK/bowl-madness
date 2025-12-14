@@ -4,6 +4,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using BowlPoolManager.Api.Services;
 using BowlPoolManager.Core.Domain;
+using BowlPoolManager.Core; // Added reference
 using System.Text.Json;
 using System.Text;
 
@@ -49,12 +50,14 @@ namespace BowlPoolManager.Api.Functions
                         Id = principal.UserId,
                         Email = principal.UserDetails ?? string.Empty,
                         DisplayName = principal.UserDetails ?? string.Empty,
-                        AppRole = "Player"
+                        // UPDATED: Using Constants
+                        AppRole = Constants.Roles.Player
                     };
 
                     if (user.Email.Equals(BOOTSTRAP_ADMIN_EMAIL, StringComparison.OrdinalIgnoreCase))
                     {
-                        user.AppRole = "SuperAdmin";
+                        // UPDATED: Using Constants
+                        user.AppRole = Constants.Roles.SuperAdmin;
                     }
 
                     await _cosmosService.UpsertUserAsync(user);

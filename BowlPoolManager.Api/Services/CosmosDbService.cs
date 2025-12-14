@@ -1,6 +1,7 @@
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Configuration;
 using BowlPoolManager.Core.Domain;
+using BowlPoolManager.Core; // Added reference
 
 namespace BowlPoolManager.Api.Services
 {
@@ -28,8 +29,9 @@ namespace BowlPoolManager.Api.Services
             }
 
             var client = new CosmosClient(connectionString);
-            var database = client.GetDatabase("BowlMadnessDb");
-            _container = database.GetContainer("MainContainer");
+            // UPDATED: Using Constants
+            var database = client.GetDatabase(Constants.Database.DbName);
+            _container = database.GetContainer(Constants.Database.ContainerName);
         }
 
         public async Task AddPoolAsync(BowlPool pool)
@@ -42,7 +44,8 @@ namespace BowlPoolManager.Api.Services
         {
             if (_container == null) throw new InvalidOperationException("Database connection not initialized.");
             
-            var query = _container.GetItemQueryIterator<BowlPool>(new QueryDefinition("SELECT * FROM c WHERE c.type = 'BowlPool'"));
+            // UPDATED: Using Constants for DocumentType
+            var query = _container.GetItemQueryIterator<BowlPool>(new QueryDefinition($"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BowlPool}'"));
             var results = new List<BowlPool>();
             while (query.HasMoreResults)
             {
