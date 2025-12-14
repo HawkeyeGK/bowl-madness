@@ -1,0 +1,26 @@
+@page "/admin"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "SuperAdmin")]
+
+<PageTitle>Admin Dashboard</PageTitle>
+
+<AuthorizeView>
+    <div class="container mt-4">
+        <div class="card border-primary mb-3">
+            <div class="card-header bg-primary text-white">
+                <h3><i class="bi bi-shield-lock-fill me-2"></i>Super Admin Dashboard</h3>
+            </div>
+            <div class="card-body">
+                <p class="card-text">
+                    Welcome, <strong>@context.User.Identity?.Name</strong>. 
+                    If you can see this, you are successfully authenticated as a <strong>SuperAdmin</strong> in Cosmos DB.
+                </p>
+                <hr />
+                <div class="d-grid gap-2 d-md-block">
+                    <button class="btn btn-outline-dark" disabled>Manage Users (Coming Soon)</button>
+                    <button class="btn btn-outline-dark" disabled>System Settings (Coming Soon)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</AuthorizeView>
