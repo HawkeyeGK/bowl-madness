@@ -42,17 +42,8 @@ namespace BowlPoolManager.Api.Services
 
         public async Task<List<BowlPool>> GetPoolsAsync()
         {
-            if (_container == null) throw new InvalidOperationException("Database connection not initialized.");
-            
-            // UPDATED: Using Constants for DocumentType
-            var query = _container.GetItemQueryIterator<BowlPool>(new QueryDefinition($"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BowlPool}'"));
-            var results = new List<BowlPool>();
-            while (query.HasMoreResults)
-            {
-                var response = await query.ReadNextAsync();
-                results.AddRange(response.ToList());
-            }
-            return results;
+            var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BowlPool}'";
+            return await QueryAsync<BowlPool>(sql);
         }
 
         public async Task<UserProfile?> GetUserAsync(string id)
@@ -73,6 +64,23 @@ namespace BowlPoolManager.Api.Services
         {
             if (_container == null) throw new InvalidOperationException("Database connection not initialized.");
             await _container.UpsertItemAsync(user, new PartitionKey(user.Id));
+        }
+
+        // Generic Helper for all future list queries
+        private async Task<List<T>> QueryAsync<T>(string sqlQuery)
+        {
+            if (_container == null) throw new InvalidOperationException("Database connection not initialized.");
+
+            var query = _container.GetItemQueryIterator<T>(new QueryDefinition(sqlQuery));
+            var results = new List<T>();
+
+            while (query.HasMoreResults)
+            {
+                var response = await query.ReadNextAsync();
+                results.AddRange(response.ToList());
+            }
+
+            return results;
         }
     }
 }
