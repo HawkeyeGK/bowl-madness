@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using BowlPoolManager.Api.Services;
 using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Core; // Added reference
@@ -14,14 +15,13 @@ namespace BowlPoolManager.Api.Functions
     {
         private readonly ILogger _logger;
         private readonly ICosmosDbService _cosmosService;
-        
-        // Bootstrapping the SuperAdmin using the Director's email
-        private const string BOOTSTRAP_ADMIN_EMAIL = "JasonRNash@gmail.com"; 
+        private readonly IConfiguration _configuration;
 
-        public UserFunctions(ILoggerFactory loggerFactory, ICosmosDbService cosmosService)
+        public UserFunctions(ILoggerFactory loggerFactory, ICosmosDbService cosmosService, IConfiguration configuration)
         {
             _logger = loggerFactory.CreateLogger<UserFunctions>();
             _cosmosService = cosmosService;
+            _configuration = configuration;
         }
 
         [Function("SyncUser")]
@@ -54,7 +54,9 @@ namespace BowlPoolManager.Api.Functions
                         AppRole = Constants.Roles.Player
                     };
 
-                    if (user.Email.Equals(BOOTSTRAP_ADMIN_EMAIL, StringComparison.OrdinalIgnoreCase))
+                    var bootstrapEmail = _configuration["BootstrapAdminEmail"];
+
+                    if (!string.IsNullOrEmpty(bootstrapEmail) && user.Email.Equals(bootstrapEmail, StringComparison.OrdinalIgnoreCase))
                     {
                         // UPDATED: Using Constants
                         user.AppRole = Constants.Roles.SuperAdmin;
