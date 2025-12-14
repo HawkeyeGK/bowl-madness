@@ -1,0 +1,27 @@
+{
+  "routes": [
+    {
+      "route": "/admin/*",
+      "allowedRoles": ["SuperAdmin", "Admin"],
+      "serve": "BowlPoolManager.Client"
+    }
+  ],
+  "navigationFallback": {
+    "rewrite": "/index.html"
+  },
+  "auth": {
+    "rolesSource": "/api/roles",
+    "identityProviders": {
+      "google": {
+        "registration": {
+          "clientIdSettingName": "GOOGLE_CLIENT_ID",
+          "clientSecretSettingName": "GOOGLE_CLIENT_SECRET"
+        }
+      }
+    }
+  },
+  "platform": {
+    "apiRuntime": "dotnet:8.0"
+  },
+  "apiLocation": "BowlPoolManager.Api"
+}

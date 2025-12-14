@@ -1,0 +1,52 @@
+﻿@page "/"
+@using BowlPoolManager.Core.Dtos
+@inject HttpClient Http
+
+<PageTitle>Home - BowlPool Manager</PageTitle>
+
+<h1>BowlPool Manager</h1>
+<p>Welcome to the BowlPool Manager application.</p>
+
+<div class="card bg-light mt-4">
+    <div class="card-header">API Health Check</div>
+    <div class="card-body">
+        <p>Attempting to call the Azure Function API at <code>/api/healthcheck</code>...</p>
+        
+        @if (healthData == null)
+        {
+            <p><em>Loading...</em></p>
+        }
+        else
+        {
+            <table class="table table-sm table-bordered">
+                <tbody>
+                    <tr><th>Status</th><td><span class="badge @(healthData.Status == "OK" ? "bg-success" : "bg-danger")">@healthData.Status</span></td></tr>
+                    <tr><th>Source</th><td>@healthData.Source</td></tr>
+                    <tr><th>Timestamp</th><td>@healthData.Timestamp.ToLocalTime()</td></tr>
+                    <tr><th>Message</th><td>@healthData.Message</td></tr>
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@code {
+    private HealthCheckResponseDto? healthData;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            healthData = await Http.GetFromJsonAsync<HealthCheckResponseDto>("api/healthcheck");
+        }
+        catch (Exception ex)
+        {
+            healthData = new HealthCheckResponseDto
+            {
+                Status = "ERROR",
+                Source = "Client-Side",
+                Message = $"API Call Failed: {ex.Message}"
+            };
+        }
+    }
+}
