@@ -186,35 +186,29 @@
     {
         var teams = new List<string>();
 
-        // 1. If it's a base game (Round 1 or Standard), use the teams on the record
-        if (!game.IsPlayoff || game.Round == PlayoffRound.Round1)
-        {
-            if (!string.IsNullOrEmpty(game.TeamHome)) teams.Add(game.TeamHome);
-            if (!string.IsNullOrEmpty(game.TeamAway)) teams.Add(game.TeamAway);
-            return teams;
-        }
+        // 1. Static Teams: Always check the game record itself. 
+        // This handles Standard games, Round 1, AND the "Bye" teams in Round 2.
+        if (!string.IsNullOrEmpty(game.TeamHome)) teams.Add(game.TeamHome);
+        if (!string.IsNullOrEmpty(game.TeamAway)) teams.Add(game.TeamAway);
 
-        // 2. If it's a later round, find who feeds into it
-        if (games != null)
+        // 2. Dynamic Teams: If it is a playoff game, look for winners coming from previous games.
+        if (game.IsPlayoff && games != null)
         {
-            // Find games where the winner advances to THIS game
+            // Find any game that points to THIS game's ID
             var feederGames = games.Where(g => g.NextGameId == game.Id).ToList();
             
             foreach (var feeder in feederGames)
             {
-                // If we have made a pick for the feeder game, that pick is now a candidate here
+                // If we have picked a winner for that feeder game, add them to the list
                 if (entry.Picks.TryGetValue(feeder.Id, out var winnerOfFeeder))
                 {
                     teams.Add(winnerOfFeeder);
                 }
-                else
-                {
-                    // Optional: You could add a placeholder like "Winner of [Bowl]" if needed
-                }
             }
         }
 
-        return teams;
+        // Return distinct list to be safe, though overlap is unlikely
+        return teams.Distinct().ToList();
     }
 
     private async Task HandleSave()
