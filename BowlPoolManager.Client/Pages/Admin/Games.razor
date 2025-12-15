@@ -46,6 +46,15 @@
                         <label for="startTime" class="form-label">Start Time (UTC)</label>
                         <InputText id="startTime" class="form-control" @bind-Value="startTimeString" type="datetime-local" />
                     </div>
+
+                    <div class="col-md-3">
+                        <label for="location" class="form-label">Location</label>
+                        <InputText id="location" class="form-control" @bind-Value="newGame.Location" placeholder="Stadium/City" />
+                    </div>
+                    <div class="col-md-3">
+                        <label for="television" class="form-label">Television</label>
+                        <InputText id="television" class="form-control" @bind-Value="newGame.Television" placeholder="Network" />
+                    </div>
                 </div>
 
                 <div class="mt-3 text-end">
@@ -75,6 +84,7 @@
                         <th>Game</th>
                         <th>Matchup</th>
                         <th>Time (UTC)</th>
+                        <th>Loc/TV</th>
                         <th>Points</th>
                         <th>Type</th>
                         <th class="text-end">Actions</th>
@@ -91,6 +101,10 @@
                                 @game.TeamAway @if(game.TeamAwaySeed.HasValue) { <span class="badge bg-primary">#@game.TeamAwaySeed</span> }
                             </td>
                             <td>@game.StartTime.ToLocalTime().ToString("MMM d, yyyy HH:mm")</td>
+                            <td>
+                                <div><small><i class="bi bi-geo-alt"></i> @game.Location</small></div>
+                                <div><small><i class="bi bi-tv"></i> @game.Television</small></div>
+                            </td>
                             <td>@game.PointValue</td>
                             <td>
                                 @if(game.IsPlayoff)

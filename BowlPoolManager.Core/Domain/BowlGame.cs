@@ -60,6 +60,15 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("nextGameSlot")]
         public string? NextGameSlot { get; set; }
 
+        // METADATA
+        [JsonProperty("location")]
+        [JsonPropertyName("location")]
+        public string? Location { get; set; }
+
+        [JsonProperty("television")]
+        [JsonPropertyName("television")]
+        public string? Television { get; set; }
+
         // COSMOS DISCRIMINATOR
         [JsonProperty("type")]
         [JsonPropertyName("type")]
