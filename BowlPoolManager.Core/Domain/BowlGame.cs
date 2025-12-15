@@ -55,10 +55,7 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("nextGameId")]
         public string? NextGameId { get; set; }
 
-        // "Home" or "Away"
-        [JsonProperty("nextGameSlot")]
-        [JsonPropertyName("nextGameSlot")]
-        public string? NextGameSlot { get; set; }
+        // REMOVED: NextGameSlot (Home/Away is determined by seed comparison)
 
         // METADATA
         [JsonProperty("location")]

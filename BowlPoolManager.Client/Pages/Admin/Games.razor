@@ -88,7 +88,7 @@
                                 <InputNumber id="awaySeed" class="form-control" @bind-Value="newGame.TeamAwaySeed" />
                             </div>
 
-                            <div class="col-md-3">
+                            <div class="col-md-5">
                                 <label for="nextGame" class="form-label">Winner Advances To</label>
                                 <InputSelect id="nextGame" class="form-select" @bind-Value="newGame.NextGameId">
                                     <option value="">-- End of Bracket --</option>
@@ -99,14 +99,6 @@
                                             <option value="@g.Id">@g.BowlName</option>
                                         }
                                     }
-                                </InputSelect>
-                            </div>
-                            <div class="col-md-2">
-                                <label for="nextSlot" class="form-label">Next Slot</label>
-                                <InputSelect id="nextSlot" class="form-select" @bind-Value="newGame.NextGameSlot">
-                                    <option value="">-- Select --</option>
-                                    <option value="Home">Home</option>
-                                    <option value="Away">Away</option>
                                 </InputSelect>
                             </div>
                         </div>
@@ -189,7 +181,6 @@
                                     if(next != null)
                                     {
                                         <div><i class="bi bi-arrow-right"></i> @next.BowlName</div>
-                                        <div class="text-muted">(@game.NextGameSlot Slot)</div>
                                     }
                                 }
                                 else if (game.IsPlayoff)
