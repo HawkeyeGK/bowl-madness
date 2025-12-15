@@ -7,6 +7,7 @@ using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Core;
 using System.Text.Json;
 using System.Text;
+using BowlPoolManager.Api.Helpers; // Added reference
 
 namespace BowlPoolManager.Api.Functions
 {
@@ -43,7 +44,8 @@ namespace BowlPoolManager.Api.Functions
             try
             {
                 // 1. Authenticate
-                var principal = ParseSwaHeader(req);
+                // 1. Authenticate
+                var principal = SecurityHelper.ParseSwaHeader(req);
                 if (principal == null || string.IsNullOrEmpty(principal.UserId))
                 {
                     return req.CreateResponse(HttpStatusCode.Unauthorized);
@@ -80,22 +82,5 @@ namespace BowlPoolManager.Api.Functions
             }
         }
 
-        private ClientPrincipal? ParseSwaHeader(HttpRequestData req)
-        {
-            try
-            {
-                if (!req.Headers.TryGetValues("x-ms-client-principal", out var headerValues)) return null;
-                var header = headerValues.FirstOrDefault();
-                if (string.IsNullOrEmpty(header)) return null;
-
-                var data = Convert.FromBase64String(header);
-                var json = Encoding.UTF8.GetString(data);
-                return JsonSerializer.Deserialize<ClientPrincipal>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            }
-            catch
-            {
-                return null;
-            }
-        }
     }
 }
