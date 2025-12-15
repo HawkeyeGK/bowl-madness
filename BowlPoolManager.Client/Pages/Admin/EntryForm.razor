@@ -1,0 +1,257 @@
+@page "/admin/entry"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@using System.Text.Json
+@attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<PageTitle>Add Bracket Entry</PageTitle>
+
+<div class="container mt-4 pb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-pencil-square"></i> New Bracket Entry</h1>
+        <a href="/admin/dashboard" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+
+    @if (games == null)
+    {
+        <div class="alert alert-info">Loading Schedule...</div>
+    }
+    else
+    {
+        <EditForm Model="@entry" OnValidSubmit="HandleSave">
+            <DataAnnotationsValidator />
+            
+            @if (!string.IsNullOrEmpty(statusMessage))
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    @statusMessage
+                    <button type="button" class="btn-close" @onclick="() => statusMessage = null"></button>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">@errorMessage</div>
+            }
+
+            @* PLAYER INFO *@
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-primary text-white">Player Details</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Player Name</label>
+                            <InputText class="form-control" @bind-Value="entry.PlayerName" placeholder="e.g. John Doe" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Tiebreaker (Total Points in Championship)</label>
+                            <InputNumber class="form-control" @bind-Value="entry.TieBreakerPoints" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* PLAYOFF BRACKET *@
+            <div class="card mb-4 shadow-sm border-warning">
+                <div class="card-header bg-warning text-dark fw-bold">
+                    <i class="bi bi-trophy"></i> Playoff Bracket
+                </div>
+                <div class="card-body">
+                    @foreach (var round in new[] { PlayoffRound.Round1, PlayoffRound.QuarterFinal, PlayoffRound.SemiFinal, PlayoffRound.Championship })
+                    {
+                        var roundGames = games.Where(g => g.IsPlayoff && g.Round == round).OrderBy(g => g.StartTime).ToList();
+                        if (roundGames.Any())
+                        {
+                            <h5 class="mt-3 border-bottom pb-2">@GetRoundName(round)</h5>
+                            <div class="row g-3">
+                                @foreach (var game in roundGames)
+                                {
+                                    <div class="col-md-6 col-lg-4">
+                                        <div class="p-2 border rounded bg-light h-100">
+                                            <div class="small fw-bold text-muted mb-1">@game.BowlName</div>
+                                            
+                                            @{
+                                                var options = GetTeamsForGame(game);
+                                            }
+
+                                            <select class="form-select" value="@GetPick(game.Id)" @onchange="@(e => UpdatePick(game.Id, e.Value?.ToString()))">
+                                                <option value="">-- Select Winner --</option>
+                                                @foreach (var team in options)
+                                                {
+                                                    <option value="@team">@team</option>
+                                                }
+                                            </select>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            @* STANDARD GAMES *@
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-secondary text-white">Standard Bowl Games</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        @foreach (var game in games.Where(g => !g.IsPlayoff).OrderBy(g => g.StartTime))
+                        {
+                            <div class="col-md-6 col-lg-4">
+                                <div class="p-2 border rounded h-100">
+                                    <div class="small fw-bold text-muted mb-1">@game.BowlName</div>
+                                    <div class="small text-secondary mb-2">@game.TeamHome vs @game.TeamAway</div>
+                                    
+                                    <select class="form-select" value="@GetPick(game.Id)" @onchange="@(e => UpdatePick(game.Id, e.Value?.ToString()))">
+                                        <option value="">-- Select Winner --</option>
+                                        @if (!string.IsNullOrEmpty(game.TeamHome)) { <option value="@game.TeamHome">@game.TeamHome</option> }
+                                        @if (!string.IsNullOrEmpty(game.TeamAway)) { <option value="@game.TeamAway">@game.TeamAway</option> }
+                                    </select>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-5">
+                <button type="button" class="btn btn-secondary me-2" @onclick="ResetForm">Clear Form</button>
+                <button type="submit" class="btn btn-success btn-lg px-5">
+                    <i class="bi bi-save"></i> Save Entry
+                </button>
+            </div>
+
+        </EditForm>
+    }
+</div>
+
+@code {
+    private List<BowlGame>? games;
+    private BracketEntry entry = new BracketEntry();
+    private string? statusMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadGames();
+    }
+
+    private async Task LoadGames()
+    {
+        try
+        {
+            games = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading games: {ex.Message}");
+        }
+    }
+
+    private string GetRoundName(PlayoffRound round) => round switch
+    {
+        PlayoffRound.Round1 => "First Round",
+        PlayoffRound.QuarterFinal => "Quarterfinals",
+        PlayoffRound.SemiFinal => "Semifinals",
+        PlayoffRound.Championship => "National Championship",
+        _ => "Playoffs"
+    };
+
+    private string GetPick(string gameId)
+    {
+        return entry.Picks.ContainsKey(gameId) ? entry.Picks[gameId] : "";
+    }
+
+    private void UpdatePick(string gameId, string? selection)
+    {
+        if (string.IsNullOrEmpty(selection))
+        {
+            if (entry.Picks.ContainsKey(gameId)) entry.Picks.Remove(gameId);
+        }
+        else
+        {
+            entry.Picks[gameId] = selection;
+        }
+
+        // TRIGGER RE-RENDER: Important so downstream dropdowns update immediately
+        StateHasChanged();
+    }
+
+    // THE MAGIC SAUCE: Calculates valid options based on previous picks
+    private List<string> GetTeamsForGame(BowlGame game)
+    {
+        var teams = new List<string>();
+
+        // 1. If it's a base game (Round 1 or Standard), use the teams on the record
+        if (!game.IsPlayoff || game.Round == PlayoffRound.Round1)
+        {
+            if (!string.IsNullOrEmpty(game.TeamHome)) teams.Add(game.TeamHome);
+            if (!string.IsNullOrEmpty(game.TeamAway)) teams.Add(game.TeamAway);
+            return teams;
+        }
+
+        // 2. If it's a later round, find who feeds into it
+        if (games != null)
+        {
+            // Find games where the winner advances to THIS game
+            var feederGames = games.Where(g => g.NextGameId == game.Id).ToList();
+            
+            foreach (var feeder in feederGames)
+            {
+                // If we have made a pick for the feeder game, that pick is now a candidate here
+                if (entry.Picks.TryGetValue(feeder.Id, out var winnerOfFeeder))
+                {
+                    teams.Add(winnerOfFeeder);
+                }
+                else
+                {
+                    // Optional: You could add a placeholder like "Winner of [Bowl]" if needed
+                }
+            }
+        }
+
+        return teams;
+    }
+
+    private async Task HandleSave()
+    {
+        statusMessage = null;
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(entry.PlayerName))
+        {
+            errorMessage = "Player Name is required.";
+            return;
+        }
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/SaveEntry", entry);
+            if (response.IsSuccessStatusCode)
+            {
+                statusMessage = $"Entry for {entry.PlayerName} saved successfully!";
+                ResetForm();
+            }
+            else
+            {
+                errorMessage = "Failed to save entry. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private void ResetForm()
+    {
+        // Keep the games loaded, but reset the entry
+        entry = new BracketEntry();
+        // Clear status after a short delay so they see the success message? 
+        // No, keep it simple.
+    }
+}
