@@ -87,11 +87,16 @@
                                 <label for="awaySeed" class="form-label">Away Seed</label>
                                 <InputNumber id="awaySeed" class="form-control" @bind-Value="newGame.TeamAwaySeed" />
                             </div>
+                            <div class="col-12 mt-1">
+                                <div class="form-text text-muted small">
+                                    <i class="bi bi-info-circle"></i> Enter seeds for Round 1 or Bye teams. Leave blank if the team is determined by a previous game result.
+                                </div>
+                            </div>
 
                             <div class="col-md-5">
                                 <label for="nextGame" class="form-label">Winner Advances To</label>
                                 <InputSelect id="nextGame" class="form-select" @bind-Value="newGame.NextGameId">
-                                    <option value="">-- End of Bracket --</option>
+                                    <option value="">-- Unlinked / Select Later --</option>
                                     @if (games != null)
                                     {
                                         @foreach (var g in games.Where(x => x.Id != newGame.Id).OrderBy(x => x.StartTime))
@@ -183,9 +188,13 @@
                                         <div><i class="bi bi-arrow-right"></i> @next.BowlName</div>
                                     }
                                 }
+                                else if (game.IsPlayoff && game.Round < 4) 
+                                {
+                                    <span class="badge bg-danger">Unlinked</span>
+                                }
                                 else if (game.IsPlayoff)
                                 {
-                                    <span class="text-muted">No Link</span>
+                                    <span class="text-muted">Championship</span>
                                 }
                                 else
                                 {
