@@ -45,17 +45,15 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("isPlayoff")]
         public bool IsPlayoff { get; set; } = false;
 
-        // 0 = Standard, 1 = Rd 1, 2 = QF, 3 = SF, 4 = Championship
+        // REFACTOR: Now using Enum (Underlying int values match DB)
         [JsonProperty("round")]
         [JsonPropertyName("round")]
-        public int Round { get; set; } = 0;
+        public PlayoffRound Round { get; set; } = PlayoffRound.Standard;
 
         // BRACKET LINKAGE
         [JsonProperty("nextGameId")]
         [JsonPropertyName("nextGameId")]
         public string? NextGameId { get; set; }
-
-        // REMOVED: NextGameSlot (Home/Away is determined by seed comparison)
 
         // METADATA
         [JsonProperty("location")]

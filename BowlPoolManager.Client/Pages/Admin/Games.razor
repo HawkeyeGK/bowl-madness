@@ -72,10 +72,10 @@
                             <div class="col-md-3">
                                 <label for="round" class="form-label">Round</label>
                                 <InputSelect id="round" class="form-select" @bind-Value="newGame.Round">
-                                    <option value="1">Round 1 (First Round)</option>
-                                    <option value="2">Round 2 (Quarterfinals)</option>
-                                    <option value="3">Round 3 (Semifinals)</option>
-                                    <option value="4">Round 4 (Championship)</option>
+                                    <option value="@PlayoffRound.Round1">Round 1 (First Round)</option>
+                                    <option value="@PlayoffRound.QuarterFinal">Round 2 (Quarterfinals)</option>
+                                    <option value="@PlayoffRound.SemiFinal">Round 3 (Semifinals)</option>
+                                    <option value="@PlayoffRound.Championship">Round 4 (Championship)</option>
                                 </InputSelect>
                             </div>
 
@@ -155,7 +155,7 @@
                                 <strong>@game.BowlName</strong>
                                 @if(game.IsPlayoff)
                                 {
-                                    <div class="small text-muted">Round @game.Round</div>
+                                    <div class="small text-muted">Round @((int)game.Round)</div>
                                 }
                             </td>
                             <td>
@@ -188,7 +188,7 @@
                                         <div><i class="bi bi-arrow-right"></i> @next.BowlName</div>
                                     }
                                 }
-                                else if (game.IsPlayoff && game.Round < 4) 
+                                else if (game.IsPlayoff && game.Round != PlayoffRound.Championship) 
                                 {
                                     <span class="badge bg-danger">Unlinked</span>
                                 }
@@ -216,8 +216,7 @@
     private List<BowlGame>? games;
     private BowlGame newGame = new BowlGame { PointValue = 1 };
     // Initialize to tomorrow at noon Central
-    private string startTimeString = ""; 
-
+    private string startTimeString = "";
     // Helper for Central Time - Try IANA first (better for WASM), fall back to Windows
     private TimeZoneInfo CentralTimeZone
     {
@@ -300,7 +299,6 @@
         {
             // This hits the SuperAdmin-protected SaveGame endpoint
             var response = await Http.PostAsJsonAsync("api/SaveGame", newGame);
-            
             if (response.IsSuccessStatusCode)
             {
                 ResetForm();
