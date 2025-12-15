@@ -138,8 +138,30 @@
     // Initialize to tomorrow at noon Central
     private string startTimeString = ""; 
 
-    // Helper for Central Time
-    private TimeZoneInfo CentralTimeZone => TimeZoneInfo.FindSystemTimeZoneById("Central Standard Time");
+    // Helper for Central Time - Try IANA first (better for WASM), fall back to Windows
+    private TimeZoneInfo CentralTimeZone
+    {
+        get
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("America/Chicago");
+            }
+            catch
+            {
+                try 
+                {
+                    return TimeZoneInfo.FindSystemTimeZoneById("Central Standard Time");
+                }
+                catch
+                {
+                    // Fallback to local if nothing else works to prevent crash
+                    Console.WriteLine("Warning: Could not find Central Time zone. Defaulting to Local.");
+                    return TimeZoneInfo.Local;
+                }
+            }
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
