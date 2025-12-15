@@ -43,7 +43,7 @@
                     </div>
 
                     <div class="col-md-6">
-                        <label for="startTime" class="form-label">Start Time (UTC)</label>
+                        <label for="startTime" class="form-label">Start Time (Central)</label>
                         <InputText id="startTime" class="form-control" @bind-Value="startTimeString" type="datetime-local" />
                     </div>
 
@@ -100,7 +100,12 @@
                                 vs 
                                 @game.TeamAway @if(game.TeamAwaySeed.HasValue) { <span class="badge bg-primary">#@game.TeamAwaySeed</span> }
                             </td>
-                            <td>@game.StartTime.ToLocalTime().ToString("MMM d, yyyy HH:mm")</td>
+                            <td>
+                                @{
+                                    var centralTime = TimeZoneInfo.ConvertTimeFromUtc(game.StartTime, CentralTimeZone);
+                                }
+                                @centralTime.ToString("MMM d, yyyy h:mm tt")
+                            </td>
                             <td>
                                 <div><small><i class="bi bi-geo-alt"></i> @game.Location</small></div>
                                 <div><small><i class="bi bi-tv"></i> @game.Television</small></div>
@@ -129,11 +134,19 @@
 
 @code {
     private List<BowlGame>? games;
-    private BowlGame newGame = new BowlGame { PointValue = 1, StartTime = DateTime.UtcNow.AddDays(1) };
-    private string startTimeString = DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-ddTHH:mm"); // Required for datetime-local input
+    private BowlGame newGame = new BowlGame { PointValue = 1 };
+    // Initialize to tomorrow at noon Central
+    private string startTimeString = ""; 
+
+    // Helper for Central Time
+    private TimeZoneInfo CentralTimeZone => TimeZoneInfo.FindSystemTimeZoneById("Central Standard Time");
 
     protected override async Task OnInitializedAsync()
     {
+        // Set initial default time in Central
+        var tomorrowCentral = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow.AddDays(1), CentralTimeZone);
+        startTimeString = tomorrowCentral.ToString("yyyy-MM-ddTHH:mm");
+        
         await LoadGames();
     }
 
@@ -152,10 +165,12 @@
 
     private async Task HandleSaveGame()
     {
-        // 1. Manually update StartTime from the InputText string
-        if (DateTime.TryParse(startTimeString, out DateTime parsedTime))
+        // 1. Manually update StartTime from the InputText string (Treating input as Central)
+        if (DateTime.TryParse(startTimeString, out DateTime parsedLocal))
         {
-            newGame.StartTime = parsedTime.ToUniversalTime();
+            // The parser might treat it as Unspecified, which is what we want for "wall clock time" in Central.
+            // Convert that "wall clock" Central time to UTC.
+             newGame.StartTime = TimeZoneInfo.ConvertTimeToUtc(parsedLocal, CentralTimeZone);
         }
         else
         {
@@ -171,8 +186,10 @@
             if (response.IsSuccessStatusCode)
             {
                 // Reset form and reload list
-                newGame = new BowlGame { PointValue = 1, StartTime = DateTime.UtcNow.AddDays(1) };
-                startTimeString = newGame.StartTime.ToString("yyyy-MM-ddTHH:mm");
+                newGame = new BowlGame { PointValue = 1 };
+                var tomorrowCentral = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow.AddDays(1), CentralTimeZone);
+                startTimeString = tomorrowCentral.ToString("yyyy-MM-ddTHH:mm");
+                
                 await LoadGames();
             }
             else
