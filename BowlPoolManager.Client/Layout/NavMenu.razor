@@ -1,6 +1,4 @@
 ﻿@using BowlPoolManager.Core
-@using Microsoft.AspNetCore.Components.Authorization
-
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">BowlPoolManager</a>
@@ -10,39 +8,56 @@
     </div>
 </div>
 
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
     <nav class="flex-column">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+                <span class="oi oi-home" aria-hidden="true"></span> Home
             </NavLink>
         </div>
         
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-
+        @* EXISTING ADMIN LINKS *@
         <AuthorizeView Roles="@Constants.Roles.SuperAdmin">
             <Authorized>
+                <div class="nav-item px-3 mt-3">
+                    <span class="text-light small text-uppercase fw-bold px-3">Admin</span>
+                </div>
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="admin/dashboard">
-                        <span class="bi bi-speedometer2" aria-hidden="true"></span> Admin Dashboard
+                        <span class="oi oi-dashboard" aria-hidden="true"></span> Dashboard
                     </NavLink>
                 </div>
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="admin/games">
-                        <span class="bi bi-controller" aria-hidden="true"></span> Game Manager
+                        <span class="oi oi-list" aria-hidden="true"></span> Manage Games
+                    </NavLink>
+                </div>
+                @* NEW LINK *@
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="admin/entry">
+                        <span class="oi oi-pencil" aria-hidden="true"></span> Enter Picks
                     </NavLink>
                 </div>
             </Authorized>
         </AuthorizeView>
+
+        @* DEBUG/DEV LINKS (Optional: Can remove if you want to clean up) *@
+        <div class="nav-item px-3 mt-4 border-top pt-2">
+            <NavLink class="nav-link" href="counter">
+                <span class="oi oi-plus" aria-hidden="true"></span> Counter
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="weather">
+                <span class="oi oi-list-rich" aria-hidden="true"></span> Weather
+            </NavLink>
+        </div>
     </nav>
 </div>
 
 @code {
     private bool collapseNavMenu = true;
+
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
     private void ToggleNavMenu()
