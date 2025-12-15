@@ -1,52 +1,169 @@
 ﻿@page "/"
-@using BowlPoolManager.Core.Dtos
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
 @inject HttpClient Http
 
-<PageTitle>Home - BowlPool Manager</PageTitle>
+<PageTitle>Leaderboard</PageTitle>
 
-<h1>BowlPool Manager</h1>
-<p>Welcome to the BowlPool Manager application.</p>
-
-<div class="card bg-light mt-4">
-    <div class="card-header">API Health Check</div>
-    <div class="card-body">
-        <p>Attempting to call the Azure Function API at <code>/api/healthcheck</code>...</p>
-        
-        @if (healthData == null)
-        {
-            <p><em>Loading...</em></p>
-        }
-        else
-        {
-            <table class="table table-sm table-bordered">
-                <tbody>
-                    <tr><th>Status</th><td><span class="badge @(healthData.Status == "OK" ? "bg-success" : "bg-danger")">@healthData.Status</span></td></tr>
-                    <tr><th>Source</th><td>@healthData.Source</td></tr>
-                    <tr><th>Timestamp</th><td>@healthData.Timestamp.ToLocalTime()</td></tr>
-                    <tr><th>Message</th><td>@healthData.Message</td></tr>
-                </tbody>
-            </table>
-        }
+<div class="container mt-4">
+    <div class="text-center mb-5">
+        <h1 class="display-4 fw-bold text-primary">Bowl Madness 2025</h1>
+        <p class="lead text-muted">Current Standings</p>
     </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (leaderboard == null || !leaderboard.Any())
+    {
+        <div class="alert alert-info text-center">
+            No entries found. The season hasn't started yet!
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0 align-middle">
+                        <thead class="bg-primary text-white">
+                            <tr>
+                                <th class="ps-4" style="width: 10%">Rank</th>
+                                <th style="width: 40%">Player</th>
+                                <th class="text-center" style="width: 15%">Points</th>
+                                <th class="text-center" style="width: 15%">Correct</th>
+                                <th class="text-end pe-4" style="width: 20%">Tiebreaker</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in leaderboard)
+                            {
+                                <tr class="@(row.Rank == 1 ? "table-warning fw-bold" : "")">
+                                    <td class="ps-4">
+                                        @if (row.Rank == 1)
+                                        {
+                                            <i class="bi bi-trophy-fill text-warning me-1"></i>
+                                        }
+                                        @row.Rank
+                                    </td>
+                                    <td>@row.Entry.PlayerName</td>
+                                    <td class="text-center fs-5">@row.Score</td>
+                                    <td class="text-center text-muted">@row.CorrectPicks / @totalFinalGames</td>
+                                    <td class="text-end pe-4 text-muted small">@row.Entry.TieBreakerPoints pts</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-3 text-center text-muted small">
+            <i class="bi bi-info-circle"></i> Leaderboard updates automatically as game results are entered.
+        </div>
+    }
 </div>
 
 @code {
-    private HealthCheckResponseDto? healthData;
+    private bool isLoading = true;
+    private List<BowlGame> games = new();
+    private List<BracketEntry> entries = new();
+    private List<LeaderboardRow> leaderboard = new();
+    private int totalFinalGames = 0;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            healthData = await Http.GetFromJsonAsync<HealthCheckResponseDto>("api/healthcheck");
+            // Parallel fetch for speed
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
+            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries");
+
+            await Task.WhenAll(gamesTask, entriesTask);
+
+            games = await gamesTask ?? new();
+            entries = await entriesTask ?? new();
+
+            CalculateLeaderboard();
         }
         catch (Exception ex)
         {
-            healthData = new HealthCheckResponseDto
-            {
-                Status = "ERROR",
-                Source = "Client-Side",
-                Message = $"API Call Failed: {ex.Message}"
-            };
+            Console.WriteLine($"Error loading leaderboard: {ex.Message}");
         }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void CalculateLeaderboard()
+    {
+        var rows = new List<LeaderboardRow>();
+        
+        // Filter to only games that are FINAL
+        var finalGames = games.Where(g => g.Status == GameStatus.Final).ToList();
+        totalFinalGames = finalGames.Count;
+
+        foreach (var entry in entries)
+        {
+            int score = 0;
+            int correct = 0;
+
+            foreach (var game in finalGames)
+            {
+                // Determine the winner string
+                string winner = "";
+                if (game.TeamHomeScore > game.TeamAwayScore) winner = game.TeamHome;
+                else if (game.TeamAwayScore > game.TeamHomeScore) winner = game.TeamAway;
+                
+                // Check if user picked this game
+                if (!string.IsNullOrEmpty(winner) && entry.Picks.TryGetValue(game.Id, out var pick))
+                {
+                    // Check strict string equality
+                    if (string.Equals(pick, winner, StringComparison.OrdinalIgnoreCase))
+                    {
+                        score += game.PointValue;
+                        correct++;
+                    }
+                }
+            }
+
+            rows.Add(new LeaderboardRow { Entry = entry, Score = score, CorrectPicks = correct });
+        }
+
+        // Sort by Score Descending, then Name
+        leaderboard = rows.OrderByDescending(r => r.Score)
+                          .ThenBy(r => r.Entry.PlayerName)
+                          .ToList();
+
+        // Assign Ranks
+        int rank = 1;
+        for (int i = 0; i < leaderboard.Count; i++)
+        {
+            // Handle ties: If score is same as previous, share rank
+            if (i > 0 && leaderboard[i].Score == leaderboard[i - 1].Score)
+            {
+                leaderboard[i].Rank = leaderboard[i - 1].Rank;
+            }
+            else
+            {
+                leaderboard[i].Rank = rank;
+            }
+            rank++;
+        }
+    }
+
+    // Local Helper Class
+    public class LeaderboardRow
+    {
+        public int Rank { get; set; }
+        public BracketEntry Entry { get; set; } = new();
+        public int Score { get; set; }
+        public int CorrectPicks { get; set; }
     }
 }
