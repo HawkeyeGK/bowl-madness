@@ -21,6 +21,8 @@ namespace BowlPoolManager.Core
             public const string BowlPool = "BowlPool";
             public const string UserProfile = "UserProfile";
             public const string BowlGame = "BowlGame";
+            // NEW
+            public const string BracketEntry = "BracketEntry";
         }
     }
 }
