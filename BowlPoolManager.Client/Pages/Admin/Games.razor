@@ -3,6 +3,7 @@
 @using BowlPoolManager.Core
 @using Microsoft.AspNetCore.Authorization
 @using System.Net.Http.Json
+@using System.Text.Json
 @attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
 @inject HttpClient Http
 
@@ -16,7 +17,7 @@
 
     <div class="card mb-5 shadow-sm">
         <div class="card-header bg-success text-white">
-            <h5 class="mb-0">Add Standard Bowl Game (Non-Playoff)</h5>
+            <h5 class="mb-0">@(string.IsNullOrEmpty(newGame.Id) || newGame.Id == Guid.Empty.ToString() ? "Add Standard Bowl Game" : "Edit Bowl Game")</h5>
         </div>
         <div class="card-body">
             <EditForm Model="@newGame" OnValidSubmit="HandleSaveGame">
@@ -122,7 +123,7 @@
                                 }
                             </td>
                             <td class="text-end">
-                                <button class="btn btn-sm btn-outline-primary" disabled title="Coming Soon">Edit</button>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => EditGame(game)">Edit</button>
                             </td>
                         </tr>
                     }
@@ -183,6 +184,17 @@
         {
             Console.WriteLine($"[Game Admin] Error loading games: {ex.Message}");
         }
+    }
+
+    private void EditGame(BowlGame game)
+    {
+        // Clone the game to avoid live editing the list row
+        var json = JsonSerializer.Serialize(game);
+        newGame = JsonSerializer.Deserialize<BowlGame>(json) ?? new BowlGame();
+
+        // Set the start time string for the input (Central)
+        var centralTime = TimeZoneInfo.ConvertTimeFromUtc(newGame.StartTime, CentralTimeZone);
+        startTimeString = centralTime.ToString("yyyy-MM-ddTHH:mm");
     }
 
     private async Task HandleSaveGame()
