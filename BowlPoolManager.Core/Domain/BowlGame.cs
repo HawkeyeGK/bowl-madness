@@ -17,6 +17,11 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("startTime")]
         public DateTime StartTime { get; set; } = DateTime.UtcNow;
 
+        // NEW: Game Lifecycle
+        [JsonProperty("gameStatus")]
+        [JsonPropertyName("gameStatus")]
+        public GameStatus Status { get; set; } = GameStatus.Scheduled;
+
         // TEAMS
         [JsonProperty("teamHome")]
         [JsonPropertyName("teamHome")]
@@ -35,6 +40,15 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("teamAwaySeed")]
         public int? TeamAwaySeed { get; set; }
 
+        // NEW: Scores
+        [JsonProperty("teamHomeScore")]
+        [JsonPropertyName("teamHomeScore")]
+        public int? TeamHomeScore { get; set; }
+
+        [JsonProperty("teamAwayScore")]
+        [JsonPropertyName("teamAwayScore")]
+        public int? TeamAwayScore { get; set; }
+
         // SCORING
         [JsonProperty("pointValue")]
         [JsonPropertyName("pointValue")]
@@ -45,7 +59,6 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("isPlayoff")]
         public bool IsPlayoff { get; set; } = false;
 
-        // REFACTOR: Now using Enum (Underlying int values match DB)
         [JsonProperty("round")]
         [JsonPropertyName("round")]
         public PlayoffRound Round { get; set; } = PlayoffRound.Standard;
