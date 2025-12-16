@@ -11,7 +11,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1><i class="bi bi-people-fill"></i> User Management</h1>
-            <p class="text-muted">View registered users.</p>
+            <p class="text-muted">View and manage registered users.</p>
         </div>
         <a href="/admin/dashboard" class="btn btn-outline-secondary">Back to Dashboard</a>
     </div>
@@ -38,16 +38,18 @@
                             <tr>
                                 <th>Name / Email</th>
                                 <th>Role</th>
-                                <th>User ID</th>
+                                <th>Status</th>
+                                <th class="text-end pe-3">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var user in users.OrderBy(u => u.DisplayName))
                             {
-                                <tr>
+                                <tr class="@(user.IsDisabled ? "table-danger" : "")">
                                     <td>
                                         <div class="fw-bold">@user.DisplayName</div>
                                         <div class="small text-muted">@user.Email</div>
+                                        <div class="small text-muted fw-normal d-block d-md-none">@user.Id</div>
                                     </td>
                                     <td>
                                         @if (user.AppRole == Constants.Roles.SuperAdmin)
@@ -63,7 +65,32 @@
                                             <span class="badge bg-info text-dark">@user.AppRole</span>
                                         }
                                     </td>
-                                    <td class="text-muted small">@user.Id</td>
+                                    <td>
+                                        @if (user.IsDisabled)
+                                        {
+                                            <span class="badge bg-danger">
+                                                <i class="bi bi-slash-circle"></i> Disabled
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-success">Active</span>
+                                        }
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <button class="btn btn-sm @(user.IsDisabled ? "btn-outline-success" : "btn-outline-danger")" 
+                                                @onclick="() => ToggleUser(user)"
+                                                title="@(user.IsDisabled ? "Enable User" : "Disable User")">
+                                            @if (user.IsDisabled)
+                                            {
+                                                <span><i class="bi bi-check-circle"></i> Enable</span>
+                                            }
+                                            else
+                                            {
+                                                <span><i class="bi bi-slash-circle"></i> Disable</span>
+                                            }
+                                        </button>
+                                    </td>
                                 </tr>
                             }
                         </tbody>
@@ -83,8 +110,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
         try
         {
+            isLoading = true;
             users = await Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers");
         }
         catch (Exception ex)
@@ -94,6 +127,29 @@
         finally
         {
             isLoading = false;
+        }
+    }
+
+    private async Task ToggleUser(UserProfile user)
+    {
+        // Optimistic UI update (feels faster)
+        bool originalState = user.IsDisabled;
+        user.IsDisabled = !user.IsDisabled;
+
+        try
+        {
+            var response = await Http.PostAsync($"api/ToggleUserStatus?userId={user.Id}", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                // Revert on failure
+                user.IsDisabled = originalState;
+                Console.WriteLine("Failed to toggle status");
+            }
+        }
+        catch (Exception ex)
+        {
+             user.IsDisabled = originalState;
+             Console.WriteLine($"Error: {ex.Message}");
         }
     }
 }
