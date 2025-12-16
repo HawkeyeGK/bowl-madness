@@ -20,6 +20,11 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("appRole")]
         public string AppRole { get; set; } = "Player";
 
+        // NEW: Access Control
+        [JsonProperty("isDisabled")]
+        [JsonPropertyName("isDisabled")]
+        public bool IsDisabled { get; set; } = false;
+
         [JsonProperty("type")]
         [JsonPropertyName("type")]
         public string Type { get; set; } = "UserProfile";
