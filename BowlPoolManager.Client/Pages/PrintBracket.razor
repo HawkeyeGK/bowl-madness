@@ -24,15 +24,11 @@ else
             <div class="inputs-area">
                 <div class="input-group">
                     <span class="label">Name:</span>
-                    <div class="line" style="width: 180px;"></div>
+                    <div class="line" style="width: 300px;"></div>
                 </div>
                 <div class="input-group">
                     <span class="label">Email:</span>
-                    <div class="line" style="width: 180px;"></div>
-                </div>
-                <div class="input-group">
-                    <span class="label">Tiebreaker (Pts):</span>
-                    <div class="line" style="width: 60px;"></div>
+                    <div class="line" style="width: 300px;"></div>
                 </div>
             </div>
             <div class="title-area">
@@ -97,7 +93,7 @@ else
                     }
                 </div>
 
-                <div class="round-col">
+                <div class="round-col center-vertical">
                     <div class="round-header">Championship</div>
                     @foreach (var game in GetPlayoffGames(PlayoffRound.Championship))
                     {
@@ -105,11 +101,11 @@ else
                             <div class="game-meta-row text-center">@game.BowlName</div>
                             <div class="team-slot">_________________</div>
                             <div class="team-slot">_________________</div>
-                        </div>
-                        
-                        <div class="champ-winner-box">
-                            <span class="small fw-bold">CHAMPION:</span>
-                            <div class="border-bottom border-dark mt-3" style="width: 100%;"></div>
+                            
+                            <div class="champ-line">
+                                <span class="small fw-bold me-1">CHAMPION:</span>
+                                <span class="line-draw">_________________</span>
+                            </div>
                         </div>
                     }
                 </div>
@@ -117,15 +113,18 @@ else
         </div>
 
         <div class="rules-footer">
-            <div class="rules-title">INSTRUCTIONS</div>
             <div class="rules-content">
-                <strong>Standard Bowls:</strong> Circle the winner of each game (@GetPointValue(false) pt each).<br/>
-                <strong>Playoffs:</strong> Write the winner of each matchup on the line in the NEXT bracket. Be sure to fill in the Champion!<br/>
+                <strong>Standard Bowls:</strong> Circle the winner (@GetPointValue(false) pt each).<br/>
+                <strong>Playoffs:</strong> Write winners on lines in NEXT bracket.<br/>
                 <strong>Scoring:</strong> 
-                First Round: @GetPointValue(true, PlayoffRound.Round1) pts | 
-                Quarterfinals: @GetPointValue(true, PlayoffRound.QuarterFinal) pts | 
-                Semifinals: @GetPointValue(true, PlayoffRound.SemiFinal) pts | 
-                Championship: @GetPointValue(true, PlayoffRound.Championship) pts.
+                R1: @GetPointValue(true, PlayoffRound.Round1) | 
+                QF: @GetPointValue(true, PlayoffRound.QuarterFinal) | 
+                Semi: @GetPointValue(true, PlayoffRound.SemiFinal) | 
+                Final: @GetPointValue(true, PlayoffRound.Championship) pts.
+            </div>
+            <div class="tiebreaker-area">
+                <span class="fw-bold">Tiebreaker (Total Pts):</span>
+                <div class="line" style="width: 80px; display: inline-block; border-bottom: 2px solid #000;"></div>
             </div>
         </div>
     </div>
@@ -146,9 +145,9 @@ else
 
     /* HEADER */
     .header-row { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 6px; }
-    .inputs-area { display: flex; gap: 15px; }
+    .inputs-area { display: flex; gap: 20px; width: 70%; }
     .input-group { display: flex; align-items: flex-end; gap: 5px; }
-    .input-group .label { font-weight: bold; font-size: 0.85rem; }
+    .input-group .label { font-weight: bold; font-size: 0.85rem; white-space: nowrap; }
     .input-group .line { border-bottom: 1px solid #000; height: 1px; }
     .title-area h1 { font-size: 1.4rem; font-weight: 900; line-height: 1; margin: 0; }
 
@@ -165,25 +164,32 @@ else
     .bracket-section { border-top: 2px solid #000; padding-top: 5px; margin-top: 5px; position: relative; }
     .bracket-container { display: flex; justify-content: space-between; height: 300px; }
     .round-col { display: flex; flex-direction: column; justify-content: space-around; flex: 1; margin: 0 4px; position: relative; }
+    /* Vertically center the Championship column */
+    .round-col.center-vertical { justify-content: center; } 
+    
     .round-header { text-align: center; font-weight: bold; font-size: 0.7rem; text-transform: uppercase; background: #eee; border: 1px solid #ccc; margin-bottom: 4px; }
+    
+    /* Absolute positioning for header in centered column */
+    .center-vertical .round-header { position: absolute; top: 0; width: 100%; }
 
     .match-card { border: 1px solid #000; padding: 2px 4px; position: relative; font-size: 0.7rem; background: #fff; }
     .game-meta-row { font-size: 0.6rem; font-weight: bold; border-bottom: 1px solid #ccc; margin-bottom: 2px; display: flex; justify-content: space-between; }
     .meta-right { font-weight: normal; font-size: 0.55rem; }
     
-    /* Slots for writing names */
     .team-slot { border-bottom: 1px solid #eee; height: 16px; line-height: 16px; overflow: hidden; white-space: nowrap; margin-bottom: 1px; }
-    .champ-card { border: 2px solid #000; height: 60px; justify-content: center; display: flex; flex-direction: column; }
     
-    .champ-winner-box { margin-top: 10px; text-align: center; }
+    /* Championship Box Styling */
+    .champ-card { border: 2px solid #000; height: auto; min-height: 90px; padding-bottom: 5px; display: flex; flex-direction: column; justify-content: space-between; }
+    .champ-line { margin-top: 8px; text-align: center; border-top: 1px dotted #ccc; padding-top: 4px; }
+    .line-draw { font-weight: bold; }
 
     /* Connectors */
     .round-col:not(:last-child) .match-card::after { content: ''; position: absolute; right: -6px; top: 50%; width: 6px; height: 1px; background: #000; }
 
     /* RULES FOOTER */
-    .rules-footer { margin-top: 8px; border-top: 1px double #000; padding-top: 4px; font-size: 0.75rem; display: flex; gap: 10px; }
-    .rules-title { font-weight: 900; text-transform: uppercase; width: 100px; }
+    .rules-footer { margin-top: 8px; border-top: 1px double #000; padding-top: 4px; font-size: 0.75rem; display: flex; justify-content: space-between; align-items: center; }
     .rules-content { flex: 1; }
+    .tiebreaker-area { display: flex; align-items: flex-end; gap: 5px; margin-left: 20px; }
 </style>
 
 @code {
@@ -214,25 +220,15 @@ else
 
     private string RenderSlot(string? teamName)
     {
-        // If the team is known (e.g. "Georgia"), print it. 
-        // If it's empty (waiting for previous game), print underline for user to write on.
         return string.IsNullOrEmpty(teamName) ? "_________________" : teamName;
     }
 
     private string GetPointValue(bool isPlayoff, PlayoffRound? round = null)
     {
         if (games == null) return "0";
-        
-        BowlGame? sample = null;
-        if (!isPlayoff)
-        {
-            sample = games.FirstOrDefault(g => !g.IsPlayoff);
-        }
-        else
-        {
-            sample = games.FirstOrDefault(g => g.IsPlayoff && g.Round == round);
-        }
-
+        BowlGame? sample = !isPlayoff 
+            ? games.FirstOrDefault(g => !g.IsPlayoff)
+            : games.FirstOrDefault(g => g.IsPlayoff && g.Round == round);
         return sample != null ? sample.PointValue.ToString() : "-";
     }
 }
