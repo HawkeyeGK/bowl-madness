@@ -36,14 +36,16 @@
                             <tr>
                                 <th class="ps-4 text-start">Rank</th>
                                 <th class="text-start">Player</th>
-                                <th class="d-none d-md-table-cell" title="Standard Bowl Games">Std</th>
-                                <th class="d-none d-md-table-cell" title="Round 1 (First Round)">R1</th>
-                                <th class="d-none d-md-table-cell" title="Quarterfinals">QF</th>
-                                <th class="d-none d-md-table-cell" title="Semifinals">SF</th>
-                                <th class="d-none d-md-table-cell" title="Championship">Champ</th>
                                 
                                 <th class="fw-bold">Total</th>
-                                <th title="Maximum Potential Score" class="table-info text-dark">Max</th>
+                                
+                                <th class="d-none d-md-table-cell" title="Standard Bowl Games">Bowls</th>
+                                <th class="d-none d-md-table-cell" title="Round 1 (First Round)">1st Rnd</th>
+                                <th class="d-none d-md-table-cell" title="Quarterfinals">Quart</th>
+                                <th class="d-none d-md-table-cell" title="Semifinals">Semis</th>
+                                <th class="d-none d-md-table-cell" title="Championship">Champ</th>
+                                
+                                <th title="Maximum Potential Score" class="text-dark">Max</th>
                                 
                                 <th class="d-none d-sm-table-cell">Correct</th>
                                 <th class="text-end pe-4 d-none d-lg-table-cell">Tiebreaker</th>
@@ -56,14 +58,15 @@
                                     <td class="ps-4 text-start">@row.Rank</td>
                                     <td class="text-start fw-bold">@row.Entry.PlayerName</td>
                                     
+                                    <td class="fs-5 text-primary fw-bold">@row.Score</td>
+                                    
                                     <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.Standard]</td>
                                     <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.Round1]</td>
                                     <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.QuarterFinal]</td>
                                     <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.SemiFinal]</td>
                                     <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.Championship]</td>
 
-                                    <td class="fs-5 text-primary fw-bold">@row.Score</td>
-                                    <td class="fw-bold table-info">@row.MaxPossible</td>
+                                    <td class="fw-bold text-muted">@row.MaxPossible</td>
                                     
                                     <td class="d-none d-sm-table-cell text-muted small">@row.CorrectPicks / @totalFinalGames</td>
                                     <td class="text-end pe-4 text-muted small d-none d-lg-table-cell">@row.Entry.TieBreakerPoints pts</td>
@@ -105,7 +108,6 @@
             games = await gamesTask ?? new();
             entries = await entriesTask ?? new();
 
-            // REFACTORED: Use the Scoring Engine
             totalFinalGames = games.Count(g => g.Status == GameStatus.Final);
             leaderboard = ScoringEngine.Calculate(games, entries);
         }
