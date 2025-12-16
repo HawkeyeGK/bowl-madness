@@ -35,6 +35,32 @@ namespace BowlPoolManager.Api.Functions
             return response;
         }
 
+
+        // NEW: Get Single Entry
+        [Function("GetEntry")]
+        public async Task<HttpResponseData> GetEntry([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
+        {
+            var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+            var id = query["id"];
+
+            if (string.IsNullOrEmpty(id))
+            {
+                return req.CreateResponse(HttpStatusCode.BadRequest);
+            }
+
+            _logger.LogInformation($"Getting entry {id}");
+            var entry = await _cosmosService.GetEntryAsync(id);
+
+            if (entry == null)
+            {
+                return req.CreateResponse(HttpStatusCode.NotFound);
+            }
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            await response.WriteAsJsonAsync(entry);
+            return response;
+        }
+
         [Function("SaveEntry")]
         public async Task<HttpResponseData> SaveEntry([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
         {
