@@ -1,17 +1,7 @@
 using BowlPoolManager.Core.Domain;
 
-namespace BowlPoolManager.Client.Helpers
+namespace BowlPoolManager.Core.Helpers
 {
-    public class LeaderboardRow
-    {
-        public int Rank { get; set; }
-        public BracketEntry Entry { get; set; } = new();
-        public int Score { get; set; }
-        public int MaxPossible { get; set; }
-        public int CorrectPicks { get; set; }
-        public Dictionary<PlayoffRound, int> RoundScores { get; set; } = new();
-    }
-
     public static class ScoringEngine
     {
         public static List<LeaderboardRow> Calculate(List<BowlGame> games, List<BracketEntry> entries)
@@ -20,10 +10,11 @@ namespace BowlPoolManager.Client.Helpers
             var eliminatedTeams = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             
             var finalGames = games.Where(g => g.Status == GameStatus.Final).ToList();
-            int totalFinalGames = finalGames.Count;
 
             foreach (var game in finalGames)
             {
+                // Note: We use strictly greater/less than. Ties in bowls are rare/impossible usually, 
+                // but this logic assumes a clear winner for elimination.
                 if (game.TeamHomeScore < game.TeamAwayScore) eliminatedTeams.Add(game.TeamHome);
                 else if (game.TeamAwayScore < game.TeamHomeScore) eliminatedTeams.Add(game.TeamAway);
             }
@@ -96,8 +87,6 @@ namespace BowlPoolManager.Client.Helpers
                                  .ToList();
 
             // Assign Ranks
-            // Note: Ranks are still tied based on CURRENT SCORE only.
-            // This means visual order might differ from rank number (which is standard).
             int rank = 1;
             for (int i = 0; i < sortedRows.Count; i++)
             {

@@ -43,20 +43,12 @@ namespace BowlPoolManager.Api.Functions
 
             try
             {
-                // 1. Authenticate
-                // 1. Authenticate
-                var principal = SecurityHelper.ParseSwaHeader(req);
-                if (principal == null || string.IsNullOrEmpty(principal.UserId))
+                // Security Check
+                var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
+                if (!authResult.IsValid)
                 {
-                    return req.CreateResponse(HttpStatusCode.Unauthorized);
-                }
-
-                // 2. Authorize (SuperAdmin Only)
-                var userProfile = await _cosmosService.GetUserAsync(principal.UserId);
-                if (userProfile == null || userProfile.AppRole != Constants.Roles.SuperAdmin)
-                {
-                    _logger.LogWarning($"User {principal.UserId} attempted to save a game without SuperAdmin rights.");
-                    return req.CreateResponse(HttpStatusCode.Forbidden);
+                    _logger.LogWarning("SaveGame blocked: Unauthorized or Forbidden.");
+                    return authResult.ErrorResponse!;
                 }
 
                 // 3. Process
