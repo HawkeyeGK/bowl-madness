@@ -1,0 +1,175 @@
+@page "/entry/{EntryId}"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@using BowlPoolManager.Client.Helpers
+@inject HttpClient Http
+
+<div class="container mt-4">
+    <div class="mb-4">
+        <a href="/" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to Leaderboard
+        </a>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (entry == null)
+    {
+        <div class="alert alert-warning">Entry not found.</div>
+    }
+    else
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-body bg-light">
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <h2 class="fw-bold mb-0">@entry.PlayerName</h2>
+                        <span class="text-muted small">Player</span>
+                    </div>
+                    <div class="col-md-4 border-start border-end">
+                        <h2 class="text-primary fw-bold mb-0">@currentScore</h2>
+                        <span class="text-muted small">Current Points</span>
+                    </div>
+                    <div class="col-md-4">
+                        <h2 class="text-info fw-bold mb-0">@maxPossible</h2>
+                        <span class="text-muted small">Max Potential</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Date</th>
+                        <th>Bowl</th>
+                        <th>Matchup</th>
+                        <th>Your Pick</th>
+                        <th class="text-center">Pts</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var game in games.OrderBy(g => g.StartTime))
+                    {
+                        // LOGIC: Determine Row Color
+                        string rowClass = "";
+                        string pickStatusIcon = "";
+                        
+                        string pick = "";
+                        bool hasPick = entry.Picks.TryGetValue(game.Id, out pick);
+
+                        if (game.Status == GameStatus.Final && hasPick)
+                        {
+                            var winner = game.TeamHomeScore > game.TeamAwayScore ? game.TeamHome : game.TeamAway;
+                            bool isCorrect = string.Equals(pick, winner, StringComparison.OrdinalIgnoreCase);
+
+                            if (isCorrect) 
+                            {
+                                rowClass = "table-success"; // Green highlight
+                                pickStatusIcon = "<i class='bi bi-check-circle-fill text-success'></i>";
+                            }
+                            else 
+                            {
+                                rowClass = "table-danger"; // Red highlight
+                                pickStatusIcon = "<i class='bi bi-x-circle-fill text-danger'></i>";
+                            }
+                        }
+
+                        <tr class="@rowClass">
+                            <td>
+                                @DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d")
+                                <div class="small text-muted">@DateTimeHelper.ToCentral(game.StartTime).ToString("h:mm tt")</div>
+                            </td>
+                            <td>
+                                <strong>@game.BowlName</strong>
+                                @if (game.IsPlayoff)
+                                {
+                                    <span class="badge bg-warning text-dark ms-1">Playoff</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="@(game.TeamHomeScore > game.TeamAwayScore ? "fw-bold" : "")">
+                                    @game.TeamHome <span class="small text-muted">(@(game.TeamHomeScore?.ToString() ?? "-"))</span>
+                                </div>
+                                <div class="@(game.TeamAwayScore > game.TeamHomeScore ? "fw-bold" : "")">
+                                    @game.TeamAway <span class="small text-muted">(@(game.TeamAwayScore?.ToString() ?? "-"))</span>
+                                </div>
+                            </td>
+                            <td class="fw-bold position-relative">
+                                @if(hasPick)
+                                {
+                                    @pick
+                                    @if(game.Status == GameStatus.Final)
+                                    {
+                                        <span class="ms-2">@((MarkupString)pickStatusIcon)</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted fst-italic">No Pick</span>
+                                }
+                            </td>
+                            <td class="text-center fw-bold">
+                                @game.PointValue
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string EntryId { get; set; } = string.Empty;
+
+    private bool isLoading = true;
+    private BracketEntry? entry;
+    private List<BowlGame> games = new();
+    
+    // Stats
+    private int currentScore = 0;
+    private int maxPossible = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
+            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries");
+
+            await Task.WhenAll(gamesTask, entriesTask);
+
+            games = await gamesTask ?? new();
+            var allEntries = await entriesTask ?? new();
+
+            // Find specific entry
+            entry = allEntries.FirstOrDefault(e => e.Id == EntryId);
+
+            if (entry != null)
+            {
+                // Reuse Scoring Engine to get accurate "Max Possible" logic
+                // We create a single-item list to run the engine against just this user
+                var stats = ScoringEngine.Calculate(games, new List<BracketEntry> { entry }).First();
+                currentScore = stats.Score;
+                maxPossible = stats.MaxPossible;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading entry: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
