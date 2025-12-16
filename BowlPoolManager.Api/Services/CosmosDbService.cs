@@ -16,6 +16,7 @@ namespace BowlPoolManager.Api.Services
         Task<List<BowlGame>> GetGamesAsync();
         Task AddEntryAsync(BracketEntry entry);
         Task<List<BracketEntry>> GetEntriesAsync();
+        Task<BracketEntry?> GetEntryAsync(string id);
     }
 
     public class CosmosDbService : ICosmosDbService
@@ -78,6 +79,19 @@ namespace BowlPoolManager.Api.Services
         public async Task<List<BracketEntry>> GetEntriesAsync() => 
             await GetListAsync<BracketEntry>(Constants.DocumentTypes.BracketEntry);
 
+        public async Task<BracketEntry?> GetEntryAsync(string id)
+        {
+            if (_container == null) return null;
+            try
+            {
+                ItemResponse<BracketEntry> response = await _container.ReadItemAsync<BracketEntry>(id, new PartitionKey(id));
+                return response.Resource;
+            }
+            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+        }
 
         // --- INTERNAL GENERIC HELPERS ---
 
