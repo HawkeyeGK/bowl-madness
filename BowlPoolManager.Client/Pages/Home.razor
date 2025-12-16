@@ -1,11 +1,12 @@
 ﻿@page "/"
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
+@using BowlPoolManager.Client.Helpers
 @inject HttpClient Http
 
 <PageTitle>Leaderboard</PageTitle>
 
-<div class="container mt-4">
+<div class="container-fluid mt-4">
     <div class="text-center mb-5">
         <h1 class="display-4 fw-bold text-primary">Bowl Madness 2025</h1>
         <p class="lead text-muted">Current Standings</p>
@@ -30,27 +31,42 @@
         <div class="card shadow-sm border-0">
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover table-striped mb-0 align-middle">
+                    <table class="table table-hover table-striped mb-0 align-middle text-center">
                         <thead class="bg-primary text-white">
                             <tr>
-                                <th class="ps-4" style="width: 10%">Rank</th>
-                                <th style="width: 40%">Player</th>
-                                <th class="text-center" style="width: 15%">Points</th>
-                                <th class="text-center" style="width: 15%">Correct</th>
-                                <th class="text-end pe-4" style="width: 20%">Tiebreaker</th>
+                                <th class="ps-4 text-start">Rank</th>
+                                <th class="text-start">Player</th>
+                                <th class="d-none d-md-table-cell" title="Standard Bowl Games">Std</th>
+                                <th class="d-none d-md-table-cell" title="Round 1 (First Round)">R1</th>
+                                <th class="d-none d-md-table-cell" title="Quarterfinals">QF</th>
+                                <th class="d-none d-md-table-cell" title="Semifinals">SF</th>
+                                <th class="d-none d-md-table-cell" title="Championship">Champ</th>
+                                
+                                <th class="fw-bold">Total</th>
+                                <th title="Maximum Potential Score" class="table-info text-dark">Max</th>
+                                
+                                <th class="d-none d-sm-table-cell">Correct</th>
+                                <th class="text-end pe-4 d-none d-lg-table-cell">Tiebreaker</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var row in leaderboard)
                             {
                                 <tr>
-                                    <td class="ps-4">
-                                        @row.Rank
-                                    </td>
-                                    <td>@row.Entry.PlayerName</td>
-                                    <td class="text-center fs-5">@row.Score</td>
-                                    <td class="text-center text-muted">@row.CorrectPicks / @totalFinalGames</td>
-                                    <td class="text-end pe-4 text-muted small">@row.Entry.TieBreakerPoints pts</td>
+                                    <td class="ps-4 text-start">@row.Rank</td>
+                                    <td class="text-start fw-bold">@row.Entry.PlayerName</td>
+                                    
+                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.Standard]</td>
+                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.Round1]</td>
+                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.QuarterFinal]</td>
+                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.SemiFinal]</td>
+                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.Championship]</td>
+
+                                    <td class="fs-5 text-primary fw-bold">@row.Score</td>
+                                    <td class="fw-bold table-info">@row.MaxPossible</td>
+                                    
+                                    <td class="d-none d-sm-table-cell text-muted small">@row.CorrectPicks / @totalFinalGames</td>
+                                    <td class="text-end pe-4 text-muted small d-none d-lg-table-cell">@row.Entry.TieBreakerPoints pts</td>
                                 </tr>
                             }
                         </tbody>
@@ -64,7 +80,6 @@
         </div>
     }
     <div class="text-center mt-5 mb-5 pt-4 border-top">
-
         <a href="print-bracket" target="_blank" class="btn btn-outline-primary">
             <i class="bi bi-file-earmark-pdf"></i> Get Printable Bracket
         </a>
@@ -82,7 +97,6 @@
     {
         try
         {
-            // Parallel fetch for speed
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
             var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries");
 
@@ -91,7 +105,9 @@
             games = await gamesTask ?? new();
             entries = await entriesTask ?? new();
 
-            CalculateLeaderboard();
+            // REFACTORED: Use the Scoring Engine
+            totalFinalGames = games.Count(g => g.Status == GameStatus.Final);
+            leaderboard = ScoringEngine.Calculate(games, entries);
         }
         catch (Exception ex)
         {
@@ -101,71 +117,5 @@
         {
             isLoading = false;
         }
-    }
-
-    private void CalculateLeaderboard()
-    {
-        var rows = new List<LeaderboardRow>();
-        
-        // Filter to only games that are FINAL
-        var finalGames = games.Where(g => g.Status == GameStatus.Final).ToList();
-        totalFinalGames = finalGames.Count;
-
-        foreach (var entry in entries)
-        {
-            int score = 0;
-            int correct = 0;
-
-            foreach (var game in finalGames)
-            {
-                // Determine the winner string
-                string winner = "";
-                if (game.TeamHomeScore > game.TeamAwayScore) winner = game.TeamHome;
-                else if (game.TeamAwayScore > game.TeamHomeScore) winner = game.TeamAway;
-                
-                // Check if user picked this game
-                if (!string.IsNullOrEmpty(winner) && entry.Picks.TryGetValue(game.Id, out var pick))
-                {
-                    // Check strict string equality
-                    if (string.Equals(pick, winner, StringComparison.OrdinalIgnoreCase))
-                    {
-                        score += game.PointValue;
-                        correct++;
-                    }
-                }
-            }
-
-            rows.Add(new LeaderboardRow { Entry = entry, Score = score, CorrectPicks = correct });
-        }
-
-        // Sort by Score Descending, then Name
-        leaderboard = rows.OrderByDescending(r => r.Score)
-                          .ThenBy(r => r.Entry.PlayerName)
-                          .ToList();
-
-        // Assign Ranks
-        int rank = 1;
-        for (int i = 0; i < leaderboard.Count; i++)
-        {
-            // Handle ties: If score is same as previous, share rank
-            if (i > 0 && leaderboard[i].Score == leaderboard[i - 1].Score)
-            {
-                leaderboard[i].Rank = leaderboard[i - 1].Rank;
-            }
-            else
-            {
-                leaderboard[i].Rank = rank;
-            }
-            rank++;
-        }
-    }
-
-    // Local Helper Class
-    public class LeaderboardRow
-    {
-        public int Rank { get; set; }
-        public BracketEntry Entry { get; set; } = new();
-        public int Score { get; set; }
-        public int CorrectPicks { get; set; }
     }
 }
