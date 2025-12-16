@@ -1,4 +1,10 @@
 ﻿@inherits LayoutComponentBase
+@using BowlPoolManager.Core.Domain
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+@inject HttpClient Http
+@inject NavigationManager Nav
+
 <div class="page">
     <div class="sidebar">
         <NavMenu />
@@ -13,4 +19,61 @@
             @Body
         </article>
     </main>
+
+    @* GLOBAL SECURITY TOAST *@
+    @if (showSecurityToast)
+    {
+         <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 2000">
+            <div class="toast show align-items-center text-white bg-danger border-0 shadow" role="alert">
+                <div class="d-flex">
+                    <div class="toast-body fs-6">
+                        <i class="bi bi-exclamation-octagon-fill me-2"></i> @securityMessage
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 </div>
+
+@code {
+    private bool showSecurityToast = false;
+    private string securityMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try 
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var userPrincipal = authState.User;
+
+            // Only check if they are actually logged in
+            if (userPrincipal.Identity?.IsAuthenticated == true)
+            {
+                // Verify against our DB (The "Bouncer" Check)
+                // We use GetMe to silently fetch the full profile
+                var userProfile = await Http.GetFromJsonAsync<UserProfile>("api/GetMe");
+
+                if (userProfile != null && userProfile.IsDisabled)
+                {
+                    // 1. Show Red Card
+                    securityMessage = "Access Denied: Your account has been disabled.";
+                    showSecurityToast = true;
+                    StateHasChanged();
+
+                    // 2. Wait for them to read it
+                    await Task.Delay(3000);
+                    
+                    // 3. Eject (Force Logout)
+                    Nav.NavigateTo("/.auth/logout?post_logout_redirect_uri=/", forceLoad: true);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Fail open effectively, or log silently. 
+            // If the API is down, we don't want to boot legitimate users, 
+            // but we also can't check for bans. 
+            Console.WriteLine($"Auth Check Failed: {ex.Message}");
+        }
+    }
+}
