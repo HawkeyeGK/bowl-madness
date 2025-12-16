@@ -219,8 +219,12 @@
 
     private RenderFragment RenderSortIcon(string column)
     {
-        if (sortColumn != column) return @<span></span>;
-        
-        return isAscending ? @<i class="bi bi-caret-up-fill small"></i> : @<i class="bi bi-caret-down-fill small"></i>;
+        // Always render an icon to reserve the pixel width, preventing layout jumps.
+        // If not active, we just hide it visually.
+        bool isActive = (sortColumn == column);
+        string visibilityStyle = isActive ? "visibility: visible" : "visibility: hidden";
+        string iconClass = (isActive && isAscending) ? "bi-caret-up-fill" : "bi-caret-down-fill";
+
+        return @<i class="@($"bi {iconClass} small ms-1")" style="@visibilityStyle"></i>;
     }
 }
