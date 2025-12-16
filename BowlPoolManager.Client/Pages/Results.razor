@@ -1,0 +1,111 @@
+@page "/results"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@using BowlPoolManager.Client.Helpers
+@inject HttpClient Http
+
+<PageTitle>Game Results</PageTitle>
+
+<div class="container mt-4">
+    <div class="text-center mb-5">
+        <h1 class="display-4 fw-bold text-primary">Game Results</h1>
+        <p class="lead text-muted">Scores & Outcomes</p>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0 align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Date</th>
+                                <th>Bowl</th>
+                                <th>Matchup</th>
+                                <th>Winner</th>
+                                <th class="text-center">Pts</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var game in games.OrderBy(g => g.StartTime))
+                            {
+                                string winner = "-";
+                                if (game.Status == GameStatus.Final)
+                                {
+                                    winner = (game.TeamHomeScore > game.TeamAwayScore) ? game.TeamHome : game.TeamAway;
+                                }
+
+                                <tr>
+                                    <td>
+                                        @DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d")
+                                        <div class="small text-muted">@DateTimeHelper.ToCentral(game.StartTime).ToString("h:mm tt")</div>
+                                    </td>
+                                    <td>
+                                        <strong>@game.BowlName</strong>
+                                        @if (game.IsPlayoff)
+                                        {
+                                            <span class="badge bg-warning text-dark ms-1">Playoff</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="@(game.TeamHomeScore > game.TeamAwayScore ? "fw-bold" : "")">
+                                            @(string.IsNullOrEmpty(game.TeamHome) ? "TBD" : game.TeamHome) 
+                                            <span class="small text-muted">(@(game.TeamHomeScore?.ToString() ?? "-"))</span>
+                                        </div>
+                                        <div class="@(game.TeamAwayScore > game.TeamHomeScore ? "fw-bold" : "")">
+                                            @(string.IsNullOrEmpty(game.TeamAway) ? "TBD" : game.TeamAway) 
+                                            <span class="small text-muted">(@(game.TeamAwayScore?.ToString() ?? "-"))</span>
+                                        </div>
+                                    </td>
+                                    <td class="fw-bold">
+                                        @if(game.Status == GameStatus.Final)
+                                        {
+                                            <span class="text-success">@winner <i class="bi bi-check-lg"></i></span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted fw-normal">-</span>
+                                        }
+                                    </td>
+                                    <td class="text-center fw-bold">
+                                        @game.PointValue
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private List<BowlGame> games = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            games = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading games: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
