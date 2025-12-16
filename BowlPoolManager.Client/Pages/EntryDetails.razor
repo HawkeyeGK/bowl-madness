@@ -58,27 +58,41 @@
                 <tbody>
                     @foreach (var game in games.OrderBy(g => g.StartTime))
                     {
-                        // LOGIC: Determine Row Color
+                        // LOGIC: Determine Row Color & Status
                         string rowClass = "";
                         string pickStatusIcon = "";
                         
                         string pick = "";
                         bool hasPick = entry.Picks.TryGetValue(game.Id, out pick);
 
-                        if (game.Status == GameStatus.Final && hasPick)
+                        if (game.Status == GameStatus.Final)
                         {
-                            var winner = game.TeamHomeScore > game.TeamAwayScore ? game.TeamHome : game.TeamAway;
-                            bool isCorrect = string.Equals(pick, winner, StringComparison.OrdinalIgnoreCase);
+                            // 1. GAME IS OVER
+                            if (hasPick)
+                            {
+                                var winner = game.TeamHomeScore > game.TeamAwayScore ? game.TeamHome : game.TeamAway;
+                                bool isCorrect = string.Equals(pick, winner, StringComparison.OrdinalIgnoreCase);
 
-                            if (isCorrect) 
-                            {
-                                rowClass = "table-success"; // Green highlight
-                                pickStatusIcon = "<i class='bi bi-check-circle-fill text-success'></i>";
+                                if (isCorrect) 
+                                {
+                                    rowClass = "table-success"; // Green highlight
+                                    pickStatusIcon = "<i class='bi bi-check-circle-fill text-success'></i>";
+                                }
+                                else 
+                                {
+                                    rowClass = "table-danger"; // Red highlight
+                                    pickStatusIcon = "<i class='bi bi-x-circle-fill text-danger'></i>";
+                                }
                             }
-                            else 
+                        }
+                        else
+                        {
+                            // 2. GAME IS FUTURE / IN-PROGRESS
+                            if (hasPick && eliminatedTeams.Contains(pick))
                             {
-                                rowClass = "table-danger"; // Red highlight
-                                pickStatusIcon = "<i class='bi bi-x-circle-fill text-danger'></i>";
+                                // Pick is DEAD (Team eliminated in previous round)
+                                rowClass = "table-danger";
+                                pickStatusIcon = "<i class='bi bi-x-circle-fill text-danger' title='Team Eliminated'></i> <span class='badge bg-danger'>Eliminated</span>";
                             }
                         }
 
@@ -95,21 +109,32 @@
                                 }
                             </td>
                             <td>
-                                <div class="@(game.TeamHomeScore > game.TeamAwayScore ? "fw-bold" : "")">
-                                    @game.TeamHome <span class="small text-muted">(@(game.TeamHomeScore?.ToString() ?? "-"))</span>
-                                </div>
-                                <div class="@(game.TeamAwayScore > game.TeamHomeScore ? "fw-bold" : "")">
-                                    @game.TeamAway <span class="small text-muted">(@(game.TeamAwayScore?.ToString() ?? "-"))</span>
-                                </div>
+                                @* MATCHUP DISPLAY LOGIC *@
+                                @if (game.IsPlayoff && string.IsNullOrEmpty(game.TeamHome) && hasPick)
+                                {
+                                    // Special Case: TBD Playoff Game. Show the user's pick as the implied participant.
+                                    <div class="fst-italic text-muted">
+                                        Needs: <strong>@pick</strong> to advance
+                                    </div>
+                                }
+                                else
+                                {
+                                    // Standard Display
+                                    <div class="@(game.TeamHomeScore > game.TeamAwayScore ? "fw-bold" : "")">
+                                        @(string.IsNullOrEmpty(game.TeamHome) ? "TBD" : game.TeamHome) 
+                                        <span class="small text-muted">(@(game.TeamHomeScore?.ToString() ?? "-"))</span>
+                                    </div>
+                                    <div class="@(game.TeamAwayScore > game.TeamHomeScore ? "fw-bold" : "")">
+                                        @(string.IsNullOrEmpty(game.TeamAway) ? "TBD" : game.TeamAway) 
+                                        <span class="small text-muted">(@(game.TeamAwayScore?.ToString() ?? "-"))</span>
+                                    </div>
+                                }
                             </td>
                             <td class="fw-bold position-relative">
                                 @if(hasPick)
                                 {
                                     @pick
-                                    @if(game.Status == GameStatus.Final)
-                                    {
-                                        <span class="ms-2">@((MarkupString)pickStatusIcon)</span>
-                                    }
+                                    <span class="ms-2">@((MarkupString)pickStatusIcon)</span>
                                 }
                                 else
                                 {
@@ -138,6 +163,9 @@
     // Stats
     private int currentScore = 0;
     private int maxPossible = 0;
+    
+    // Elimination Tracking
+    private HashSet<string> eliminatedTeams = new(StringComparer.OrdinalIgnoreCase);
 
     protected override async Task OnInitializedAsync()
     {
@@ -151,13 +179,18 @@
             games = await gamesTask ?? new();
             var allEntries = await entriesTask ?? new();
 
+            // Calculate Eliminated Teams
+            foreach (var g in games.Where(x => x.Status == GameStatus.Final))
+            {
+                if (g.TeamHomeScore < g.TeamAwayScore) eliminatedTeams.Add(g.TeamHome);
+                else if (g.TeamAwayScore < g.TeamHomeScore) eliminatedTeams.Add(g.TeamAway);
+            }
+
             // Find specific entry
             entry = allEntries.FirstOrDefault(e => e.Id == EntryId);
 
             if (entry != null)
             {
-                // Reuse Scoring Engine to get accurate "Max Possible" logic
-                // We create a single-item list to run the engine against just this user
                 var stats = ScoringEngine.Calculate(games, new List<BracketEntry> { entry }).First();
                 currentScore = stats.Score;
                 maxPossible = stats.MaxPossible;
