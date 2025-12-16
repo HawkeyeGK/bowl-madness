@@ -67,7 +67,6 @@
 
                         if (game.Status == GameStatus.Final)
                         {
-                            // 1. GAME IS OVER
                             if (hasPick)
                             {
                                 var winner = game.TeamHomeScore > game.TeamAwayScore ? game.TeamHome : game.TeamAway;
@@ -75,26 +74,28 @@
 
                                 if (isCorrect) 
                                 {
-                                    rowClass = "table-success"; // Green highlight
+                                    rowClass = "table-success";
                                     pickStatusIcon = "<i class='bi bi-check-circle-fill text-success'></i>";
                                 }
                                 else 
                                 {
-                                    rowClass = "table-danger"; // Red highlight
+                                    rowClass = "table-danger";
                                     pickStatusIcon = "<i class='bi bi-x-circle-fill text-danger'></i>";
                                 }
                             }
                         }
                         else
                         {
-                            // 2. GAME IS FUTURE / IN-PROGRESS
+                            // Future/In-Progress: Check if pick is dead
                             if (hasPick && eliminatedTeams.Contains(pick))
                             {
-                                // Pick is DEAD (Team eliminated in previous round)
                                 rowClass = "table-danger";
                                 pickStatusIcon = "<i class='bi bi-x-circle-fill text-danger' title='Team Eliminated'></i> <span class='badge bg-danger'>Eliminated</span>";
                             }
                         }
+
+                        // LOGIC: Resolve Matchup Names (Real vs Predicted)
+                        var (homeTeamName, awayTeamName) = GetDisplayTeams(game, entry);
 
                         <tr class="@rowClass">
                             <td>
@@ -109,26 +110,12 @@
                                 }
                             </td>
                             <td>
-                                @* MATCHUP DISPLAY LOGIC *@
-                                @if (game.IsPlayoff && string.IsNullOrEmpty(game.TeamHome) && hasPick)
-                                {
-                                    // Special Case: TBD Playoff Game. Show the user's pick as the implied participant.
-                                    <div class="fst-italic text-muted">
-                                        Needs: <strong>@pick</strong> to advance
-                                    </div>
-                                }
-                                else
-                                {
-                                    // Standard Display
-                                    <div class="@(game.TeamHomeScore > game.TeamAwayScore ? "fw-bold" : "")">
-                                        @(string.IsNullOrEmpty(game.TeamHome) ? "TBD" : game.TeamHome) 
-                                        <span class="small text-muted">(@(game.TeamHomeScore?.ToString() ?? "-"))</span>
-                                    </div>
-                                    <div class="@(game.TeamAwayScore > game.TeamHomeScore ? "fw-bold" : "")">
-                                        @(string.IsNullOrEmpty(game.TeamAway) ? "TBD" : game.TeamAway) 
-                                        <span class="small text-muted">(@(game.TeamAwayScore?.ToString() ?? "-"))</span>
-                                    </div>
-                                }
+                                <div class="@(game.TeamHomeScore > game.TeamAwayScore ? "fw-bold" : "")">
+                                    @homeTeamName <span class="small text-muted">@(game.TeamHomeScore?.ToString() ?? "")</span>
+                                </div>
+                                <div class="@(game.TeamAwayScore > game.TeamHomeScore ? "fw-bold" : "")">
+                                    @awayTeamName <span class="small text-muted">@(game.TeamAwayScore?.ToString() ?? "")</span>
+                                </div>
                             </td>
                             <td class="fw-bold position-relative">
                                 @if(hasPick)
@@ -164,7 +151,6 @@
     private int currentScore = 0;
     private int maxPossible = 0;
     
-    // Elimination Tracking
     private HashSet<string> eliminatedTeams = new(StringComparer.OrdinalIgnoreCase);
 
     protected override async Task OnInitializedAsync()
@@ -186,7 +172,6 @@
                 else if (g.TeamAwayScore < g.TeamHomeScore) eliminatedTeams.Add(g.TeamAway);
             }
 
-            // Find specific entry
             entry = allEntries.FirstOrDefault(e => e.Id == EntryId);
 
             if (entry != null)
@@ -204,5 +189,40 @@
         {
             isLoading = false;
         }
+    }
+
+    /// <summary>
+    /// Returns the Real teams if known, otherwise returns the User's Predicted teams from the bracket tree.
+    /// </summary>
+    private (string Home, string Away) GetDisplayTeams(BowlGame game, BracketEntry? entry)
+    {
+        string home = game.TeamHome;
+        string away = game.TeamAway;
+
+        // If specific teams are already known (e.g. Real Life has advanced them), use them.
+        // If they are empty/TBD, we fill them in with the User's predictions.
+        if (string.IsNullOrEmpty(home) || string.IsNullOrEmpty(away))
+        {
+            // Find the "Feeders" (Games that advance to this one)
+            var feeders = games.Where(g => g.NextGameId == game.Id).OrderBy(g => g.StartTime).ToList();
+            
+            if (feeders.Count >= 1 && entry != null && entry.Picks.ContainsKey(feeders[0].Id))
+            {
+                // If the real home slot is empty, show the user's pick from Feeder #1
+                if (string.IsNullOrEmpty(home)) home = entry.Picks[feeders[0].Id];
+            }
+
+            if (feeders.Count >= 2 && entry != null && entry.Picks.ContainsKey(feeders[1].Id))
+            {
+                // If the real away slot is empty, show the user's pick from Feeder #2
+                if (string.IsNullOrEmpty(away)) away = entry.Picks[feeders[1].Id];
+            }
+        }
+
+        // Fallback for visual clarity if still empty
+        if (string.IsNullOrEmpty(home)) home = "TBD";
+        if (string.IsNullOrEmpty(away)) away = "TBD";
+
+        return (home, away);
     }
 }
