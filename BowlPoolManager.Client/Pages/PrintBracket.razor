@@ -1,0 +1,193 @@
+@page "/print-bracket"
+@layout BowlPoolManager.Client.Layout.PrintLayout
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@inject HttpClient Http
+
+<PageTitle>Printable Bracket</PageTitle>
+
+@if (games == null)
+{
+    <div class="p-5 text-center">Loading Bracket...</div>
+}
+else
+{
+    <div class="text-center mb-4 no-print d-flex gap-2 justify-content-center">
+        <button class="btn btn-primary" onclick="window.print()">
+            <i class="bi bi-printer"></i> Print / Save as PDF
+        </button>
+        <a href="/" class="btn btn-outline-secondary">Back to Home</a>
+    </div>
+
+    <div class="header-section text-center mb-4 pb-2">
+        <h1 class="mb-0">Bowl Madness 2025</h1>
+        <div class="d-flex justify-content-center gap-5 mt-4">
+            <div class="input-line" style="width: 300px;">
+                <span class="label">Player Name</span>
+            </div>
+            <div class="input-line" style="width: 150px;">
+                <span class="label">Tiebreaker (Pts)</span>
+            </div>
+        </div>
+    </div>
+
+    <h4 class="section-title">Bowl Schedule</h4>
+    <div class="standard-grid mb-4">
+        @foreach (var game in GetStandardGames())
+        {
+            <div class="game-box">
+                <div class="game-meta">@FormatTime(game.StartTime) - @game.BowlName</div>
+                <div class="matchup">
+                    <span>@game.TeamHome</span>
+                    <span class="vs">vs</span>
+                    <span>@game.TeamAway</span>
+                </div>
+                <div class="winner-line">Winner: ________________</div>
+            </div>
+        }
+    </div>
+
+    <h4 class="section-title text-center mt-4">Playoff Bracket</h4>
+    <div class="bracket-container">
+        
+        <div class="round-col">
+            <div class="round-header">First Round</div>
+            @foreach (var game in GetPlayoffGames(PlayoffRound.Round1))
+            {
+                <div class="match-card">
+                    <div class="game-meta">@game.BowlName</div>
+                    <div class="team-slot">@game.TeamHome</div>
+                    <div class="team-slot">@game.TeamAway</div>
+                </div>
+            }
+        </div>
+
+        <div class="round-col">
+            <div class="round-header">Quarterfinals</div>
+            @foreach (var game in GetPlayoffGames(PlayoffRound.QuarterFinal))
+            {
+                <div class="match-card">
+                    <div class="game-meta">@game.BowlName</div>
+                    <div class="team-slot">@(string.IsNullOrEmpty(game.TeamHome) ? "R1 Winner" : game.TeamHome)</div>
+                    <div class="team-slot">@(string.IsNullOrEmpty(game.TeamAway) ? "R1 Winner" : game.TeamAway)</div>
+                </div>
+            }
+        </div>
+
+        <div class="round-col">
+            <div class="round-header">Semifinals</div>
+            @foreach (var game in GetPlayoffGames(PlayoffRound.SemiFinal))
+            {
+                <div class="match-card">
+                    <div class="game-meta">@game.BowlName</div>
+                    <div class="team-slot">QF Winner</div>
+                    <div class="team-slot">QF Winner</div>
+                </div>
+            }
+        </div>
+
+        <div class="round-col">
+            <div class="round-header">Championship</div>
+            @foreach (var game in GetPlayoffGames(PlayoffRound.Championship))
+            {
+                <div class="match-card champ-card">
+                    <div class="game-meta">@game.BowlName</div>
+                    <div class="team-slot">Semi Winner</div>
+                    <div class="team-slot">Semi Winner</div>
+                </div>
+            }
+        </div>
+
+    </div>
+}
+
+<style>
+    /* PAGE & UTILS */
+    .header-section { border-bottom: 2px solid #000; }
+    .input-line { border-bottom: 2px solid #000; position: relative; height: 30px; }
+    .input-line .label { position: absolute; bottom: -20px; left: 0; right: 0; font-size: 0.8rem; color: #666; }
+    .section-title { text-transform: uppercase; font-weight: 800; border-bottom: 1px solid #ccc; margin-bottom: 15px; }
+    
+    /* GRID LAYOUT (Standard Games) */
+    .standard-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        font-size: 0.8rem;
+    }
+    .game-box { border: 1px solid #ccc; padding: 6px; background: #fdfdfd; break-inside: avoid; }
+    .game-meta { font-size: 0.7rem; color: #666; font-weight: bold; margin-bottom: 2px; }
+    .matchup { display: flex; justify-content: space-between; font-weight: bold; }
+    .vs { color: #999; font-weight: normal; font-size: 0.7rem; margin: 0 4px; }
+    .winner-line { margin-top: 4px; color: #ccc; font-size: 0.7rem; }
+
+    /* BRACKET LAYOUT (Flexbox Tree) */
+    .bracket-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: stretch; /* Stretches columns to full height */
+        height: 500px; /* Fixed height forces vertical distribution */
+    }
+    .round-col {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around; /* The Magic: Distributes games evenly */
+        flex: 1;
+        margin: 0 5px;
+        position: relative;
+    }
+    /* Shift Round 1 slightly to align better if count mismatches */
+    .round-col:first-child { justify-content: space-evenly; }
+
+    .round-header { 
+        position: absolute; top: -25px; left: 0; right: 0; 
+        text-align: center; font-weight: bold; font-size: 0.8rem; text-transform: uppercase; 
+    }
+
+    .match-card {
+        border: 1px solid #000;
+        background: #fff;
+        padding: 4px;
+        position: relative;
+        box-shadow: 2px 2px 0 rgba(0,0,0,0.1);
+        min-height: 55px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .champ-card { border: 2px solid #000; height: 80px; }
+
+    .team-slot { border-bottom: 1px solid #eee; padding: 2px 0; font-size: 0.85rem; height: 22px; overflow: hidden; white-space: nowrap; }
+    
+    /* CONNECTORS (Visual cues) */
+    .round-col:not(:last-child) .match-card::after {
+        content: ''; position: absolute; right: -8px; top: 50%;
+        width: 8px; height: 2px; background: #000;
+    }
+    .round-col:not(:first-child) .match-card::before {
+        content: ''; position: absolute; left: -8px; top: 50%;
+        width: 8px; height: 2px; background: #000;
+    }
+
+    /* PRINT RULES */
+    @@media print {
+        .no-print { display: none !important; }
+        .standard-grid { grid-template-columns: repeat(3, 1fr); }
+        body { -webkit-print-color-adjust: exact; }
+        .bracket-container { height: auto; min-height: 600px; } /* Ensure height on paper */
+    }
+</style>
+
+@code {
+    private List<BowlGame>? games;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var allGames = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
+        games = allGames?.OrderBy(g => g.StartTime).ToList();
+    }
+
+    private List<BowlGame> GetStandardGames() => games?.Where(g => !g.IsPlayoff).ToList() ?? new();
+    private List<BowlGame> GetPlayoffGames(PlayoffRound round) => games?.Where(g => g.IsPlayoff && g.Round == round).OrderBy(g => g.StartTime).ToList() ?? new();
+    private string FormatTime(DateTime utc) => utc.ToLocalTime().ToString("MMM d, h:mm tt");
+}

@@ -1,0 +1,21 @@
+@inherits LayoutComponentBase
+
+<div class="print-container">
+    @Body
+</div>
+
+<style>
+    /* Force white background for printing */
+    body {
+        background-color: white !important;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: black;
+        margin: 0;
+        padding: 0;
+    }
+    .print-container {
+        max-width: 100%;
+        margin: 0 auto;
+        padding: 20px;
+    }
+</style>
