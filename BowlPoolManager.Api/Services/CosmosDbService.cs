@@ -17,6 +17,9 @@ namespace BowlPoolManager.Api.Services
         Task AddEntryAsync(BracketEntry entry);
         Task<List<BracketEntry>> GetEntriesAsync();
         Task<BracketEntry?> GetEntryAsync(string id);
+
+        // NEW: Get All Users
+        Task<List<UserProfile>> GetUsersAsync();
     }
 
     public class CosmosDbService : ICosmosDbService
@@ -92,6 +95,10 @@ namespace BowlPoolManager.Api.Services
                 return null;
             }
         }
+
+        // NEW: Get All Users Implementation
+        public async Task<List<UserProfile>> GetUsersAsync() => 
+            await GetListAsync<UserProfile>(Constants.DocumentTypes.UserProfile);
 
         // --- INTERNAL GENERIC HELPERS ---
 
