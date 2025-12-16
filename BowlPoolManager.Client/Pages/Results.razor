@@ -8,8 +8,8 @@
 
 <div class="container mt-4">
     <div class="text-center mb-5">
-        <h1 class="display-4 fw-bold text-primary">Game Results</h1>
-        <p class="lead text-muted">Scores & Outcomes</p>
+        <h1 class="display-4 fw-bold text-primary">Scoreboard</h1>
+        <p class="lead text-muted">Scores & Schedules</p>
     </div>
 
     @if (isLoading)
@@ -29,54 +29,76 @@
                         <thead class="table-dark">
                             <tr>
                                 <th>Date</th>
-                                <th>Bowl</th>
+                                <th>Bowl / Info</th>
                                 <th>Matchup</th>
-                                <th>Winner</th>
                                 <th class="text-center">Pts</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var game in games.OrderBy(g => g.StartTime))
                             {
-                                string winner = "-";
+                                // Determine Styling for Final Games
+                                string homeClass = "";
+                                string awayClass = "";
+                                
                                 if (game.Status == GameStatus.Final)
                                 {
-                                    winner = (game.TeamHomeScore > game.TeamAwayScore) ? game.TeamHome : game.TeamAway;
+                                    if (game.TeamHomeScore > game.TeamAwayScore)
+                                    {
+                                        homeClass = "text-success fw-bold";
+                                        awayClass = "text-danger text-opacity-75";
+                                    }
+                                    else
+                                    {
+                                        homeClass = "text-danger text-opacity-75";
+                                        awayClass = "text-success fw-bold";
+                                    }
+                                }
+                                else
+                                {
+                                    // Future Games: Bold the seeded/known teams, standard for TBD
+                                    homeClass = string.IsNullOrEmpty(game.TeamHome) ? "text-muted fst-italic" : "fw-bold";
+                                    awayClass = string.IsNullOrEmpty(game.TeamAway) ? "text-muted fst-italic" : "fw-bold";
                                 }
 
                                 <tr>
-                                    <td>
+                                    <td style="width: 15%">
                                         @DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d")
                                         <div class="small text-muted">@DateTimeHelper.ToCentral(game.StartTime).ToString("h:mm tt")</div>
                                     </td>
-                                    <td>
+
+                                    <td style="width: 25%">
                                         <strong>@game.BowlName</strong>
                                         @if (game.IsPlayoff)
                                         {
                                             <span class="badge bg-warning text-dark ms-1">Playoff</span>
                                         }
+                                        <div class="small text-muted mt-1">
+                                            <i class="bi bi-geo-alt"></i> @game.Location
+                                            <span class="mx-1">•</span>
+                                            <i class="bi bi-tv"></i> @game.Television
+                                        </div>
                                     </td>
+
                                     <td>
-                                        <div class="@(game.TeamHomeScore > game.TeamAwayScore ? "fw-bold" : "")">
-                                            @(string.IsNullOrEmpty(game.TeamHome) ? "TBD" : game.TeamHome) 
-                                            <span class="small text-muted">(@(game.TeamHomeScore?.ToString() ?? "-"))</span>
+                                        <div class="@homeClass d-flex justify-content-between" style="max-width: 300px;">
+                                            <span>@(string.IsNullOrEmpty(game.TeamHome) ? "TBD" : game.TeamHome)</span>
+                                            @if(game.TeamHomeScore.HasValue)
+                                            {
+                                                <span>- @game.TeamHomeScore</span>
+                                            }
                                         </div>
-                                        <div class="@(game.TeamAwayScore > game.TeamHomeScore ? "fw-bold" : "")">
-                                            @(string.IsNullOrEmpty(game.TeamAway) ? "TBD" : game.TeamAway) 
-                                            <span class="small text-muted">(@(game.TeamAwayScore?.ToString() ?? "-"))</span>
+
+                                        <div class="@awayClass d-flex justify-content-between mt-1" style="max-width: 300px;">
+                                            <span>@(string.IsNullOrEmpty(game.TeamAway) ? "TBD" : game.TeamAway)</span>
+                                            @if(game.TeamAwayScore.HasValue)
+                                            {
+                                                <span>- @game.TeamAwayScore</span>
+                                            }
                                         </div>
                                     </td>
-                                    <td class="fw-bold">
-                                        @if(game.Status == GameStatus.Final)
-                                        {
-                                            <span class="text-success">@winner <i class="bi bi-check-lg"></i></span>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted fw-normal">-</span>
-                                        }
-                                    </td>
-                                    <td class="text-center fw-bold">
+
+                                    <td class="text-center fw-bold fs-5">
                                         @game.PointValue
                                     </td>
                                 </tr>
