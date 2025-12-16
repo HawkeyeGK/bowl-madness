@@ -109,5 +109,58 @@ namespace BowlPoolManager.Api.Functions
             return response;
         }
 
+        // NEW: Toggle User Status (Disable/Enable)
+        [Function("ToggleUserStatus")]
+        public async Task<HttpResponseData> ToggleUserStatus([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+        {
+            _logger.LogInformation("Toggling user status.");
+
+            try
+            {
+                // 1. Authenticate & Authorize SuperAdmin
+                var principal = SecurityHelper.ParseSwaHeader(req);
+                if (principal == null || string.IsNullOrEmpty(principal.UserId)) 
+                {
+                    return req.CreateResponse(HttpStatusCode.Unauthorized);
+                }
+
+                var currentUser = await _cosmosService.GetUserAsync(principal.UserId);
+                if (currentUser == null || currentUser.AppRole != Constants.Roles.SuperAdmin)
+                {
+                    return req.CreateResponse(HttpStatusCode.Forbidden);
+                }
+
+                // 2. Parse Request
+                var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+                var targetUserId = query["userId"];
+                
+                if (string.IsNullOrEmpty(targetUserId))
+                {
+                    return req.CreateResponse(HttpStatusCode.BadRequest);
+                }
+
+                // 3. Update Target User
+                var targetUser = await _cosmosService.GetUserAsync(targetUserId);
+                if (targetUser == null)
+                {
+                    return req.CreateResponse(HttpStatusCode.NotFound);
+                }
+
+                // Toggle logic: If disabled, enable. If enabled, disable.
+                targetUser.IsDisabled = !targetUser.IsDisabled;
+
+                await _cosmosService.UpsertUserAsync(targetUser);
+
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(targetUser);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ToggleUserStatus failed.");
+                return req.CreateResponse(HttpStatusCode.InternalServerError);
+            }
+        }
+
     }
 }
