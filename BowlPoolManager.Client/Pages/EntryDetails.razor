@@ -199,27 +199,39 @@
         string home = game.TeamHome;
         string away = game.TeamAway;
 
-        // If specific teams are already known (e.g. Real Life has advanced them), use them.
-        // If they are empty/TBD, we fill them in with the User's predictions.
-        if (string.IsNullOrEmpty(home) || string.IsNullOrEmpty(away))
+        // If specific teams are already known (Real Life), use them.
+        // If slots are empty, we fill them with the User's predictions from previous rounds.
+        if ((string.IsNullOrEmpty(home) || string.IsNullOrEmpty(away)) && entry != null)
         {
-            // Find the "Feeders" (Games that advance to this one)
-            var feeders = games.Where(g => g.NextGameId == game.Id).OrderBy(g => g.StartTime).ToList();
+            // 1. Find the "Feeder Games" (Games that advance to this one)
+            var feeders = games
+                .Where(g => g.NextGameId == game.Id)
+                .OrderBy(g => g.StartTime) // Assumes standard bracket ordering (Top/Bottom)
+                .ToList();
             
-            if (feeders.Count >= 1 && entry != null && entry.Picks.ContainsKey(feeders[0].Id))
+            // 2. Gather the user's winners from those feeder games into a Queue
+            var predictedWinners = new Queue<string>();
+            foreach (var feeder in feeders)
             {
-                // If the real home slot is empty, show the user's pick from Feeder #1
-                if (string.IsNullOrEmpty(home)) home = entry.Picks[feeders[0].Id];
+                if (entry.Picks.TryGetValue(feeder.Id, out var winner))
+                {
+                    predictedWinners.Enqueue(winner);
+                }
             }
 
-            if (feeders.Count >= 2 && entry != null && entry.Picks.ContainsKey(feeders[1].Id))
+            // 3. Fill the Empty Slots
+            if (string.IsNullOrEmpty(home) && predictedWinners.Count > 0)
             {
-                // If the real away slot is empty, show the user's pick from Feeder #2
-                if (string.IsNullOrEmpty(away)) away = entry.Picks[feeders[1].Id];
+                home = predictedWinners.Dequeue();
+            }
+
+            if (string.IsNullOrEmpty(away) && predictedWinners.Count > 0)
+            {
+                away = predictedWinners.Dequeue();
             }
         }
 
-        // Fallback for visual clarity if still empty
+        // Fallback for visual clarity if we still don't have a name
         if (string.IsNullOrEmpty(home)) home = "TBD";
         if (string.IsNullOrEmpty(away)) away = "TBD";
 
