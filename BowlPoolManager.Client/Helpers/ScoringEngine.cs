@@ -67,7 +67,6 @@ namespace BowlPoolManager.Client.Helpers
                             // Banked points count towards max
                             maxPossible += game.PointValue; 
                         }
-                        // If picked wrong, points are lost forever (do not add to maxPossible)
                     }
                     else
                     {
@@ -90,12 +89,15 @@ namespace BowlPoolManager.Client.Helpers
                 });
             }
 
-            // Sort by Score Descending, then Name
+            // UPDATED SORT ORDER: Total -> Max Potential -> Name
             var sortedRows = rows.OrderByDescending(r => r.Score)
+                                 .ThenByDescending(r => r.MaxPossible)
                                  .ThenBy(r => r.Entry.PlayerName)
                                  .ToList();
 
             // Assign Ranks
+            // Note: Ranks are still tied based on CURRENT SCORE only.
+            // This means visual order might differ from rank number (which is standard).
             int rank = 1;
             for (int i = 0; i < sortedRows.Count; i++)
             {
