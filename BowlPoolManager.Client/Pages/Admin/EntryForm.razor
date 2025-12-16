@@ -1,4 +1,5 @@
 @page "/admin/entry"
+@page "/admin/entry/{EntryId}"
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
 @using Microsoft.AspNetCore.Authorization
@@ -8,17 +9,17 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 
-<PageTitle>Add Bracket Entry</PageTitle>
+<PageTitle>@(string.IsNullOrEmpty(EntryId) ? "New" : "Edit") Bracket Entry</PageTitle>
 
 <div class="container mt-4 pb-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1><i class="bi bi-pencil-square"></i> New Bracket Entry</h1>
+        <h1><i class="bi bi-pencil-square"></i> @(string.IsNullOrEmpty(EntryId) ? "New" : "Edit") Bracket Entry</h1>
         <a href="/admin/dashboard" class="btn btn-outline-secondary">Back to Dashboard</a>
     </div>
 
-    @if (games == null)
+    @if (games == null || isLoading)
     {
-        <div class="alert alert-info">Loading Schedule...</div>
+        <div class="alert alert-info">Loading...</div>
     }
     else
     {
@@ -73,7 +74,7 @@
                                     <div class="col-md-6 col-lg-4">
                                         <div class="p-2 border rounded bg-light h-100">
                                             <div class="small fw-bold text-muted mb-1">@game.BowlName</div>
-                                            
+                                             
                                             @{
                                                 var options = GetTeamsForGame(game);
                                             }
@@ -119,7 +120,7 @@
             </div>
 
             <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-5">
-                <button type="button" class="btn btn-secondary me-2" @onclick="ResetForm">Clear Form</button>
+                <button type="button" class="btn btn-secondary me-2" @onclick="ResetForm">Clear / Reset</button>
                 <button type="submit" class="btn btn-success btn-lg px-5">
                     <i class="bi bi-save"></i> Save Entry
                 </button>
@@ -130,25 +131,48 @@
 </div>
 
 @code {
+    [Parameter]
+    public string? EntryId { get; set; }
+
     private List<BowlGame>? games;
     private BracketEntry entry = new BracketEntry();
     private string? statusMessage;
     private string? errorMessage;
+    private bool isLoading = true;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadGames();
+        await LoadData();
     }
 
-    private async Task LoadGames()
+    private async Task LoadData()
     {
         try
         {
+            isLoading = true;
             games = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
+
+            if (!string.IsNullOrEmpty(EntryId))
+            {
+                var existingEntry = await Http.GetFromJsonAsync<BracketEntry>($"api/GetEntry?id={EntryId}");
+                if (existingEntry != null)
+                {
+                    entry = existingEntry;
+                }
+                else
+                {
+                    errorMessage = "Entry not found.";
+                }
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading games: {ex.Message}");
+            Console.WriteLine($"Error loading data: {ex.Message}");
+            errorMessage = $"Error loading data: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
         }
     }
 
@@ -185,8 +209,7 @@
     private List<string> GetTeamsForGame(BowlGame game)
     {
         var teams = new List<string>();
-
-        // 1. Static Teams: Always check the game record itself. 
+        // 1. Static Teams: Always check the game record itself.
         // This handles Standard games, Round 1, AND the "Bye" teams in Round 2.
         if (!string.IsNullOrEmpty(game.TeamHome)) teams.Add(game.TeamHome);
         if (!string.IsNullOrEmpty(game.TeamAway)) teams.Add(game.TeamAway);
@@ -196,7 +219,6 @@
         {
             // Find any game that points to THIS game's ID
             var feederGames = games.Where(g => g.NextGameId == game.Id).ToList();
-            
             foreach (var feeder in feederGames)
             {
                 // If we have picked a winner for that feeder game, add them to the list
@@ -228,7 +250,13 @@
             if (response.IsSuccessStatusCode)
             {
                 statusMessage = $"Entry for {entry.PlayerName} saved successfully!";
-                ResetForm();
+                
+                // If we are in "Add" mode, reset. If "Edit", maybe stay?
+                // For now, if adding new, reset to allow rapid entry.
+                if (string.IsNullOrEmpty(EntryId))
+                {
+                    ResetForm();
+                }
             }
             else
             {
@@ -245,7 +273,10 @@
     {
         // Keep the games loaded, but reset the entry
         entry = new BracketEntry();
-        // Clear status after a short delay so they see the success message? 
-        // No, keep it simple.
+        // If we were editing, we effectively just cleared the edit.
+        if (!string.IsNullOrEmpty(EntryId))
+        {
+            Nav.NavigateTo("/admin/dashboard");
+        }
     }
 }
