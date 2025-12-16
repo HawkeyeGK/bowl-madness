@@ -11,8 +11,14 @@
         </a>
     </Authorized>
     <NotAuthorized>
-        <a href="/.auth/login/aad" class="btn btn-sm btn-primary">
-            <i class="bi bi-person-circle"></i> Log in
+        <span class="me-2 text-muted small">Log in with:</span>
+        
+        <a href="/.auth/login/aad" class="btn btn-sm btn-outline-primary me-1" title="Log in with Microsoft">
+            <i class="bi bi-microsoft"></i> Microsoft
+        </a>
+        
+        <a href="/.auth/login/google" class="btn btn-sm btn-outline-danger" title="Log in with Google">
+            <i class="bi bi-google"></i> Google
         </a>
     </NotAuthorized>
 </AuthorizeView>
