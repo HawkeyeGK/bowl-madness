@@ -43,12 +43,8 @@
                         <tbody>
                             @foreach (var row in leaderboard)
                             {
-                                <tr class="@(row.Rank == 1 ? "table-warning fw-bold" : "")">
+                                <tr>
                                     <td class="ps-4">
-                                        @if (row.Rank == 1)
-                                        {
-                                            <i class="bi bi-trophy-fill text-warning me-1"></i>
-                                        }
                                         @row.Rank
                                     </td>
                                     <td>@row.Entry.PlayerName</td>
