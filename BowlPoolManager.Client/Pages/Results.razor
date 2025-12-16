@@ -4,7 +4,7 @@
 @using BowlPoolManager.Client.Helpers
 @inject HttpClient Http
 
-<PageTitle>Game Results</PageTitle>
+<PageTitle>Scoreboard</PageTitle>
 
 <div class="container mt-4">
     <div class="text-center mb-5">
@@ -30,7 +30,7 @@
                             <tr>
                                 <th>Date</th>
                                 <th>Bowl / Info</th>
-                                <th>Matchup</th>
+                                <th class="text-center">Result</th>
                                 <th class="text-center">Pts</th>
                             </tr>
                         </thead>
@@ -67,7 +67,7 @@
                                         <div class="small text-muted">@DateTimeHelper.ToCentral(game.StartTime).ToString("h:mm tt")</div>
                                     </td>
 
-                                    <td style="width: 25%">
+                                    <td style="width: 30%">
                                         <strong>@game.BowlName</strong>
                                         @if (game.IsPlayoff)
                                         {
@@ -75,26 +75,28 @@
                                         }
                                         <div class="small text-muted mt-1">
                                             <i class="bi bi-geo-alt"></i> @game.Location
-                                            <span class="mx-1">•</span>
+                                            <span class="mx-1">&bull;</span>
                                             <i class="bi bi-tv"></i> @game.Television
                                         </div>
                                     </td>
 
-                                    <td>
-                                        <div class="@homeClass d-flex justify-content-between" style="max-width: 300px;">
-                                            <span>@(string.IsNullOrEmpty(game.TeamHome) ? "TBD" : game.TeamHome)</span>
-                                            @if(game.TeamHomeScore.HasValue)
-                                            {
-                                                <span>- @game.TeamHomeScore</span>
-                                            }
-                                        </div>
+                                    <td class="text-center">
+                                        <div class="mx-auto" style="max-width: 260px;">
+                                            <div class="@homeClass d-flex justify-content-between">
+                                                <span>@(string.IsNullOrEmpty(game.TeamHome) ? "TBD" : game.TeamHome)</span>
+                                                @if(game.TeamHomeScore.HasValue)
+                                                {
+                                                    <span>@game.TeamHomeScore</span>
+                                                }
+                                            </div>
 
-                                        <div class="@awayClass d-flex justify-content-between mt-1" style="max-width: 300px;">
-                                            <span>@(string.IsNullOrEmpty(game.TeamAway) ? "TBD" : game.TeamAway)</span>
-                                            @if(game.TeamAwayScore.HasValue)
-                                            {
-                                                <span>- @game.TeamAwayScore</span>
-                                            }
+                                            <div class="@awayClass d-flex justify-content-between mt-1">
+                                                <span>@(string.IsNullOrEmpty(game.TeamAway) ? "TBD" : game.TeamAway)</span>
+                                                @if(game.TeamAwayScore.HasValue)
+                                                {
+                                                    <span>@game.TeamAwayScore</span>
+                                                }
+                                            </div>
                                         </div>
                                     </td>
 
