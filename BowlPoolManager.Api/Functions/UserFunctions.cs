@@ -81,5 +81,33 @@ namespace BowlPoolManager.Api.Functions
             }
         }
 
+        [Function("GetUsers")]
+        public async Task<HttpResponseData> GetUsers([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
+        {
+            _logger.LogInformation("Getting all users.");
+
+            // 1. Authenticate
+            var principal = SecurityHelper.ParseSwaHeader(req);
+            if (principal == null || string.IsNullOrEmpty(principal.UserId))
+            {
+                return req.CreateResponse(HttpStatusCode.Unauthorized);
+            }
+
+            // 2. Authorize (SuperAdmin Only)
+            var currentUser = await _cosmosService.GetUserAsync(principal.UserId);
+            if (currentUser == null || currentUser.AppRole != Constants.Roles.SuperAdmin)
+            {
+                _logger.LogWarning($"User {principal.UserId} attempted to access user list without SuperAdmin rights.");
+                return req.CreateResponse(HttpStatusCode.Forbidden);
+            }
+
+            // 3. Fetch Data
+            var users = await _cosmosService.GetUsersAsync();
+            
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            await response.WriteAsJsonAsync(users);
+            return response;
+        }
+
     }
 }
