@@ -98,5 +98,39 @@ namespace BowlPoolManager.Api.Functions
                 return req.CreateResponse(HttpStatusCode.InternalServerError);
             }
         }
+
+        // NEW: Delete Endpoint
+        [Function("DeleteEntry")]
+        public async Task<HttpResponseData> DeleteEntry([HttpTrigger(AuthorizationLevel.Anonymous, "delete")] HttpRequestData req)
+        {
+            _logger.LogInformation("Deleting a bracket entry.");
+
+            try
+            {
+                // Security Check (SuperAdmin Only)
+                var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
+                if (!authResult.IsValid)
+                {
+                    return authResult.ErrorResponse!;
+                }
+
+                var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+                var id = query["id"];
+
+                if (string.IsNullOrEmpty(id))
+                {
+                    return req.CreateResponse(HttpStatusCode.BadRequest);
+                }
+
+                await _cosmosService.DeleteEntryAsync(id);
+
+                return req.CreateResponse(HttpStatusCode.OK);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DeleteEntry failed.");
+                return req.CreateResponse(HttpStatusCode.InternalServerError);
+            }
+        }
     }
 }

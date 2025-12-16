@@ -20,6 +20,9 @@ namespace BowlPoolManager.Api.Services
 
         // NEW: Get All Users
         Task<List<UserProfile>> GetUsersAsync();
+
+        // NEW: Delete Entry
+        Task DeleteEntryAsync(string id);
     }
 
     public class CosmosDbService : ICosmosDbService
@@ -99,6 +102,14 @@ namespace BowlPoolManager.Api.Services
         // NEW: Get All Users Implementation
         public async Task<List<UserProfile>> GetUsersAsync() => 
             await GetListAsync<UserProfile>(Constants.DocumentTypes.UserProfile);
+
+        // NEW: Delete Implementation
+        public async Task DeleteEntryAsync(string id)
+        {
+            if (_container == null) throw new InvalidOperationException("Database connection not initialized.");
+            // PartitionKey is /id
+            await _container.DeleteItemAsync<BracketEntry>(id, new PartitionKey(id));
+        }
 
         // --- INTERNAL GENERIC HELPERS ---
 
