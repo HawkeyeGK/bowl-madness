@@ -1,105 +1,353 @@
-@page "/admin/entries/new"
-@page "/admin/entries/edit/{Id}"
+@page "/admin/entry"
+@page "/admin/entry/{EntryId}"
 @using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@using Microsoft.AspNetCore.Authorization
 @using System.Net.Http.Json
+@using System.Text.Json
+@attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
 @inject HttpClient Http
 @inject NavigationManager Nav
-@inject IJSRuntime JS
+@inject IJSRuntime JS 
 
-<h3>@(string.IsNullOrEmpty(Id) ? "New Entry" : "Edit Entry")</h3>
+<PageTitle>@(string.IsNullOrEmpty(EntryId) ? "New" : "Edit") Bracket Entry</PageTitle>
 
-@if (Entry == null)
-{
-    <p>Loading...</p>
-}
-else
-{
-    <EditForm Model="Entry" OnValidSubmit="SaveEntry">
-        <DataAnnotationsValidator />
+<div class="container mt-4 pb-5 position-relative">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-pencil-square"></i> @(string.IsNullOrEmpty(EntryId) ? "New" : "Edit") Bracket Entry</h1>
+        <a href="/admin/dashboard" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+
+    @if (games == null || isLoading)
+    {
+        <div class="alert alert-info">Loading...</div>
+    }
+    else
+    {
+        <EditForm Model="@entry" OnValidSubmit="HandleSave">
+            <DataAnnotationsValidator />
+            
+            @if (!string.IsNullOrEmpty(statusMessage) && string.IsNullOrEmpty(EntryId))
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    @statusMessage
+                    <button type="button" class="btn-close" @onclick="() => statusMessage = null"></button>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">@errorMessage</div>
+            }
+
+            @* PLAYER INFO *@
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-primary text-white">Player Details</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Player Name</label>
+                            <InputText class="form-control" @bind-Value="entry.PlayerName" placeholder="e.g. John Doe" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Tiebreaker (Total Points in Championship)</label>
+                            <InputNumber class="form-control" @bind-Value="entry.TieBreakerPoints" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* PLAYOFF BRACKET *@
+            <div class="card mb-4 shadow-sm border-warning">
+                <div class="card-header bg-warning text-dark fw-bold">
+                    <i class="bi bi-trophy"></i> Playoff Bracket
+                </div>
+                <div class="card-body">
+                    @foreach (var round in new[] { PlayoffRound.Round1, PlayoffRound.QuarterFinal, PlayoffRound.SemiFinal, PlayoffRound.Championship })
+                    {
+                        var roundGames = games.Where(g => g.IsPlayoff && g.Round == round).OrderBy(g => g.StartTime).ToList();
+                        if (roundGames.Any())
+                        {
+                            <h5 class="mt-3 border-bottom pb-2">@GetRoundName(round)</h5>
+                            <div class="row g-3">
+                                @foreach (var game in roundGames)
+                                {
+                                    <div class="col-md-6 col-lg-4">
+                                        <div class="p-2 border rounded bg-light h-100">
+                                            <div class="small fw-bold text-muted mb-1">@game.BowlName</div>
+                                              
+                                            @{
+                                                var options = GetTeamsForGame(game);
+                                            }
+
+                                            <select class="form-select" value="@GetPick(game.Id)" @onchange="@(e => UpdatePick(game.Id, e.Value?.ToString()))">
+                                                <option value="">-- Select Winner --</option>
+                                                @foreach (var team in options)
+                                                {
+                                                    <option value="@team">@team</option>
+                                                }
+                                            </select>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            @* STANDARD GAMES *@
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-secondary text-white">Standard Bowl Games</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        @foreach (var game in games.Where(g => !g.IsPlayoff).OrderBy(g => g.StartTime))
+                        {
+                            <div class="col-md-6 col-lg-4">
+                                <div class="p-2 border rounded h-100">
+                                    <div class="small fw-bold text-muted mb-1">@game.BowlName</div>
+                                    <div class="small text-secondary mb-2">@game.TeamHome vs @game.TeamAway</div>
+                                    
+                                    <select class="form-select" value="@GetPick(game.Id)" @onchange="@(e => UpdatePick(game.Id, e.Value?.ToString()))">
+                                        <option value="">-- Select Winner --</option>
+                                        @if (!string.IsNullOrEmpty(game.TeamHome)) { <option value="@game.TeamHome">@game.TeamHome</option> }
+                                        @if (!string.IsNullOrEmpty(game.TeamAway)) { <option value="@game.TeamAway">@game.TeamAway</option> }
+                                    </select>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-5">
+                <button type="button" class="btn btn-secondary me-2" @onclick="ResetForm" disabled="@isSaving">
+                    Clear / Reset
+                </button>
+                
+                @* NEW: Delete Button (Only in Edit Mode) *@
+                @if (!string.IsNullOrEmpty(EntryId))
+                {
+                    <button type="button" class="btn btn-danger me-2" @onclick="DeleteEntry" disabled="@isSaving">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                }
+
+                <button type="submit" class="btn btn-success btn-lg px-5" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-save"></i> <span>Save Entry</span>
+                    }
+                </button>
+            </div>
+
+        </EditForm>
         
-        <div class="mb-3">
-            <label class="form-label">Player Name</label>
-            <InputText @bind-Value="Entry.PlayerName" class="form-control" />
-        </div>
-
-        <div class="mb-3">
-            <label class="form-label">Tie Breaker Points</label>
-            <InputNumber @bind-Value="Entry.TieBreakerPoints" class="form-control" />
-        </div>
-        
-        <div class="alert alert-info">
-            To edit specific picks, please use the "My Picks" interface or a dedicated Pick Editor.
-        </div>
-
-        <button type="submit" class="btn btn-primary">Save</button>
-        <button type="button" class="btn btn-secondary" @onclick="Cancel">Cancel</button>
-
-        @if (!string.IsNullOrEmpty(Id))
+        @if (showToast)
         {
-            <button type="button" class="btn btn-danger ms-2" @onclick="DeleteEntry">Delete</button>
+            <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1050">
+                <div class="toast show align-items-center text-white bg-success border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body fs-6">
+                             <i class="bi bi-check-circle-fill me-2"></i> @toastMessage
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" @onclick="() => showToast = false"></button>
+                    </div>
+                </div>
+            </div>
         }
-    </EditForm>
-}
+    }
+</div>
 
 @code {
-    [Parameter] public string? Id { get; set; }
-    private BracketEntry? Entry { get; set; }
+    [Parameter]
+    public string? EntryId { get; set; }
+
+    private List<BowlGame>? games;
+    private BracketEntry entry = new BracketEntry();
+    private string? statusMessage;
+    private string? errorMessage;
+    private bool isLoading = true;
+    
+    // UX State
+    private bool isSaving = false;
+    private bool showToast = false;
+    private string toastMessage = "";
 
     protected override async Task OnInitializedAsync()
     {
-        if (string.IsNullOrEmpty(Id))
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
         {
-            Entry = new BracketEntry();
+            isLoading = true;
+            games = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
+
+            if (!string.IsNullOrEmpty(EntryId))
+            {
+                var existingEntry = await Http.GetFromJsonAsync<BracketEntry>($"api/GetEntry?id={EntryId}");
+                if (existingEntry != null)
+                {
+                    entry = existingEntry;
+                }
+                else
+                {
+                    errorMessage = "Entry not found.";
+                }
+            }
         }
-        else
+        catch (Exception ex)
         {
-            // Edit Mode: Fetch existing
-            try 
-            {
-                Entry = await Http.GetFromJsonAsync<BracketEntry>($"api/GetEntry?id={Id}");
-            }
-            catch
-            {
-                // Handle not found
-                Nav.NavigateTo("/admin/dashboard");
-            }
+            Console.WriteLine($"Error loading data: {ex.Message}");
+            errorMessage = $"Error loading data: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
         }
     }
 
-    private async Task SaveEntry()
+    private string GetRoundName(PlayoffRound round) => round switch
     {
-        var response = await Http.PostAsJsonAsync("api/SaveEntry", Entry);
-        if (response.IsSuccessStatusCode)
+        PlayoffRound.Round1 => "First Round",
+        PlayoffRound.QuarterFinal => "Quarterfinals",
+        PlayoffRound.SemiFinal => "Semifinals",
+        PlayoffRound.Championship => "National Championship",
+        _ => "Playoffs"
+    };
+
+    private string GetPick(string gameId)
+    {
+        return entry.Picks.ContainsKey(gameId) ? entry.Picks[gameId] : "";
+    }
+
+    private void UpdatePick(string gameId, string? selection)
+    {
+        if (string.IsNullOrEmpty(selection))
         {
-            Nav.NavigateTo("/admin/dashboard");
+            if (entry.Picks.ContainsKey(gameId)) entry.Picks.Remove(gameId);
         }
         else
         {
-            await JS.InvokeVoidAsync("alert", "Error saving entry.");
+            entry.Picks[gameId] = selection;
         }
+        StateHasChanged();
     }
 
-    private async Task DeleteEntry()
+    private List<string> GetTeamsForGame(BowlGame game)
     {
-        if (Entry == null) return;
+        var teams = new List<string>();
+        if (!string.IsNullOrEmpty(game.TeamHome)) teams.Add(game.TeamHome);
+        if (!string.IsNullOrEmpty(game.TeamAway)) teams.Add(game.TeamAway);
 
-        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete the entry for {Entry.PlayerName}?");
-        if (confirmed)
+        if (game.IsPlayoff && games != null)
         {
-            var response = await Http.DeleteAsync($"api/DeleteEntry?id={Entry.Id}");
+            var feederGames = games.Where(g => g.NextGameId == game.Id).ToList();
+            foreach (var feeder in feederGames)
+            {
+                if (entry.Picks.TryGetValue(feeder.Id, out var winnerOfFeeder))
+                {
+                    teams.Add(winnerOfFeeder);
+                }
+            }
+        }
+        return teams.Distinct().ToList();
+    }
+
+    private async Task HandleSave()
+    {
+        statusMessage = null;
+        errorMessage = null;
+        showToast = false;
+
+        if (string.IsNullOrWhiteSpace(entry.PlayerName))
+        {
+            errorMessage = "Player Name is required.";
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/SaveEntry", entry);
             if (response.IsSuccessStatusCode)
             {
-                Nav.NavigateTo("/admin/dashboard");
+                toastMessage = "Changes saved successfully!";
+                showToast = true;
+                
+                if (string.IsNullOrEmpty(EntryId))
+                {
+                    statusMessage = $"Entry for {entry.PlayerName} saved!";
+                    ResetForm();
+                }
+
+                _ = Task.Delay(3000).ContinueWith(t => 
+                {
+                    showToast = false;
+                    InvokeAsync(StateHasChanged);
+                });
             }
             else
             {
-                await JS.InvokeVoidAsync("alert", "Error deleting entry.");
+                errorMessage = "Failed to save entry. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    // NEW: Delete Implementation
+    private async Task DeleteEntry()
+    {
+        if (string.IsNullOrEmpty(EntryId)) return;
+
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete the entry for {entry.PlayerName}?");
+        if (confirmed)
+        {
+            isSaving = true;
+            try
+            {
+                var response = await Http.DeleteAsync($"api/DeleteEntry?id={EntryId}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Nav.NavigateTo("/admin/dashboard");
+                }
+                else
+                {
+                    errorMessage = "Error deleting entry. Please check the logs.";
+                }
+            }
+            catch(Exception ex)
+            {
+                errorMessage = $"Error: {ex.Message}";
+            }
+            finally
+            {
+                isSaving = false;
             }
         }
     }
 
-    private void Cancel()
+    private void ResetForm()
     {
-        Nav.NavigateTo("/admin/dashboard");
+        entry = new BracketEntry();
+        if (!string.IsNullOrEmpty(EntryId))
+        {
+            Nav.NavigateTo("/admin/dashboard");
+        }
     }
 }

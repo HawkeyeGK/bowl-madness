@@ -1,8 +1,8 @@
 @page "/entry/{EntryId}"
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
-@using BowlPoolManager.Client.Helpers
 @using BowlPoolManager.Core.Helpers
+@using BowlPoolManager.Client.Helpers
 @inject HttpClient Http
 
 <div class="container mt-4">
@@ -35,7 +35,8 @@
                         @* NEW: Edit Button for Admins *@
                         <AuthorizeView Roles="@Constants.Roles.SuperAdmin">
                             <Authorized>
-                                <a href="admin/entry/@entry.Id" class="btn btn-warning btn-sm shadow-sm">
+                                @* FIX: Added leading slash to href to ensure absolute path *@
+                                <a href="/admin/entry/@entry.Id" class="btn btn-warning btn-sm shadow-sm">
                                     <i class="bi bi-pencil-square"></i> Edit Picks
                                 </a>
                             </Authorized>
@@ -105,8 +106,8 @@
                             // Future/In-Progress: Check if pick is dead
                             if (hasPick && eliminatedTeams.Contains(pick))
                             {
-                                rowClass = "table-danger";
-                                pickStatusIcon = "<i class='bi bi-x-circle-fill text-danger' title='Team Eliminated'></i> <span class='badge bg-danger'>Eliminated</span>";
+                                 rowClass = "table-danger";
+                                 pickStatusIcon = "<i class='bi bi-x-circle-fill text-danger' title='Team Eliminated'></i> <span class='badge bg-danger'>Eliminated</span>";
                             }
                         }
 
@@ -224,7 +225,7 @@
                 .Where(g => g.NextGameId == game.Id)
                 .OrderBy(g => g.StartTime) // Assumes standard bracket ordering (Top/Bottom)
                 .ToList();
-            
+
             // 2. Gather the user's winners from those feeder games into a Queue
             var predictedWinners = new Queue<string>();
             foreach (var feeder in feeders)
