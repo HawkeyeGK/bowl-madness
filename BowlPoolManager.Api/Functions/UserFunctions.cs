@@ -5,10 +5,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using BowlPoolManager.Api.Services;
 using BowlPoolManager.Core.Domain;
-using BowlPoolManager.Core; // Added reference
+using BowlPoolManager.Core;
 using System.Text.Json;
-using System.Text;
-using BowlPoolManager.Api.Helpers; // Added reference
+using BowlPoolManager.Api.Helpers;
 
 namespace BowlPoolManager.Api.Functions
 {
@@ -25,46 +24,45 @@ namespace BowlPoolManager.Api.Functions
             _configuration = configuration;
         }
 
-        [Function("SyncUser")]
-        public async Task<HttpResponseData> SyncUser([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "user/sync")] HttpRequestData req)
+        [Function("GetMe")]
+        public async Task<HttpResponseData> GetMe([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
-            _logger.LogInformation("Syncing user profile.");
+            _logger.LogInformation("Getting current user profile (GetMe).");
 
             try 
             {
                 // 1. Get Identity from SWA Header
-                // 1. Get Identity from SWA Header
                 var principal = SecurityHelper.ParseSwaHeader(req);
                 if (principal == null || string.IsNullOrEmpty(principal.UserId))
                 {
-                    _logger.LogWarning("No SWA Principal found.");
+                    // If running locally without emulation, this might be null
                     return req.CreateResponse(HttpStatusCode.Unauthorized);
                 }
 
                 // 2. Check if User exists in DB
-                // This line will throw if DB connection is bad
                 var user = await _cosmosService.GetUserAsync(principal.UserId);
 
                 if (user == null)
                 {
+                    // First time seeing this user: Create Profile
                     user = new UserProfile
                     {
                         Id = principal.UserId,
                         Email = principal.UserDetails ?? string.Empty,
                         DisplayName = principal.UserDetails ?? string.Empty,
-                        // UPDATED: Using Constants
                         AppRole = Constants.Roles.Player
                     };
 
+                    // Bootstrap Check: Is this the main admin defined in settings?
                     var bootstrapEmail = _configuration["BootstrapAdminEmail"];
-
-                    if (!string.IsNullOrEmpty(bootstrapEmail) && user.Email.Equals(bootstrapEmail, StringComparison.OrdinalIgnoreCase))
+                    if (!string.IsNullOrEmpty(bootstrapEmail) && 
+                        user.Email.Equals(bootstrapEmail, StringComparison.OrdinalIgnoreCase))
                     {
-                        // UPDATED: Using Constants
                         user.AppRole = Constants.Roles.SuperAdmin;
                     }
 
                     await _cosmosService.UpsertUserAsync(user);
+                    _logger.LogInformation($"Created new user: {user.Email}");
                 }
 
                 var response = req.CreateResponse(HttpStatusCode.OK);
@@ -73,11 +71,8 @@ namespace BowlPoolManager.Api.Functions
             }
             catch (Exception ex)
             {
-                // DEBUGGING: Return the crash details to the client
-                _logger.LogError(ex, "SyncUser Crashed");
-                var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-                await errorResponse.WriteStringAsync($"CRASH REPORT: {ex.Message} | Trace: {ex.StackTrace}");
-                return errorResponse;
+                _logger.LogError(ex, "GetMe failed.");
+                return req.CreateResponse(HttpStatusCode.InternalServerError);
             }
         }
 
@@ -86,14 +81,13 @@ namespace BowlPoolManager.Api.Functions
         {
             _logger.LogInformation("Getting all users.");
 
-            // 1. Authenticate
             var principal = SecurityHelper.ParseSwaHeader(req);
             if (principal == null || string.IsNullOrEmpty(principal.UserId))
             {
                 return req.CreateResponse(HttpStatusCode.Unauthorized);
             }
 
-            // 2. Authorize (SuperAdmin Only)
+            // Authorize (SuperAdmin Only)
             var currentUser = await _cosmosService.GetUserAsync(principal.UserId);
             if (currentUser == null || currentUser.AppRole != Constants.Roles.SuperAdmin)
             {
@@ -101,15 +95,12 @@ namespace BowlPoolManager.Api.Functions
                 return req.CreateResponse(HttpStatusCode.Forbidden);
             }
 
-            // 3. Fetch Data
             var users = await _cosmosService.GetUsersAsync();
-            
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(users);
             return response;
         }
 
-        // NEW: Toggle User Status (Disable/Enable)
         [Function("ToggleUserStatus")]
         public async Task<HttpResponseData> ToggleUserStatus([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
         {
@@ -119,10 +110,7 @@ namespace BowlPoolManager.Api.Functions
             {
                 // 1. Authenticate & Authorize SuperAdmin
                 var principal = SecurityHelper.ParseSwaHeader(req);
-                if (principal == null || string.IsNullOrEmpty(principal.UserId)) 
-                {
-                    return req.CreateResponse(HttpStatusCode.Unauthorized);
-                }
+                if (principal == null) return req.CreateResponse(HttpStatusCode.Unauthorized);
 
                 var currentUser = await _cosmosService.GetUserAsync(principal.UserId);
                 if (currentUser == null || currentUser.AppRole != Constants.Roles.SuperAdmin)
@@ -146,7 +134,7 @@ namespace BowlPoolManager.Api.Functions
                     return req.CreateResponse(HttpStatusCode.NotFound);
                 }
 
-                // Toggle logic: If disabled, enable. If enabled, disable.
+                // Toggle logic
                 targetUser.IsDisabled = !targetUser.IsDisabled;
 
                 await _cosmosService.UpsertUserAsync(targetUser);
@@ -161,6 +149,5 @@ namespace BowlPoolManager.Api.Functions
                 return req.CreateResponse(HttpStatusCode.InternalServerError);
             }
         }
-
     }
 }
