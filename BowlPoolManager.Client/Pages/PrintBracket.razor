@@ -39,7 +39,7 @@ else
         </div>
 
         <div class="standard-grid">
-            @foreach (var game in GetStandardGames())
+            @foreach (var game in standardGames)
             {
                 <div class="game-box">
                     <div class="game-header">
@@ -59,9 +59,10 @@ else
 
         <div class="bracket-section">
             <div class="bracket-container">
+                @* ROUND 1 *@
                 <div class="round-col">
                     <div class="round-header">First Round</div>
-                    @foreach (var game in GetPlayoffGames(PlayoffRound.Round1))
+                    @foreach (var game in round1Games)
                     {
                         <div class="match-card">
                             <div class="game-meta-row">@game.BowlName <span class="meta-right">@FormatTimeShort(game.StartTime)</span></div>
@@ -71,9 +72,10 @@ else
                     }
                 </div>
 
+                @* QUARTERFINALS *@
                 <div class="round-col">
                     <div class="round-header">Quarterfinals</div>
-                    @foreach (var game in GetPlayoffGames(PlayoffRound.QuarterFinal))
+                    @foreach (var game in quarterGames)
                     {
                         <div class="match-card">
                             <div class="game-meta-row">@game.BowlName <span class="meta-right">@FormatTimeShort(game.StartTime)</span></div>
@@ -83,9 +85,10 @@ else
                     }
                 </div>
 
+                @* SEMIFINALS *@
                 <div class="round-col">
                     <div class="round-header">Semifinals</div>
-                    @foreach (var game in GetPlayoffGames(PlayoffRound.SemiFinal))
+                    @foreach (var game in semiGames)
                     {
                         <div class="match-card spacer-lg">
                             <div class="game-meta-row">@game.BowlName</div>
@@ -95,9 +98,10 @@ else
                     }
                 </div>
 
+                @* CHAMPIONSHIP *@
                 <div class="round-col center-vertical">
                     <div class="round-header">Championship</div>
-                    @foreach (var game in GetPlayoffGames(PlayoffRound.Championship))
+                    @foreach (var game in champGames)
                     {
                         <div class="match-card champ-card">
                             <div class="game-meta-row text-center">@game.BowlName</div>
@@ -195,20 +199,62 @@ else
 
 @code {
     private List<BowlGame>? games;
+    
+    // Sorted Lists for Bracket Display
+    private List<BowlGame> standardGames = new();
+    private List<BowlGame> round1Games = new();
+    private List<BowlGame> quarterGames = new();
+    private List<BowlGame> semiGames = new();
+    private List<BowlGame> champGames = new();
 
     protected override async Task OnInitializedAsync()
     {
         try 
         {
             var allGames = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
-            games = allGames?.OrderBy(g => g.StartTime).ToList();
+            games = allGames ?? new();
+            PrepareBracket();
         }
         catch(Exception ex) { Console.WriteLine(ex.Message); }
     }
 
-    private List<BowlGame> GetStandardGames() => games?.Where(g => !g.IsPlayoff).ToList() ?? new();
-    private List<BowlGame> GetPlayoffGames(PlayoffRound round) => games?.Where(g => g.IsPlayoff && g.Round == round).OrderBy(g => g.StartTime).ToList() ?? new();
+    private void PrepareBracket()
+    {
+        if (games == null) return;
 
+        // 1. Standard Games (No specific order needed, just time)
+        standardGames = games.Where(g => !g.IsPlayoff).OrderBy(g => g.StartTime).ToList();
+
+        // 2. Championship (The Anchor)
+        champGames = games.Where(g => g.IsPlayoff && g.Round == PlayoffRound.Championship).OrderBy(g => g.StartTime).ToList();
+
+        // 3. Semis - Sort by which Champ game they feed into
+        semiGames = SortRoundByNext(PlayoffRound.SemiFinal, champGames);
+
+        // 4. Quarters - Sort by which Semi they feed into
+        quarterGames = SortRoundByNext(PlayoffRound.QuarterFinal, semiGames);
+
+        // 5. Round 1 - Sort by which Quarter they feed into
+        round1Games = SortRoundByNext(PlayoffRound.Round1, quarterGames);
+    }
+
+    // Helper: Sorts current round based on the order of the games in the next round
+    private List<BowlGame> SortRoundByNext(PlayoffRound currentRound, List<BowlGame> nextRoundSorted)
+    {
+        var roundGames = games!.Where(g => g.IsPlayoff && g.Round == currentRound).ToList();
+
+        return roundGames.OrderBy(g => 
+        {
+            // Find index of the target game in the next round's sorted list
+            var targetIndex = nextRoundSorted.FindIndex(next => next.Id == g.NextGameId);
+            // If unlinked, push to bottom
+            return targetIndex == -1 ? int.MaxValue : targetIndex;
+        })
+        .ThenBy(g => g.StartTime) // Secondary sort for pairs feeding the same game
+        .ToList();
+    }
+
+    // Replaces explicit "CT" append with DateTimeHelper logic + suffix
     private string FormatTimeShort(DateTime utc) => DateTimeHelper.ToCentral(utc).ToString("MMM d h:mm tt") + " CT";
 
     private string FormatCompact(BowlGame g)
@@ -220,7 +266,7 @@ else
     }
 
     private string RenderSlot(string? teamName) => string.IsNullOrEmpty(teamName) ? "_________________" : teamName;
-
+    
     private string GetPointValue(bool isPlayoff, PlayoffRound? round = null)
     {
         if (games == null) return "0";
