@@ -24,40 +24,44 @@ namespace BowlPoolManager.Api.Functions
         [Function("GetEntries")]
         public async Task<HttpResponseData> GetEntries([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
-            _logger.LogInformation("Getting bracket entries.");
+            _logger.LogInformation("Getting all bracket entries with security check.");
             
+            // 1. Fetch Data
+            // We fetch ALL pools to build a "Lock Map" (PoolId -> LockDate) efficiently
+            var pools = await _cosmosService.GetPoolsAsync();
+            var poolLockMap = pools.ToDictionary(p => p.Id, p => p.LockDate);
+
+            // Fetch Entries (Optionally filtered)
             var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
-            string? poolId = query["poolId"];
+            string? poolIdFilter = query["poolId"];
+            var entries = await _cosmosService.GetEntriesAsync(poolIdFilter);
 
-            // 1. Fetch Entries (Optionally filtered by Pool)
-            var entries = await _cosmosService.GetEntriesAsync(poolId);
-            
-            // 2. Redaction Logic (The Silencer)
-            // If a PoolId is provided, we must respect its Lock Date.
-            if (!string.IsNullOrEmpty(poolId))
+            // 2. Identify Requester
+            var principal = SecurityHelper.ParseSwaHeader(req);
+            string currentUserId = principal?.UserId ?? string.Empty;
+            bool isAdmin = principal != null && principal.UserRoles.Contains(Constants.Roles.SuperAdmin);
+
+            // 3. The Silencer (Redaction Logic)
+            foreach (var entry in entries)
             {
-                var pool = await _cosmosService.GetPoolAsync(poolId);
-                if (pool != null)
+                // Rule 1: Admins see everything.
+                if (isAdmin) continue;
+
+                // Rule 2: I see my own picks.
+                if (!string.IsNullOrEmpty(entry.UserId) && entry.UserId == currentUserId) continue;
+
+                // Rule 3: Check Lock Date
+                bool isPoolOpen = true; // Default to Open (Secure) if unknown
+                if (!string.IsNullOrEmpty(entry.PoolId) && poolLockMap.TryGetValue(entry.PoolId, out var lockDate))
                 {
-                    // Check if the pool is still "Open" (Pre-Deadline)
-                    bool isPoolOpen = DateTime.UtcNow < pool.LockDate;
+                    isPoolOpen = DateTime.UtcNow < lockDate;
+                }
 
-                    if (isPoolOpen)
-                    {
-                        // Identify the requester
-                        var principal = SecurityHelper.ParseSwaHeader(req);
-                        string currentUserId = principal?.UserId ?? string.Empty;
-
-                        // Redact picks for everyone EXCEPT the requester
-                        foreach (var entry in entries)
-                        {
-                            if (entry.UserId != currentUserId)
-                            {
-                                entry.Picks = null; // Hide the data
-                                entry.TieBreakerPoints = 0; // Hide the strategy
-                            }
-                        }
-                    }
+                if (isPoolOpen)
+                {
+                    // REDACT: Hide the data so cheating is impossible
+                    entry.Picks = null; 
+                    entry.TieBreakerPoints = 0;
                 }
             }
 
@@ -77,6 +81,34 @@ namespace BowlPoolManager.Api.Functions
 
             var entry = await _cosmosService.GetEntryAsync(id);
             if (entry == null) return req.CreateResponse(HttpStatusCode.NotFound);
+
+            // SECURITY CHECK
+            // 1. Identify Requester
+            var principal = SecurityHelper.ParseSwaHeader(req);
+            string currentUserId = principal?.UserId ?? string.Empty;
+            bool isAdmin = principal != null && principal.UserRoles.Contains(Constants.Roles.SuperAdmin);
+
+            // 2. Check Ownership/Admin
+            bool isMine = !string.IsNullOrEmpty(entry.UserId) && entry.UserId == currentUserId;
+            
+            if (!isAdmin && !isMine)
+            {
+                // 3. Check Lock Date
+                if (!string.IsNullOrEmpty(entry.PoolId))
+                {
+                    var pool = await _cosmosService.GetPoolAsync(entry.PoolId);
+                    if (pool != null)
+                    {
+                        bool isPoolOpen = DateTime.UtcNow < pool.LockDate;
+                        if (isPoolOpen)
+                        {
+                            // REDACT
+                            entry.Picks = null;
+                            entry.TieBreakerPoints = 0;
+                        }
+                    }
+                }
+            }
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(entry);

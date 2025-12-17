@@ -52,18 +52,14 @@
                                     <td class="ps-4 text-start">@row.Rank</td>
                                     
                                     <td class="text-start fw-bold">
-                                        @if (isRedacted)
-                                        {
-                                            <span class="text-muted" title="Picks Hidden">
-                                                <i class="bi bi-lock-fill me-1"></i> @row.Entry.PlayerName
-                                            </span>
-                                        }
-                                        else
-                                        {
-                                            <a href="entry/@row.Entry.Id" class="text-decoration-none text-dark">
-                                                @row.Entry.PlayerName
-                                            </a>
-                                        }
+                                        @* UPDATED: Link is enabled for EVERYONE. Redaction handled on details page. *@
+                                        <a href="entry/@row.Entry.Id" class="text-decoration-none text-dark">
+                                            @if (isRedacted)
+                                            {
+                                                <i class="bi bi-lock-fill text-muted me-1" title="Picks Hidden"></i>
+                                            }
+                                            @row.Entry.PlayerName
+                                        </a>
                                     </td>
                                     
                                     <td class="fs-5 text-primary fw-bold">@row.Score</td>
