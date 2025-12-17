@@ -27,31 +27,36 @@ namespace BowlPoolManager.Api.Functions
             _logger.LogInformation("Getting all bracket entries with security check.");
             
             // 1. Fetch Data
-            // We fetch ALL pools to build a "Lock Map" (PoolId -> LockDate) efficiently
             var pools = await _cosmosService.GetPoolsAsync();
             var poolLockMap = pools.ToDictionary(p => p.Id, p => p.LockDate);
 
-            // Fetch Entries (Optionally filtered)
             var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
             string? poolIdFilter = query["poolId"];
             var entries = await _cosmosService.GetEntriesAsync(poolIdFilter);
 
-            // 2. Identify Requester
+            // 2. Identify Requester & Resolve Role
             var principal = SecurityHelper.ParseSwaHeader(req);
             string currentUserId = principal?.UserId ?? string.Empty;
-            bool isAdmin = principal != null && principal.UserRoles.Contains(Constants.Roles.SuperAdmin);
+            bool isAdmin = false;
+
+            // FIXED: Check Database for Admin Role (SWA Header is not enough)
+            if (!string.IsNullOrEmpty(currentUserId))
+            {
+                var userProfile = await _cosmosService.GetUserAsync(currentUserId);
+                if (userProfile != null && userProfile.AppRole == Constants.Roles.SuperAdmin)
+                {
+                    isAdmin = true;
+                }
+            }
 
             // 3. The Silencer (Redaction Logic)
             foreach (var entry in entries)
             {
-                // Rule 1: Admins see everything.
-                if (isAdmin) continue;
+                if (isAdmin) continue; // Admins see all
+                if (!string.IsNullOrEmpty(entry.UserId) && entry.UserId == currentUserId) continue; // Owners see their own
 
-                // Rule 2: I see my own picks.
-                if (!string.IsNullOrEmpty(entry.UserId) && entry.UserId == currentUserId) continue;
-
-                // Rule 3: Check Lock Date
-                bool isPoolOpen = true; // Default to Open (Secure) if unknown
+                // Check Lock Date
+                bool isPoolOpen = true; 
                 if (!string.IsNullOrEmpty(entry.PoolId) && poolLockMap.TryGetValue(entry.PoolId, out var lockDate))
                 {
                     isPoolOpen = DateTime.UtcNow < lockDate;
@@ -59,7 +64,6 @@ namespace BowlPoolManager.Api.Functions
 
                 if (isPoolOpen)
                 {
-                    // REDACT: Hide the data so cheating is impossible
                     entry.Picks = null; 
                     entry.TieBreakerPoints = 0;
                 }
@@ -83,17 +87,25 @@ namespace BowlPoolManager.Api.Functions
             if (entry == null) return req.CreateResponse(HttpStatusCode.NotFound);
 
             // SECURITY CHECK
-            // 1. Identify Requester
             var principal = SecurityHelper.ParseSwaHeader(req);
             string currentUserId = principal?.UserId ?? string.Empty;
-            bool isAdmin = principal != null && principal.UserRoles.Contains(Constants.Roles.SuperAdmin);
+            bool isAdmin = false;
 
-            // 2. Check Ownership/Admin
+            // FIXED: Check Database for Admin Role
+            if (!string.IsNullOrEmpty(currentUserId))
+            {
+                var userProfile = await _cosmosService.GetUserAsync(currentUserId);
+                if (userProfile != null && userProfile.AppRole == Constants.Roles.SuperAdmin)
+                {
+                    isAdmin = true;
+                }
+            }
+
+            // Check Ownership/Admin
             bool isMine = !string.IsNullOrEmpty(entry.UserId) && entry.UserId == currentUserId;
             
             if (!isAdmin && !isMine)
             {
-                // 3. Check Lock Date
                 if (!string.IsNullOrEmpty(entry.PoolId))
                 {
                     var pool = await _cosmosService.GetPoolAsync(entry.PoolId);
@@ -115,7 +127,6 @@ namespace BowlPoolManager.Api.Functions
             return response;
         }
 
-        // NEW: Get My Entry (Secure)
         [Function("GetMyEntry")]
         public async Task<HttpResponseData> GetMyEntry([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
@@ -132,7 +143,6 @@ namespace BowlPoolManager.Api.Functions
 
             var entry = await _cosmosService.GetEntryByUserAsync(principal.UserId, poolId);
 
-            // It is valid to return null (204 or 404) if I haven't joined yet
             if (entry == null) return req.CreateResponse(HttpStatusCode.NotFound);
 
             var response = req.CreateResponse(HttpStatusCode.OK);
@@ -140,7 +150,6 @@ namespace BowlPoolManager.Api.Functions
             return response;
         }
 
-        // NEW: Save My Entry (The Gatekeeper)
         [Function("SaveMyEntry")]
         public async Task<HttpResponseData> SaveMyEntry([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
         {
@@ -148,7 +157,6 @@ namespace BowlPoolManager.Api.Functions
 
             try
             {
-                // 1. Identity Check
                 var principal = SecurityHelper.ParseSwaHeader(req);
                 if (principal == null || string.IsNullOrEmpty(principal.UserId))
                 {
@@ -158,10 +166,8 @@ namespace BowlPoolManager.Api.Functions
                 var entry = await JsonSerializer.DeserializeAsync<BracketEntry>(req.Body);
                 if (entry == null) return req.CreateResponse(HttpStatusCode.BadRequest);
 
-                // Enforce Ownership
                 entry.UserId = principal.UserId;
 
-                // 2. Pool Validation
                 if (string.IsNullOrEmpty(entry.PoolId))
                 {
                     var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
@@ -172,7 +178,6 @@ namespace BowlPoolManager.Api.Functions
                 var pool = await _cosmosService.GetPoolAsync(entry.PoolId);
                 if (pool == null) return req.CreateResponse(HttpStatusCode.NotFound);
 
-                // 3. Deadline Check (Lifecycle)
                 if (DateTime.UtcNow > pool.LockDate)
                 {
                     var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
@@ -180,15 +185,12 @@ namespace BowlPoolManager.Api.Functions
                     return forbidden;
                 }
 
-                // 4. Access Check (Invite Code for NEW entries)
                 var existingEntry = await _cosmosService.GetEntryByUserAsync(principal.UserId, entry.PoolId);
                 if (existingEntry == null)
                 {
-                    // This is a join attempt. Check the code.
                     var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
                     string? suppliedCode = query["inviteCode"];
 
-                    // Case-insensitive compare
                     if (!string.Equals(pool.InviteCode, suppliedCode, StringComparison.OrdinalIgnoreCase))
                     {
                         var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
@@ -198,12 +200,10 @@ namespace BowlPoolManager.Api.Functions
                 }
                 else
                 {
-                    // Updating existing entry. Ensure ID consistency.
                     entry.Id = existingEntry.Id;
-                    entry.CreatedOn = existingEntry.CreatedOn; // Preserve original timestamp
+                    entry.CreatedOn = existingEntry.CreatedOn; 
                 }
 
-                // 5. Completeness Check (All-or-Nothing)
                 var allGames = await _cosmosService.GetGamesAsync();
                 if (entry.Picks.Count != allGames.Count)
                 {
@@ -212,7 +212,6 @@ namespace BowlPoolManager.Api.Functions
                     return badReq;
                 }
 
-                // Save
                 await _cosmosService.AddEntryAsync(entry);
 
                 var response = req.CreateResponse(HttpStatusCode.OK);
@@ -226,7 +225,6 @@ namespace BowlPoolManager.Api.Functions
             }
         }
 
-        // ADMIN: Save Entry (Override)
         [Function("SaveEntry")]
         public async Task<HttpResponseData> SaveEntry([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
         {
@@ -254,7 +252,6 @@ namespace BowlPoolManager.Api.Functions
             }
         }
 
-        // ADMIN: Delete Entry
         [Function("DeleteEntry")]
         public async Task<HttpResponseData> DeleteEntry([HttpTrigger(AuthorizationLevel.Anonymous, "delete")] HttpRequestData req)
         {
