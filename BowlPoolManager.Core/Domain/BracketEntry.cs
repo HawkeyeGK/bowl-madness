@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Newtonsoft.Json;
+using System.ComponentModel.DataAnnotations;
 
 namespace BowlPoolManager.Core.Domain
 {
@@ -20,6 +21,7 @@ namespace BowlPoolManager.Core.Domain
         public string UserId { get; set; } = string.Empty;
 
         // The name of the person (Entered by Admin or User)
+        [Required(ErrorMessage = "Bracket Name is required.")]
         [JsonProperty("playerName")]
         [JsonPropertyName("playerName")]
         public string PlayerName { get; set; } = string.Empty;
