@@ -20,8 +20,8 @@
         {
             <p class="text-muted">
                 Pool: <strong>@currentPool.Name</strong> |
-                @* UPDATED: Precise wording with Central Time *@
-                Picks Lock at <span class="text-danger fw-bold">@DateTimeHelper.ToCentral(currentPool.LockDate).ToString("MMM d, h:mm tt")</span>
+                @* UPDATED: Added "CT" for clarity *@
+                Picks Lock at <span class="text-danger fw-bold">@DateTimeHelper.ToCentral(currentPool.LockDate).ToString("MMM d, h:mm tt") CT</span>
             </p>
         }
     </div>

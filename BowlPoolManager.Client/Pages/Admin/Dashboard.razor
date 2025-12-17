@@ -39,7 +39,8 @@
                                         <th>Name</th>
                                         <th>Season</th>
                                         <th>Invite Code</th>
-                                        <th>Lock Date (Central)</th>
+                                        @* UPDATED LABEL *@
+                                        <th>Lock Date (Central Time)</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -137,8 +138,9 @@
                             <label class="form-label">Invite Code</label>
                             <InputText @bind-Value="editingPool.InviteCode" class="form-control" placeholder="Secret password" />
                         </div>
-                         <div class="mb-3">
-                            <label class="form-label">Lock Date (Central)</label>
+                        <div class="mb-3">
+                            @* UPDATED LABEL *@
+                            <label class="form-label">Lock Date (Central Time)</label>
                             @* Binds to string to handle conversion *@
                             <InputText type="datetime-local" class="form-control" @bind-Value="lockDateString" />
                             <div class="form-text">Picks cannot be changed after this time.</div>
