@@ -10,7 +10,16 @@
 <div class="container-fluid mt-4">
     <div class="text-center mb-5">
         <h1 class="display-4 fw-bold text-primary">Bowl Madness 2025</h1>
-        <p class="lead text-muted">Current Standings</p>
+        <p class="lead text-muted">
+            Current Standings 
+            @if (currentPool != null)
+            {
+                <span class="mx-2">|</span> 
+                <span class="text-danger fw-bold fs-6">
+                    <i class="bi bi-clock"></i> Picks Lock at @DateTimeHelper.ToCentral(currentPool.LockDate).ToString("MMM d, h:mm tt")
+                </span>
+            }
+        </p>
     </div>
 
     @if (isLoading)
@@ -29,7 +38,7 @@
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover table-striped mb-0 align-middle text-center">
-                         <thead class="bg-primary text-white">
+                        <thead class="bg-primary text-white">
                             <tr>
                                 <th class="ps-4 text-start cursor-pointer" @onclick='() => Sort("Rank")'>Rank @RenderSortIcon("Rank")</th>
                                 <th class="text-start cursor-pointer" @onclick='() => Sort("Player")'>Player @RenderSortIcon("Player")</th>
@@ -42,7 +51,7 @@
                                 <th title="Maximum Potential Score" class="text-dark cursor-pointer" @onclick='() => Sort("Max")'>Max @RenderSortIcon("Max")</th>
                                 <th class="d-none d-sm-table-cell cursor-pointer" @onclick='() => Sort("Correct")'>Correct @RenderSortIcon("Correct")</th>
                                 <th class="text-end pe-4 d-none d-lg-table-cell cursor-pointer" @onclick='() => Sort("Tiebreaker")'>Tiebreaker @RenderSortIcon("Tiebreaker")</th>
-                             </tr>
+                            </tr>
                         </thead>
                         <tbody>
                             @foreach (var row in leaderboard)
@@ -52,7 +61,6 @@
                                     <td class="ps-4 text-start">@row.Rank</td>
                                     
                                     <td class="text-start fw-bold">
-                                        @* UPDATED: Link is enabled for EVERYONE. Redaction handled on details page. *@
                                         <a href="entry/@row.Entry.Id" class="text-decoration-none text-dark">
                                             @if (isRedacted)
                                             {
@@ -74,14 +82,15 @@
                                         @(isRedacted ? "-" : $"{row.Entry.TieBreakerPoints} pts")
                                     </td>
                                 </tr>
-                             }
+                            }
                         </tbody>
                     </table>
                 </div>
             </div>
          </div>
         <div class="mt-3 text-center text-muted small">
-            <i class="bi bi-info-circle"></i> Leaderboard updates automatically. <i class="bi bi-lock-fill"></i> indicates picks are hidden until the pool unlocks.
+             <i class="bi bi-info-circle"></i> Leaderboard updates automatically.
+             <i class="bi bi-lock-fill"></i> indicates picks are hidden until the pool unlocks.
         </div>
     }
     <div class="text-center mt-5 mb-5 pt-4 border-top">
@@ -98,6 +107,7 @@
 
 @code {
     private bool isLoading = true;
+    private BowlPool? currentPool;
     private List<BowlGame> games = new();
     private List<BracketEntry> entries = new();
     private List<LeaderboardRow> leaderboard = new();
@@ -111,12 +121,19 @@
     {
         try
         {
+            // UPDATED: Fetch pools to get lock date
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
             var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries");
 
-            await Task.WhenAll(gamesTask, entriesTask);
+            await Task.WhenAll(poolsTask, gamesTask, entriesTask);
+            
+            var pools = await poolsTask ?? new();
+            currentPool = pools.FirstOrDefault();
+            
             games = await gamesTask ?? new();
             entries = await entriesTask ?? new();
+            
             totalFinalGames = games.Count(g => g.Status == GameStatus.Final);
             
             leaderboard = ScoringEngine.Calculate(games, entries);
