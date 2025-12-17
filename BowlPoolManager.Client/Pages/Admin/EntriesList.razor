@@ -1,6 +1,7 @@
 @page "/admin/entries"
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
+@using BowlPoolManager.Client.Helpers
 @using Microsoft.AspNetCore.Authorization
 @using System.Net.Http.Json
 @attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
@@ -38,9 +39,10 @@
                         <thead class="table-light">
                             <tr>
                                 <th>Player Name</th>
+                                <th>Email</th> @* NEW: Email Column *@
                                 <th>Tiebreaker</th>
-                                <th>Pool ID</th>
-                                <th>Created On (UTC)</th>
+                                @* REMOVED: Pool ID *@
+                                <th>Created On (CT)</th> @* UPDATED: Timezone *@
                                 <th class="text-end">Actions</th>
                             </tr>
                         </thead>
@@ -49,9 +51,20 @@
                             {
                                 <tr>
                                     <td class="fw-bold">@entry.PlayerName</td>
+                                    <td>
+                                        @* NEW: Email Lookup *@
+                                        @if (userEmailMap.TryGetValue(entry.UserId, out var email))
+                                        {
+                                            <a href="mailto:@email" class="text-decoration-none">@email</a>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small fst-italic">Manual / Unknown</span>
+                                        }
+                                    </td>
                                     <td>@entry.TieBreakerPoints</td>
-                                    <td><small class="text-muted">@entry.PoolId</small></td>
-                                    <td>@entry.CreatedOn.ToString("g")</td>
+                                    @* UPDATED: Use Helper for Central Time *@
+                                    <td>@DateTimeHelper.ToCentral(entry.CreatedOn).ToString("g")</td>
                                     <td class="text-end">
                                         <div class="btn-group btn-group-sm">
                                             <a href="/admin/entry/@entry.Id" class="btn btn-outline-primary">Edit</a>
@@ -70,21 +83,34 @@
 
 @code {
     private List<BracketEntry> entries = new();
+    private Dictionary<string, string> userEmailMap = new(); // NEW: Lookup
     private bool isLoading = true;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadEntries();
+        await LoadData();
     }
 
-    private async Task LoadEntries()
+    private async Task LoadData()
     {
         try
         {
             isLoading = true;
-            // Since we are Admin, the API will return full data (unredacted)
-            entries = await Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries") ?? new();
-            // Sort by creation date desc
+            
+            // 1. Fetch Entries and Users in parallel
+            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries");
+            var usersTask = Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers");
+
+            await Task.WhenAll(entriesTask, usersTask);
+
+            // 2. Populate Data
+            entries = await entriesTask ?? new();
+            var users = await usersTask ?? new();
+
+            // 3. Build Lookup Map (UserId -> Email)
+            userEmailMap = users.ToDictionary(u => u.Id, u => u.Email);
+
+            // 4. Sort
             entries = entries.OrderByDescending(e => e.CreatedOn).ToList();
         }
         catch (Exception ex)
@@ -105,7 +131,7 @@
             var response = await Http.DeleteAsync($"api/DeleteEntry?id={entry.Id}");
             if (response.IsSuccessStatusCode)
             {
-                await LoadEntries(); // Refresh list
+                await LoadData(); // Refresh list
             }
             else
             {
