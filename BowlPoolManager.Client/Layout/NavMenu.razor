@@ -1,57 +1,75 @@
-﻿@using BowlPoolManager.Core
-<div class="top-row ps-3 navbar navbar-dark">
+﻿<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">Bowl Madness 2025</a>
+        <a class="navbar-brand" href="">
+            <i class="bi bi-bowling-ball me-2"></i>Bowl Madness
+        </a>
         <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
     </div>
 </div>
 
-<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
     <nav class="flex-column">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-trophy-fill" aria-hidden="true"></span> Leaderboard
+                <span class="bi bi-house-door-fill" aria-hidden="true"></span> Home
             </NavLink>
         </div>
         
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="results">
-                <span class="bi bi-clipboard-check-fill" aria-hidden="true"></span> Game Results
-            </NavLink>
-        </div>
-
-        @* NEW: My Picks Link (Authenticated Users Only) *@
         <AuthorizeView>
             <Authorized>
-                 <div class="nav-item px-3">
+                <div class="nav-item px-3">
                     <NavLink class="nav-link" href="mypicks">
-                        <span class="bi bi-controller" aria-hidden="true"></span> My Picks
+                        <span class="bi bi-clipboard-check-fill" aria-hidden="true"></span> My Picks
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="results">
+                        <span class="bi bi-display" aria-hidden="true"></span> Scoreboard
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="print-bracket">
+                        <span class="bi bi-printer-fill" aria-hidden="true"></span> Print Bracket
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="weather">
+                         <span class="bi bi-cloud-sun-fill" aria-hidden="true"></span> Weather
                     </NavLink>
                 </div>
             </Authorized>
         </AuthorizeView>
 
-        @* ADMIN SECTION *@
-        <AuthorizeView Roles="@Constants.Roles.SuperAdmin">
+        <AuthorizeView Roles="SuperAdmin">
             <Authorized>
                 <div class="nav-item px-3 mt-4">
-                    <div class="text-uppercase small text-muted px-3 mb-2 fw-bold">Admin</div>
+                    <div class="text-white-50 small text-uppercase fw-bold px-3 mb-1">Admin</div>
                 </div>
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="admin/dashboard">
                         <span class="bi bi-speedometer2" aria-hidden="true"></span> Dashboard
                     </NavLink>
                 </div>
-                <div class="nav-item px-3">
+                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="admin/games">
-                         <span class="bi bi-calendar-event" aria-hidden="true"></span> Manage Games
+                        <span class="bi bi-calendar-event-fill" aria-hidden="true"></span> Games
+                    </NavLink>
+                </div>
+                 <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="admin/game-results">
+                        <span class="bi bi-123" aria-hidden="true"></span> Enter Results
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="admin/entries">
+                        <span class="bi bi-people-fill" aria-hidden="true"></span> Entries
                     </NavLink>
                 </div>
                  <div class="nav-item px-3">
                     <NavLink class="nav-link" href="admin/users">
-                         <span class="bi bi-people-fill" aria-hidden="true"></span> Manage Users
+                        <span class="bi bi-person-badge-fill" aria-hidden="true"></span> Users
                     </NavLink>
                 </div>
             </Authorized>
