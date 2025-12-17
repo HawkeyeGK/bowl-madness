@@ -78,7 +78,6 @@
             </div>
         }
 
-        @* UPDATED: Added OnInvalidSubmit handler *@
         <EditForm Model="@myEntry" OnValidSubmit="SavePicks" OnInvalidSubmit="HandleInvalidSubmit">
             <DataAnnotationsValidator />
             
@@ -118,9 +117,21 @@
                         bool isDisabled = isLocked || !isGameReady;
 
                         <li class="list-group-item p-3 @(isSelected ? "bg-light-success" : "")">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
+                            @* UPDATED HEADER ROW *@
+                            <div class="d-flex justify-content-between align-items-start mb-2">
                                 <span class="badge bg-secondary">@game.BowlName</span>
-                                <span class="small text-muted">@DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d, h:mm tt")</span>
+                                <div class="text-end">
+                                    <div class="small fw-bold text-dark">
+                                        @DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d, h:mm tt")
+                                    </div>
+                                    <div class="small text-muted" style="font-size: 0.85em;">
+                                        @game.Location 
+                                        @if(!string.IsNullOrEmpty(game.Television)) 
+                                        {
+                                            <span class="ms-1 badge bg-light text-dark border">@game.Television</span>
+                                        }
+                                    </div>
+                                </div>
                             </div>
                             
                             <div class="row g-2">
@@ -279,7 +290,6 @@
         StateHasChanged();
     }
 
-    // NEW: Invalid Handler
     private void HandleInvalidSubmit()
     {
         TriggerToast("Please check the form for errors (missing Name or Picks).", false);
