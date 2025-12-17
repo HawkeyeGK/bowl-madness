@@ -98,6 +98,7 @@
                 <div class="card-body">
                     <label class="form-label fw-bold">Bracket Name (Your Name)</label>
                     <InputText @bind-Value="myEntry.PlayerName" class="form-control" disabled="@isLocked" placeholder="e.g. John Doe" />
+                    <ValidationMessage For="@(() => myEntry.PlayerName)" />
                 </div>
             </div>
 
@@ -123,16 +124,21 @@
                             
                             @if (potentialTeams.Any())
                             {
-                                <div class="d-flex w-100 gap-2">
+                                @* UPDATED: Use Grid Row/Col for equal widths *@
+                                <div class="row g-2">
                                     @foreach(var teamName in potentialTeams)
                                     {
-                                        <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_{teamName}")" 
-                                               checked="@(pick == teamName)" 
-                                               disabled="@isLocked"
-                                               @onchange="@(() => UpdatePick(game.Id, teamName))" autocomplete="off">
-                                        <label class="btn btn-outline-primary flex-grow-1 @(pick == teamName ? "active fw-bold" : "")" for="@($"{game.Id}_{teamName}")">
-                                            @teamName
-                                        </label>
+                                        <div class="col">
+                                            <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_{teamName}")" 
+                                                   checked="@(pick == teamName)" 
+                                                   disabled="@isLocked"
+                                                   @onchange="@(() => UpdatePick(game.Id, teamName))" autocomplete="off">
+                                            
+                                            <label class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center h-100 @(pick == teamName ? "active fw-bold" : "")" 
+                                                   for="@($"{game.Id}_{teamName}")">
+                                                @teamName
+                                            </label>
+                                        </div>
                                     }
                                 </div>
                             }
