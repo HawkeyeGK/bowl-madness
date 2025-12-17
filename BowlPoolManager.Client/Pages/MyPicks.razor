@@ -264,7 +264,8 @@
         try
         {
             string url = "api/SaveMyEntry";
-            if (string.IsNullOrEmpty(myEntry.Id))
+            // FIXED: Entry ID is never empty (auto-guid), so check the Join Model instead.
+            if (!string.IsNullOrEmpty(joinModel.InviteCode))
             {
                 url += $"?inviteCode={joinModel.InviteCode}";
             }
