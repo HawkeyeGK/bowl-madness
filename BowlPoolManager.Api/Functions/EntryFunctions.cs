@@ -98,7 +98,6 @@ namespace BowlPoolManager.Api.Functions
             return response;
         }
 
-        // UPDATED: Now returns a list of entries for the user
         [Function("GetMyEntries")]
         public async Task<HttpResponseData> GetMyEntries([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
@@ -158,38 +157,42 @@ namespace BowlPoolManager.Api.Functions
                 }
 
                 // 2. Determine Create vs Update
-                // If the Entry ID is provided, we verify it exists and belongs to the user
                 bool isUpdate = false;
                 if (!string.IsNullOrEmpty(entry.Id))
                 {
                     var existingEntry = await _cosmosService.GetEntryAsync(entry.Id);
                     
-                    // If ID was sent but not found, we treat as new (or could error out)
                     if (existingEntry != null)
                     {
                         if (existingEntry.UserId != principal.UserId)
                         {
-                            return req.CreateResponse(HttpStatusCode.Forbidden); // Trying to edit someone else's entry
+                            return req.CreateResponse(HttpStatusCode.Forbidden); 
                         }
                         isUpdate = true;
-                        // Preserve original creation date
                         entry.CreatedOn = existingEntry.CreatedOn;
                     }
                 }
 
-                // 3. Invite Code Check (Only for NEW entries)
+                // 3. Invite Code Check (Skipped if user already has verified entries)
                 if (!isUpdate)
                 {
-                    var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
-                    string? suppliedCode = query["inviteCode"];
+                    // Check if they are already in the pool
+                    var userEntries = await _cosmosService.GetEntriesForUserAsync(principal.UserId, entry.PoolId);
+                    bool alreadyJoined = userEntries.Any();
 
-                    // Strict check only if the pool has an invite code
-                    if (!string.IsNullOrEmpty(pool.InviteCode) && 
-                        !string.Equals(pool.InviteCode, suppliedCode, StringComparison.OrdinalIgnoreCase))
+                    if (!alreadyJoined)
                     {
-                        var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
-                        await forbidden.WriteStringAsync("Invalid Invite Code.");
-                        return forbidden;
+                        // First time entering? Check the code.
+                        var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+                        string? suppliedCode = query["inviteCode"];
+
+                        if (!string.IsNullOrEmpty(pool.InviteCode) && 
+                            !string.Equals(pool.InviteCode, suppliedCode, StringComparison.OrdinalIgnoreCase))
+                        {
+                            var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
+                            await forbidden.WriteStringAsync("Invalid Invite Code.");
+                            return forbidden;
+                        }
                     }
                 }
 
@@ -205,7 +208,7 @@ namespace BowlPoolManager.Api.Functions
                 if (isNameTaken)
                 {
                     var conflict = req.CreateResponse(HttpStatusCode.Conflict);
-                    await conflict.WriteStringAsync($"The bracket name '{entry.PlayerName}' is already taken in this pool. Please choose another.");
+                    await conflict.WriteStringAsync($"The bracket name '{entry.PlayerName}' is already taken. Please choose another.");
                     return conflict;
                 }
 
@@ -221,7 +224,6 @@ namespace BowlPoolManager.Api.Functions
                 // 6. Save
                 if (!isUpdate)
                 {
-                    // Ensure new ID for new entries
                     entry.Id = Guid.NewGuid().ToString();
                 }
 
