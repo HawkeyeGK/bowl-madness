@@ -5,8 +5,10 @@
 @using Microsoft.AspNetCore.Authorization
 @using System.Net.Http.Json
 @using System.Text.Json
+@using Microsoft.JSInterop
 @attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
 @inject HttpClient Http
+@inject IJSRuntime JS
 
 <PageTitle>Game Management</PageTitle>
 
@@ -16,7 +18,8 @@
         <span class="badge bg-danger">Super Admin Zone</span>
     </div>
 
-    <div class="card mb-5 shadow-sm">
+    @* ID for Anchor Scrolling *@
+    <div id="gameEditor" class="card mb-5 shadow-sm">
         <div class="card-header bg-success text-white">
             <h5 class="mb-0">@(string.IsNullOrEmpty(newGame.Id) || newGame.Id == Guid.Empty.ToString() ? "Add Game" : "Edit Game")</h5>
         </div>
@@ -228,9 +231,9 @@
     private void ResetForm()
     {
         newGame = new BowlGame { PointValue = 1 };
-        // REFACTORED: Use Helper
         var tomorrowCentral = DateTimeHelper.ToCentral(DateTime.UtcNow.AddDays(1));
         startTimeString = tomorrowCentral.ToString("yyyy-MM-ddTHH:mm");
+        StateHasChanged();
     }
 
     private async Task LoadGames()
@@ -245,14 +248,17 @@
         }
     }
 
-    private void EditGame(BowlGame game)
+    private async Task EditGame(BowlGame game)
     {
         var json = JsonSerializer.Serialize(game);
         newGame = JsonSerializer.Deserialize<BowlGame>(json) ?? new BowlGame();
 
-        // REFACTORED: Use Helper
         var centralTime = DateTimeHelper.ToCentral(newGame.StartTime);
         startTimeString = centralTime.ToString("yyyy-MM-ddTHH:mm");
+
+        // UI FIX: Scroll to the top so the user sees the form
+        await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
+        StateHasChanged();
     }
 
     private async Task HandleSaveGame()
@@ -276,6 +282,8 @@
             {
                 ResetForm();
                 await LoadGames();
+                // UI FIX: Feedback scroll
+                await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
             }
             else
             {
