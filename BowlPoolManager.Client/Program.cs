@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.AspNetCore.Components.Authorization;
 using BowlPoolManager.Client;
 using BowlPoolManager.Client.Security;
+using BowlPoolManager.Client.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -13,5 +14,8 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.
 // AUTHENTICATION SERVICES
 builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, StaticWebAppsAuthenticationStateProvider>();
+
+// REGISTER APPSTATE
+builder.Services.AddScoped<AppState>();
 
 await builder.Build().RunAsync();

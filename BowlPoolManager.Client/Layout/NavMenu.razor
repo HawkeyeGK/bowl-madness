@@ -1,7 +1,10 @@
 ﻿@using BowlPoolManager.Core.Domain
 @using System.Net.Http.Json
+@using BowlPoolManager.Client.Services
+@implements IDisposable
 @inject HttpClient Http
 @inject AuthenticationStateProvider AuthStateProvider
+@inject AppState AppState
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -75,44 +78,58 @@
 @code {
     private bool collapseNavMenu = true;
     private string MyPicksText = "My Picks";
-
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
-    private void ToggleNavMenu()
-    {
-        collapseNavMenu = !collapseNavMenu;
-    }
+    private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
 
     protected override async Task OnInitializedAsync()
+    {
+        // Subscribe to events
+        AppState.OnChange += StateHasChangedWrapper;
+        await UpdateNavText();
+    }
+
+    private async void StateHasChangedWrapper()
+    {
+        await UpdateNavText();
+        StateHasChanged();
+    }
+
+    private async Task UpdateNavText()
     {
         try
         {
             var authState = await AuthStateProvider.GetAuthenticationStateAsync();
             if (authState.User.Identity?.IsAuthenticated ?? false)
             {
-                // 1. Get Pool Status
                 var pools = await Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
                 var currentPool = pools?.FirstOrDefault();
 
                 if (currentPool != null)
                 {
                     bool isLocked = DateTime.UtcNow > currentPool.LockDate;
-
-                    // 2. If Open, check if user has entries
                     if (!isLocked)
                     {
                         var myEntries = await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyEntries?poolId={currentPool.Id}");
                         if (myEntries == null || !myEntries.Any())
                         {
                             MyPicksText = "Enter Your Picks";
+                            return; 
                         }
                     }
                 }
             }
+            // Default
+            MyPicksText = "My Picks";
         }
         catch 
         {
-            // Fail silently to default "My Picks" if API or network has issues
+            MyPicksText = "My Picks";
         }
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChangedWrapper;
     }
 }

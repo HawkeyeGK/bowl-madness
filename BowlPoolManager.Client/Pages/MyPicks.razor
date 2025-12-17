@@ -9,6 +9,7 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
+@inject BowlPoolManager.Client.Services.AppState AppState
 
 <PageTitle>My Picks</PageTitle>
 
@@ -450,6 +451,9 @@
                     
                     TriggerToast("Bracket saved successfully!", true);
                     viewMode = ViewMode.Dashboard; // Return to dashboard on success
+                    
+                    // --- THE NOTIFICATION ---
+                    AppState.NotifyDataChanged();
                 }
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
