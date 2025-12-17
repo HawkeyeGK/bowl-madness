@@ -11,7 +11,7 @@
 
 <PageTitle>My Picks</PageTitle>
 
-<div class="container mt-4 pb-5">
+<div class="container mt-4 pb-5 position-relative">
     <div class="text-center mb-4">
         <h1 class="fw-bold text-primary"><i class="bi bi-controller"></i> My Picks</h1>
         @if (currentPool != null)
@@ -112,11 +112,7 @@
                     {
                         string pick = myEntry.Picks.ContainsKey(game.Id) ? myEntry.Picks[game.Id] : "";
                         bool isSelected = !string.IsNullOrEmpty(pick);
-                        
-                        // LOGIC: Get the two slots (Home/Away or TBD)
                         var slots = GetMatchupSlots(game);
-                        
-                        // LOGIC: Disable if TBD or Locked
                         bool isGameReady = slots.Home != "TBD" && slots.Away != "TBD";
                         bool isDisabled = isLocked || !isGameReady;
 
@@ -197,6 +193,18 @@
                 </div>
             }
         </EditForm>
+        
+        @* NEW: Toast Notification *@
+        <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1050">
+            <div class="toast @(showToast ? "show" : "hide") align-items-center text-white @(isSuccessToast ? "bg-success" : "bg-danger") border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body fs-6">
+                        <i class="@(isSuccessToast ? "bi bi-check-circle-fill" : "bi bi-exclamation-triangle-fill") me-2"></i> @toastMessage
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" @onclick="() => showToast = false" aria-label="Close"></button>
+                </div>
+            </div>
+        </div>
     }
 </div>
 
@@ -208,6 +216,11 @@
     private bool isSaving = false;
     private bool showSuccess = false;
     private string errorMessage = "";
+    
+    // Toast State
+    private bool showToast = false;
+    private bool isSuccessToast = true;
+    private string toastMessage = "";
     
     private BowlPool? currentPool;
     private List<BowlGame> games = new();
@@ -288,16 +301,19 @@
             {
                 myEntry = await response.Content.ReadFromJsonAsync<BracketEntry>();
                 showSuccess = true;
+                TriggerToast("Picks saved successfully!", true);
             }
             else
             {
                 var errorText = await response.Content.ReadAsStringAsync();
                 errorMessage = $"Save failed: {errorText}";
+                TriggerToast(errorMessage, false);
             }
         }
         catch (Exception ex)
         {
             errorMessage = $"Error: {ex.Message}";
+            TriggerToast(errorMessage, false);
         }
         finally
         {
@@ -305,7 +321,21 @@
         }
     }
 
-    // NEW: Robust Queue Logic
+    // Helper to fire the toast and auto-hide it
+    private void TriggerToast(string message, bool success)
+    {
+        toastMessage = message;
+        isSuccessToast = success;
+        showToast = true;
+        
+        // Auto-dismiss after 4 seconds
+        _ = Task.Delay(4000).ContinueWith(t => 
+        {
+            showToast = false;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
     private (string Home, string Away) GetMatchupSlots(BowlGame game)
     {
         string home = game.TeamHome;
@@ -313,11 +343,9 @@
 
         if (game.IsPlayoff)
         {
-             // 1. Queue up feeders
              var feeders = games.Where(g => g.NextGameId == game.Id).OrderBy(g => g.StartTime).ToList();
              var feederQueue = new Queue<BowlGame>(feeders);
 
-             // 2. Fill Home Slot if empty/TBD
              if (string.IsNullOrWhiteSpace(home) || home.Equals("TBD", StringComparison.OrdinalIgnoreCase))
              {
                  if (feederQueue.TryDequeue(out var f1))
@@ -328,7 +356,6 @@
                  else home = "TBD";
              }
 
-             // 3. Fill Away Slot if empty/TBD
              if (string.IsNullOrWhiteSpace(away) || away.Equals("TBD", StringComparison.OrdinalIgnoreCase))
              {
                  if (feederQueue.TryDequeue(out var f2))
@@ -340,7 +367,6 @@
              }
         }
 
-        // Fallback checks
         if (string.IsNullOrWhiteSpace(home)) home = "TBD";
         if (string.IsNullOrWhiteSpace(away)) away = "TBD";
         
