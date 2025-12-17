@@ -5,6 +5,7 @@
 @using System.Net.Http.Json
 @using System.Text.Json
 @attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
+@using BowlPoolManager.Client.Helpers
 @inject HttpClient Http
 
 <PageTitle>Enter Game Results</PageTitle>
@@ -44,9 +45,8 @@
                             {
                                 <tr class="@GetRowClass(game)">
                                     <td>
-                                        @{ var central = TimeZoneInfo.ConvertTimeFromUtc(game.StartTime, CentralTimeZone); }
-                                        <div class="fw-bold">@central.ToString("MMM d")</div>
-                                        <div class="small text-muted">@central.ToString("h:mm tt")</div>
+                                        <div class="fw-bold">@DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d")</div>
+                                        <div class="small text-muted">@DateTimeHelper.ToCentral(game.StartTime).ToString("h:mm tt") CT</div>
                                     </td>
                                     <td>
                                         <div class="fw-bold">@game.BowlName</div>
@@ -100,15 +100,7 @@
     private List<BowlGame>? games;
     private string? statusMessage;
 
-    // Helper for Central Time
-    private TimeZoneInfo CentralTimeZone
-    {
-        get
-        {
-            try { return TimeZoneInfo.FindSystemTimeZoneById("America/Chicago"); }
-            catch { return TimeZoneInfo.Local; }
-        }
-    }
+
 
     protected override async Task OnInitializedAsync()
     {

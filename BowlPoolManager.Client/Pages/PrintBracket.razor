@@ -2,6 +2,7 @@
 @layout BowlPoolManager.Client.Layout.PrintLayout
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
+@using BowlPoolManager.Client.Helpers
 @inject HttpClient Http
 
 <PageTitle>Printable Bracket</PageTitle>
@@ -208,14 +209,14 @@ else
     private List<BowlGame> GetStandardGames() => games?.Where(g => !g.IsPlayoff).ToList() ?? new();
     private List<BowlGame> GetPlayoffGames(PlayoffRound round) => games?.Where(g => g.IsPlayoff && g.Round == round).OrderBy(g => g.StartTime).ToList() ?? new();
 
-    private string FormatTimeShort(DateTime utc) => utc.ToLocalTime().ToString("MMM d h:mm tt");
+    private string FormatTimeShort(DateTime utc) => DateTimeHelper.ToCentral(utc).ToString("MMM d h:mm tt") + " CT";
 
     private string FormatCompact(BowlGame g)
     {
-        var time = g.StartTime.ToLocalTime();
+        var time = DateTimeHelper.ToCentral(g.StartTime);
         var loc = string.IsNullOrEmpty(g.Location) ? "" : $" - {g.Location}";
         var tv = string.IsNullOrEmpty(g.Television) ? "" : $" ({g.Television})";
-        return $"{time:MMM d h:mm tt}{tv}{loc}";
+        return $"{time:MMM d h:mm tt} CT{tv}{loc}";
     }
 
     private string RenderSlot(string? teamName) => string.IsNullOrEmpty(teamName) ? "_________________" : teamName;
