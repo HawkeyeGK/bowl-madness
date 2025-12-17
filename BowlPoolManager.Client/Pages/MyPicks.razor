@@ -178,12 +178,12 @@
 
                 @* GAMES LIST *@
                 <div class="card shadow-sm mb-5">
-                    <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between">
-                        <span>Make Your Picks</span>
-                        <span>@activeEntry.Picks.Count / @games.Count</span>
+                    <div class="card-header bg-dark text-white fw-bold">
+                        Make Your Picks (@activeEntry.Picks.Count / @games.Count Selected)
                     </div>
                     <ul class="list-group list-group-flush">
-                        @foreach (var game in games.OrderBy(g => g.StartTime))
+                        @* UPDATED SORT: Standard Bowls (false) First, then Playoffs (true) *@
+                        @foreach (var game in games.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
                         {
                             string pick = activeEntry.Picks.ContainsKey(game.Id) ? activeEntry.Picks[game.Id] : "";
                             bool isSelected = !string.IsNullOrEmpty(pick);
@@ -194,32 +194,47 @@
                             <li class="list-group-item p-3 @(isSelected ? "bg-light-success" : "")">
                                 @* HEADER *@
                                 <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <span class="badge bg-secondary">@game.BowlName</span>
+                                    <div>
+                                        <span class="badge bg-secondary">@game.BowlName</span>
+                                        @if (game.IsPlayoff)
+                                        {
+                                            <span class="badge bg-warning text-dark ms-1">Playoff</span>
+                                        }
+                                    </div>
                                     <div class="text-end">
                                         <div class="small fw-bold text-dark">
                                             @DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d, h:mm tt")
                                         </div>
-                                        <div class="small text-muted">@game.Location</div>
+                                        <div class="small text-muted" style="font-size: 0.85em;">
+                                            @game.Location 
+                                            @if(!string.IsNullOrEmpty(game.Television)) 
+                                            {
+                                                <span class="ms-1 badge bg-light text-dark border">@game.Television</span>
+                                            }
+                                        </div>
                                     </div>
                                 </div>
                                 
-                                @* MATCHUP *@
+                                @* MATCHUP ROWS *@
                                 <div class="row g-2">
                                     <div class="col">
                                         <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_home")" 
                                                checked="@(pick == slots.Home && slots.Home != "TBD")" 
                                                disabled="@isDisabled"
                                                @onchange="@(() => UpdatePick(game.Id, slots.Home))" autocomplete="off">
+                                        
                                         <label class="btn @(isDisabled ? "btn-outline-secondary" : "btn-outline-primary") w-100 d-flex align-items-center justify-content-center h-100 @(pick == slots.Home && slots.Home != "TBD" ? "active fw-bold" : "")" 
                                                for="@($"{game.Id}_home")">
                                             @slots.Home
                                         </label>
                                     </div>
+
                                     <div class="col">
                                         <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_away")" 
                                                checked="@(pick == slots.Away && slots.Away != "TBD")" 
                                                disabled="@isDisabled"
                                                @onchange="@(() => UpdatePick(game.Id, slots.Away))" autocomplete="off">
+                                        
                                         <label class="btn @(isDisabled ? "btn-outline-secondary" : "btn-outline-primary") w-100 d-flex align-items-center justify-content-center h-100 @(pick == slots.Away && slots.Away != "TBD" ? "active fw-bold" : "")" 
                                                for="@($"{game.Id}_away")">
                                             @slots.Away
