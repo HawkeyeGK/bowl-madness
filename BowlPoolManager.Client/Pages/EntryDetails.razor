@@ -82,7 +82,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var game in games.OrderBy(g => g.StartTime))
+                    @foreach (var game in games.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
                     {
                         // Safe Dictionary Access
                         string pick = "";
