@@ -24,13 +24,23 @@ namespace BowlPoolManager.Core.Helpers
                 // SAFETY CHECK: Handle Redacted (Hidden) Entries
                 if (entry.Picks == null)
                 {
+                    // FIXED: Initialize the dictionary with ALL keys to prevents UI crashes (KeyNotFound)
+                    var safeRoundScores = new Dictionary<PlayoffRound, int> 
+                    {
+                        { PlayoffRound.Standard, 0 },
+                        { PlayoffRound.Round1, 0 },
+                        { PlayoffRound.QuarterFinal, 0 },
+                        { PlayoffRound.SemiFinal, 0 },
+                        { PlayoffRound.Championship, 0 }
+                    };
+
                     rows.Add(new LeaderboardRow 
                     { 
                         Entry = entry, 
                         Score = 0, 
                         MaxPossible = 0, 
                         CorrectPicks = 0,
-                        RoundScores = new Dictionary<PlayoffRound, int>()
+                        RoundScores = safeRoundScores
                     });
                     continue;
                 }
