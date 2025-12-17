@@ -80,7 +80,20 @@
                                     <td class="fw-bold text-muted">@row.MaxPossible</td>
                                     <td class="d-none d-sm-table-cell text-muted small">@row.CorrectPicks / @totalFinalGames</td>
                                     <td class="text-end pe-4 text-muted small d-none d-lg-table-cell">
-                                        @(isRedacted ? "-" : $"{row.Entry.TieBreakerPoints} pts")
+                                        @if (currentPool != null && DateTime.UtcNow < currentPool.LockDate)
+                                        {
+                                            <span title="Hidden until picks lock" class="text-secondary opacity-50">
+                                                <i class="bi bi-eye-slash"></i>
+                                            </span>
+                                        }
+                                        else if (isRedacted)
+                                        {
+                                            <span>-</span>
+                                        }
+                                        else
+                                        {
+                                            @($"{row.Entry.TieBreakerPoints} pts")
+                                        }
                                     </td>
                                 </tr>
                             }
