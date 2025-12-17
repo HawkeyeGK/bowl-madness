@@ -13,25 +13,23 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;
 
-        // NEW: Replaces AdminUserId. Supports delegated admins.
-        [JsonProperty("poolAdminIds")]
-        [JsonPropertyName("poolAdminIds")]
-        public List<string> PoolAdminIds { get; set; } = new List<string>();
+        [JsonProperty("season")]
+        [JsonPropertyName("season")]
+        public int Season { get; set; } = DateTime.Now.Year;
 
-        // NEW: Password required to join the pool.
-        [JsonProperty("accessKey")]
-        [JsonPropertyName("accessKey")]
-        public string AccessKey { get; set; } = string.Empty;
+        // NEW: The Master Deadline (No picks/entries after this)
+        [JsonProperty("lockDate")]
+        [JsonPropertyName("lockDate")]
+        public DateTime LockDate { get; set; } = DateTime.UtcNow.AddDays(7); 
 
-        [JsonProperty("year")]
-        [JsonPropertyName("year")]
-        public int Year { get; set; } = DateTime.UtcNow.Year;
+        // NEW: The Gatekeeper Password
+        [JsonProperty("inviteCode")]
+        [JsonPropertyName("inviteCode")]
+        public string InviteCode { get; set; } = string.Empty;
 
-        // Removed: IsPublic (YAGNI - You Aint Gonna Need It)
-
-        // Required for Cosmos DB discriminator
+        // COSMOS DISCRIMINATOR
         [JsonProperty("type")]
         [JsonPropertyName("type")]
-        public string Type { get; set; } = "BowlPool";
+        public string Type { get; set; } = Constants.DocumentTypes.BowlPool;
     }
 }

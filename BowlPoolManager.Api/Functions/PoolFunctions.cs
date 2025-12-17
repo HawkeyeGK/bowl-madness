@@ -52,10 +52,10 @@ namespace BowlPoolManager.Api.Functions
                     return badResponse;
                 }
 
-                if (string.IsNullOrWhiteSpace(pool.AccessKey))
+                if (string.IsNullOrWhiteSpace(pool.InviteCode))
                 {
                     var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                    await badResponse.WriteStringAsync("Access Key is required to secure the pool.");
+                    await badResponse.WriteStringAsync("Invite Code is required to secure the pool.");
                     return badResponse;
                 }
 

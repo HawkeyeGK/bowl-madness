@@ -29,13 +29,13 @@
                     </div>
                     
                     <div class="col-md-3">
-                        <label for="accessKey" class="form-label">Access Key</label>
-                        <InputText id="accessKey" class="form-control" @bind-Value="newPool.AccessKey" placeholder="Secret Password" />
+                        <label for="inviteCode" class="form-label">Invite Code</label>
+                        <InputText id="inviteCode" class="form-control" @bind-Value="newPool.InviteCode" placeholder="Secret Invite Code" />
                     </div>
 
                     <div class="col-md-3">
-                        <label for="poolYear" class="form-label">Year</label>
-                        <InputNumber id="poolYear" class="form-control" @bind-Value="newPool.Year" />
+                        <label for="poolSeason" class="form-label">Season</label>
+                        <InputNumber id="poolSeason" class="form-control" @bind-Value="newPool.Season" />
                     </div>
                 </div>
 
@@ -64,9 +64,8 @@
                 <thead class="table-light">
                     <tr>
                         <th>Name</th>
-                        <th>Year</th>
-                        <th>Access Key</th>
-                        <th>Admins</th>
+                        <th>Season</th>
+                        <th>Invite Code</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -75,18 +74,8 @@
                     {
                         <tr>
                             <td><strong>@pool.Name</strong></td>
-                            <td>@pool.Year</td>
-                            <td><code>@pool.AccessKey</code></td>
-                            <td>
-                                @if(pool.PoolAdminIds.Any())
-                                {
-                                    <span class="badge bg-secondary">@pool.PoolAdminIds.Count Assigned</span>
-                                }
-                                else
-                                {
-                                    <span class="text-muted small">None</span>
-                                }
-                            </td>
+                            <td>@pool.Season</td>
+                            <td><code>@pool.InviteCode</code></td>
                             <td class="text-end">
                                 <button class="btn btn-sm btn-outline-primary" disabled title="Coming Soon">Edit</button>
                                 <button class="btn btn-sm btn-outline-danger" disabled title="Coming Soon">Delete</button>
@@ -101,7 +90,7 @@
 
 @code {
     private List<BowlPool>? pools;
-    private BowlPool newPool = new BowlPool { Year = DateTime.Now.Year };
+    private BowlPool newPool = new BowlPool { Season = DateTime.Now.Year };
 
     protected override async Task OnInitializedAsync()
     {
@@ -128,7 +117,7 @@
             if (response.IsSuccessStatusCode)
             {
                 // Reset form and reload list
-                newPool = new BowlPool { Year = DateTime.Now.Year }; 
+                newPool = new BowlPool { Season = DateTime.Now.Year }; 
                 await LoadPools();
             }
             else

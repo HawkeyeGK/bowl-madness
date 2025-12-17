@@ -9,7 +9,17 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("id")]
         public string Id { get; set; } = Guid.NewGuid().ToString();
 
-        // The name of the person (Entered by Admin)
+        // NEW: Scope this entry to a specific Pool
+        [JsonProperty("poolId")]
+        [JsonPropertyName("poolId")]
+        public string PoolId { get; set; } = string.Empty;
+
+        // NEW: Link to the Authenticated User (Empty for Admin-created entries)
+        [JsonProperty("userId")]
+        [JsonPropertyName("userId")]
+        public string UserId { get; set; } = string.Empty;
+
+        // The name of the person (Entered by Admin or User)
         [JsonProperty("playerName")]
         [JsonPropertyName("playerName")]
         public string PlayerName { get; set; } = string.Empty;
