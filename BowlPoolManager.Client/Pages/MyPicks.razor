@@ -78,7 +78,8 @@
             </div>
         }
 
-        <EditForm Model="@myEntry" OnValidSubmit="SavePicks">
+        @* UPDATED: Added OnInvalidSubmit handler *@
+        <EditForm Model="@myEntry" OnValidSubmit="SavePicks" OnInvalidSubmit="HandleInvalidSubmit">
             <DataAnnotationsValidator />
             
             @if (!string.IsNullOrEmpty(errorMessage))
@@ -194,7 +195,6 @@
             }
         </EditForm>
         
-        @* NEW: Toast Notification *@
         <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1050">
             <div class="toast @(showToast ? "show" : "hide") align-items-center text-white @(isSuccessToast ? "bg-success" : "bg-danger") border-0" role="alert" aria-live="assertive" aria-atomic="true">
                 <div class="d-flex">
@@ -279,6 +279,12 @@
         StateHasChanged();
     }
 
+    // NEW: Invalid Handler
+    private void HandleInvalidSubmit()
+    {
+        TriggerToast("Please check the form for errors (missing Name or Picks).", false);
+    }
+
     private async Task SavePicks()
     {
         if (myEntry == null || currentPool == null) return;
@@ -321,14 +327,12 @@
         }
     }
 
-    // Helper to fire the toast and auto-hide it
     private void TriggerToast(string message, bool success)
     {
         toastMessage = message;
         isSuccessToast = success;
         showToast = true;
         
-        // Auto-dismiss after 4 seconds
         _ = Task.Delay(4000).ContinueWith(t => 
         {
             showToast = false;
