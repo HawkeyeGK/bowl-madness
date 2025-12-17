@@ -1,6 +1,7 @@
 ﻿@using BowlPoolManager.Core
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
+        <a class="navbar-brand" href="">Bowl Madness 2025</a>
         <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -11,44 +12,46 @@
     <nav class="flex-column">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="oi oi-home" aria-hidden="true"></span> Leaderboard
+                <span class="bi bi-trophy-fill" aria-hidden="true"></span> Leaderboard
             </NavLink>
         </div>
         
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="results">
-                <span class="oi oi-list" aria-hidden="true"></span> Scoreboard
+                <span class="bi bi-clipboard-check-fill" aria-hidden="true"></span> Game Results
             </NavLink>
         </div>
-        
+
+        @* NEW: My Picks Link (Authenticated Users Only) *@
+        <AuthorizeView>
+            <Authorized>
+                 <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="mypicks">
+                        <span class="bi bi-controller" aria-hidden="true"></span> My Picks
+                    </NavLink>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
+        @* ADMIN SECTION *@
         <AuthorizeView Roles="@Constants.Roles.SuperAdmin">
             <Authorized>
-                <div class="nav-item px-3 mt-3">
-                    <span class="text-light small text-uppercase fw-bold px-3">Admin</span>
+                <div class="nav-item px-3 mt-4">
+                    <div class="text-uppercase small text-muted px-3 mb-2 fw-bold">Admin</div>
                 </div>
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="admin/dashboard">
-                        <span class="oi oi-dashboard" aria-hidden="true"></span> Dashboard
+                        <span class="bi bi-speedometer2" aria-hidden="true"></span> Dashboard
                     </NavLink>
                 </div>
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="admin/games">
-                        <span class="oi oi-list" aria-hidden="true"></span> Manage Schedule
+                         <span class="bi bi-calendar-event" aria-hidden="true"></span> Manage Games
                     </NavLink>
                 </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="admin/results">
-                        <span class="oi oi-check" aria-hidden="true"></span> Enter Results
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="admin/entry">
-                        <span class="oi oi-pencil" aria-hidden="true"></span> Enter Picks
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
+                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="admin/users">
-                        <span class="oi oi-people" aria-hidden="true"></span> Manage Users
+                         <span class="bi bi-people-fill" aria-hidden="true"></span> Manage Users
                     </NavLink>
                 </div>
             </Authorized>
@@ -58,6 +61,7 @@
 
 @code {
     private bool collapseNavMenu = true;
+
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
     private void ToggleNavMenu()

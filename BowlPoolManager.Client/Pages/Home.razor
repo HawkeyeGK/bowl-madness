@@ -16,16 +16,12 @@
     @if (isLoading)
     {
         <div class="d-flex justify-content-center">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
+            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
         </div>
     }
     else if (leaderboard == null || !leaderboard.Any())
     {
-        <div class="alert alert-info text-center">
-            No entries found. The season hasn't started yet!
-        </div>
+        <div class="alert alert-info text-center">No entries found. The season hasn't started yet!</div>
     }
     else
     {
@@ -33,78 +29,63 @@
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover table-striped mb-0 align-middle text-center">
-                        <thead class="bg-primary text-white">
+                         <thead class="bg-primary text-white">
                             <tr>
-                                <th class="ps-4 text-start cursor-pointer" @onclick='() => Sort("Rank")'>
-                                    Rank @RenderSortIcon("Rank")
-                                </th>
-                                <th class="text-start cursor-pointer" @onclick='() => Sort("Player")'>
-                                    Player @RenderSortIcon("Player")
-                                </th>
-                                <th class="fw-bold cursor-pointer" @onclick='() => Sort("Score")'>
-                                    Total @RenderSortIcon("Score")
-                                </th>
-                                
-                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Bowls")' title="Standard Bowl Games">
-                                    Bowls @RenderSortIcon("Bowls")
-                                </th>
-                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Round1")' title="Round 1 (First Round)">
-                                    1st Rnd @RenderSortIcon("Round1")
-                                </th>
-                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("QuarterFinal")' title="Quarterfinals">
-                                    Quart @RenderSortIcon("QuarterFinal")
-                                </th>
-                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("SemiFinal")' title="Semifinals">
-                                    Semis @RenderSortIcon("SemiFinal")
-                                </th>
-                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Championship")' title="Championship">
-                                    Champ @RenderSortIcon("Championship")
-                                </th>
-                                
-                                <th title="Maximum Potential Score" class="text-dark cursor-pointer" @onclick='() => Sort("Max")'>
-                                    Max @RenderSortIcon("Max")
-                                </th>
-                                <th class="d-none d-sm-table-cell cursor-pointer" @onclick='() => Sort("Correct")'>
-                                    Correct @RenderSortIcon("Correct")
-                                </th>
-                                <th class="text-end pe-4 d-none d-lg-table-cell cursor-pointer" @onclick='() => Sort("Tiebreaker")'>
-                                    Tiebreaker @RenderSortIcon("Tiebreaker")
-                                </th>
-                            </tr>
+                                <th class="ps-4 text-start cursor-pointer" @onclick='() => Sort("Rank")'>Rank @RenderSortIcon("Rank")</th>
+                                <th class="text-start cursor-pointer" @onclick='() => Sort("Player")'>Player @RenderSortIcon("Player")</th>
+                                <th class="fw-bold cursor-pointer" @onclick='() => Sort("Score")'>Total @RenderSortIcon("Score")</th>
+                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Bowls")'>Bowls @RenderSortIcon("Bowls")</th>
+                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Round1")'>1st Rnd @RenderSortIcon("Round1")</th>
+                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("QuarterFinal")'>Quart @RenderSortIcon("QuarterFinal")</th>
+                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("SemiFinal")'>Semis @RenderSortIcon("SemiFinal")</th>
+                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Championship")'>Champ @RenderSortIcon("Championship")</th>
+                                <th title="Maximum Potential Score" class="text-dark cursor-pointer" @onclick='() => Sort("Max")'>Max @RenderSortIcon("Max")</th>
+                                <th class="d-none d-sm-table-cell cursor-pointer" @onclick='() => Sort("Correct")'>Correct @RenderSortIcon("Correct")</th>
+                                <th class="text-end pe-4 d-none d-lg-table-cell cursor-pointer" @onclick='() => Sort("Tiebreaker")'>Tiebreaker @RenderSortIcon("Tiebreaker")</th>
+                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var row in leaderboard)
                             {
+                                bool isRedacted = row.Entry.Picks == null;
                                 <tr>
                                     <td class="ps-4 text-start">@row.Rank</td>
                                     
                                     <td class="text-start fw-bold">
-                                        <a href="entry/@row.Entry.Id" class="text-decoration-none text-dark">
-                                            @row.Entry.PlayerName
-                                        </a>
+                                        @if (isRedacted)
+                                        {
+                                            <span class="text-muted" title="Picks Hidden">
+                                                <i class="bi bi-lock-fill me-1"></i> @row.Entry.PlayerName
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <a href="entry/@row.Entry.Id" class="text-decoration-none text-dark">
+                                                @row.Entry.PlayerName
+                                            </a>
+                                        }
                                     </td>
                                     
                                     <td class="fs-5 text-primary fw-bold">@row.Score</td>
-                                    
                                     <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.Standard]</td>
                                     <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.Round1]</td>
                                     <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.QuarterFinal]</td>
                                     <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.SemiFinal]</td>
                                     <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.Championship]</td>
-
                                     <td class="fw-bold text-muted">@row.MaxPossible</td>
                                     <td class="d-none d-sm-table-cell text-muted small">@row.CorrectPicks / @totalFinalGames</td>
-                                    <td class="text-end pe-4 text-muted small d-none d-lg-table-cell">@row.Entry.TieBreakerPoints pts</td>
+                                    <td class="text-end pe-4 text-muted small d-none d-lg-table-cell">
+                                        @(isRedacted ? "-" : $"{row.Entry.TieBreakerPoints} pts")
+                                    </td>
                                 </tr>
-                            }
+                             }
                         </tbody>
                     </table>
                 </div>
             </div>
-        </div>
-        
+         </div>
         <div class="mt-3 text-center text-muted small">
-            <i class="bi bi-info-circle"></i> Leaderboard updates automatically as game results are entered. Click headers to sort.
+            <i class="bi bi-info-circle"></i> Leaderboard updates automatically. <i class="bi bi-lock-fill"></i> indicates picks are hidden until the pool locks.
         </div>
     }
     <div class="text-center mt-5 mb-5 pt-4 border-top">
@@ -125,8 +106,8 @@
     private List<BracketEntry> entries = new();
     private List<LeaderboardRow> leaderboard = new();
     private int totalFinalGames = 0;
-
-    // Sorting State
+    
+    // Sorting
     private string sortColumn = "Score";
     private bool isAscending = false;
 
@@ -138,15 +119,11 @@
             var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries");
 
             await Task.WhenAll(gamesTask, entriesTask);
-
             games = await gamesTask ?? new();
             entries = await entriesTask ?? new();
             totalFinalGames = games.Count(g => g.Status == GameStatus.Final);
             
-            // Initial Calculation
             leaderboard = ScoringEngine.Calculate(games, entries);
-            
-            // Apply Default Sort
             Sort(sortColumn, forceToggle: false);
         }
         catch (Exception ex)
@@ -163,69 +140,37 @@
     {
         if (forceToggle)
         {
-            if (sortColumn == column)
-            {
-                isAscending = !isAscending;
-            }
+            if (sortColumn == column) isAscending = !isAscending;
             else
             {
                 sortColumn = column;
-                isAscending = true; // Default to Ascending for new columns, effectively. Or Descending. 
-                // Actually, for numbers, Descending is usually better. Let's stick to true/flip logic.
-                if (column == "Score" || column == "Max" || column == "Correct" || column == "Bowls" 
-                    || column == "Round1" || column == "QuarterFinal" || column == "SemiFinal" || column == "Championship")
-                {
-                    isAscending = false; // Default high-to-low for points
-                }
+                isAscending = true; 
+                if (new[]{"Score","Max","Correct","Bowls","Round1","QuarterFinal","SemiFinal","Championship"}.Contains(column))
+                    isAscending = false;
             }
         }
 
         switch (column)
         {
-            case "Rank":
-                leaderboard = isAscending ? leaderboard.OrderBy(r => r.Rank).ToList() : leaderboard.OrderByDescending(r => r.Rank).ToList();
-                break;
-            case "Player":
-                leaderboard = isAscending ? leaderboard.OrderBy(r => r.Entry.PlayerName).ToList() : leaderboard.OrderByDescending(r => r.Entry.PlayerName).ToList();
-                break;
-            case "Score":
-                leaderboard = isAscending ? leaderboard.OrderBy(r => r.Score).ToList() : leaderboard.OrderByDescending(r => r.Score).ToList();
-                break;
-            case "Max":
-                leaderboard = isAscending ? leaderboard.OrderBy(r => r.MaxPossible).ToList() : leaderboard.OrderByDescending(r => r.MaxPossible).ToList();
-                break;
-            case "Correct":
-                leaderboard = isAscending ? leaderboard.OrderBy(r => r.CorrectPicks).ToList() : leaderboard.OrderByDescending(r => r.CorrectPicks).ToList();
-                break;
-            case "Tiebreaker":
-                leaderboard = isAscending ? leaderboard.OrderBy(r => r.Entry.TieBreakerPoints).ToList() : leaderboard.OrderByDescending(r => r.Entry.TieBreakerPoints).ToList();
-                break;
-            case "Bowls":
-                leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.Standard]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.Standard]).ToList();
-                break;
-            case "Round1":
-                leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.Round1]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.Round1]).ToList();
-                break;
-            case "QuarterFinal":
-                leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.QuarterFinal]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.QuarterFinal]).ToList();
-                break;
-            case "SemiFinal":
-                leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.SemiFinal]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.SemiFinal]).ToList();
-                break;
-            case "Championship":
-                leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.Championship]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.Championship]).ToList();
-                break;
+            case "Rank": leaderboard = isAscending ? leaderboard.OrderBy(r => r.Rank).ToList() : leaderboard.OrderByDescending(r => r.Rank).ToList(); break;
+            case "Player": leaderboard = isAscending ? leaderboard.OrderBy(r => r.Entry.PlayerName).ToList() : leaderboard.OrderByDescending(r => r.Entry.PlayerName).ToList(); break;
+            case "Score": leaderboard = isAscending ? leaderboard.OrderBy(r => r.Score).ToList() : leaderboard.OrderByDescending(r => r.Score).ToList(); break;
+            case "Max": leaderboard = isAscending ? leaderboard.OrderBy(r => r.MaxPossible).ToList() : leaderboard.OrderByDescending(r => r.MaxPossible).ToList(); break;
+            case "Correct": leaderboard = isAscending ? leaderboard.OrderBy(r => r.CorrectPicks).ToList() : leaderboard.OrderByDescending(r => r.CorrectPicks).ToList(); break;
+            case "Tiebreaker": leaderboard = isAscending ? leaderboard.OrderBy(r => r.Entry.TieBreakerPoints).ToList() : leaderboard.OrderByDescending(r => r.Entry.TieBreakerPoints).ToList(); break;
+            case "Bowls": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.Standard]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.Standard]).ToList(); break;
+            case "Round1": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.Round1]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.Round1]).ToList(); break;
+            case "QuarterFinal": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.QuarterFinal]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.QuarterFinal]).ToList(); break;
+            case "SemiFinal": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.SemiFinal]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.SemiFinal]).ToList(); break;
+            case "Championship": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.Championship]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.Championship]).ToList(); break;
         }
     }
 
     private RenderFragment RenderSortIcon(string column)
     {
-        // Always render an icon to reserve the pixel width, preventing layout jumps.
-        // If not active, we just hide it visually.
         bool isActive = (sortColumn == column);
         string visibilityStyle = isActive ? "visibility: visible" : "visibility: hidden";
         string iconClass = (isActive && isAscending) ? "bi-caret-up-fill" : "bi-caret-down-fill";
-
         return @<i class="@($"bi {iconClass} small ms-1")" style="@visibilityStyle"></i>;
     }
 }

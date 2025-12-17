@@ -4,9 +4,9 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using BowlPoolManager.Api.Services;
 using BowlPoolManager.Core.Domain;
-using BowlPoolManager.Core; // Added for Constants
+using BowlPoolManager.Core;
 using System.Text.Json;
-using System.Text; // Added for Encoding
+using BowlPoolManager.Api.Helpers;
 
 namespace BowlPoolManager.Api.Functions
 {
@@ -24,42 +24,40 @@ namespace BowlPoolManager.Api.Functions
         [Function("CreatePool")]
         public async Task<HttpResponseData> CreatePool([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
         {
-            _logger.LogInformation("Creating a new pool.");
+            _logger.LogInformation("Creating or Updating a pool.");
 
             try
             {
-                // 1. Authenticate: Parse SWA Header
-                var principal = ParseSwaHeader(req);
-                if (principal == null || string.IsNullOrEmpty(principal.UserId))
-                {
-                    return req.CreateResponse(HttpStatusCode.Unauthorized);
-                }
+                // Security Check (SuperAdmin Only)
+                var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
+                if (!authResult.IsValid) return authResult.ErrorResponse!;
 
-                // 2. Authorize: Check for SuperAdmin Role in DB
-                var userProfile = await _cosmosService.GetUserAsync(principal.UserId);
-                if (userProfile == null || userProfile.AppRole != Constants.Roles.SuperAdmin)
-                {
-                    _logger.LogWarning($"User {principal.UserId} attempted to create a pool but is not SuperAdmin.");
-                    return req.CreateResponse(HttpStatusCode.Forbidden);
-                }
-
-                // 3. Deserialize & Validate
                 var pool = await JsonSerializer.DeserializeAsync<BowlPool>(req.Body);
-                if (pool == null)
+                if (pool == null) return req.CreateResponse(HttpStatusCode.BadRequest);
+
+                // VALIDATION
+                if (string.IsNullOrWhiteSpace(pool.Name))
                 {
-                    var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                    await badResponse.WriteStringAsync("Invalid pool data.");
-                    return badResponse;
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("Pool Name is required.");
+                    return badReq;
                 }
 
                 if (string.IsNullOrWhiteSpace(pool.InviteCode))
                 {
-                    var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                    await badResponse.WriteStringAsync("Invite Code is required to secure the pool.");
-                    return badResponse;
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("Invite Code is required.");
+                    return badReq;
                 }
 
-                // 4. Save
+                // If creating new, ensure lock date is future
+                if (string.IsNullOrEmpty(pool.Id) && pool.LockDate < DateTime.UtcNow)
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("Lock Date must be in the future.");
+                    return badReq;
+                }
+
                 await _cosmosService.AddPoolAsync(pool);
 
                 var response = req.CreateResponse(HttpStatusCode.OK);
@@ -78,27 +76,14 @@ namespace BowlPoolManager.Api.Functions
         {
             _logger.LogInformation("Getting all pools.");
             var pools = await _cosmosService.GetPoolsAsync();
+            
+            // NOTE: In a high-security environment, we might hide InviteCode here 
+            // and only show it to Admins. For now, we assume the InviteCode 
+            // is semi-public (shared via email).
+            
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(pools);
             return response;
-        }
-
-        private ClientPrincipal? ParseSwaHeader(HttpRequestData req)
-        {
-            try
-            {
-                if (!req.Headers.TryGetValues("x-ms-client-principal", out var headerValues)) return null;
-                var header = headerValues.FirstOrDefault();
-                if (string.IsNullOrEmpty(header)) return null;
-
-                var data = Convert.FromBase64String(header);
-                var json = Encoding.UTF8.GetString(data);
-                return JsonSerializer.Deserialize<ClientPrincipal>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            }
-            catch
-            {
-                return null;
-            }
         }
     }
 }

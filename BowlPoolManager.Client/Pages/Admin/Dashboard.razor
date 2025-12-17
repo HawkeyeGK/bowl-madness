@@ -5,92 +5,160 @@
 @using System.Net.Http.Json
 @attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
 @inject HttpClient Http
+@inject NavigationManager Nav
 
 <PageTitle>Admin Dashboard</PageTitle>
 
-<div class="container mt-4">
+<div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Pool Administration</h1>
-        <span class="badge bg-danger">Super Admin Zone</span>
+        <h1 class="h2">Admin Dashboard</h1>
+        <button class="btn btn-primary" @onclick="() => EditPool(new BowlPool())">
+            <i class="bi bi-plus-circle"></i> New Pool
+        </button>
     </div>
 
-    <div class="card mb-5 shadow-sm">
-        <div class="card-header bg-primary text-white">
-            <h5 class="mb-0">Create New Pool</h5>
-        </div>
-        <div class="card-body">
-            <EditForm Model="@newPool" OnValidSubmit="HandleCreatePool">
-                <DataAnnotationsValidator />
-                
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label for="poolName" class="form-label">Pool Name</label>
-                        <InputText id="poolName" class="form-control" @bind-Value="newPool.Name" placeholder="e.g. Nash Family Bowl 2025" />
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <label for="inviteCode" class="form-label">Invite Code</label>
-                        <InputText id="inviteCode" class="form-control" @bind-Value="newPool.InviteCode" placeholder="Secret Invite Code" />
-                    </div>
-
-                    <div class="col-md-3">
-                        <label for="poolSeason" class="form-label">Season</label>
-                        <InputNumber id="poolSeason" class="form-control" @bind-Value="newPool.Season" />
-                    </div>
-                </div>
-
-                <div class="mt-3 text-end">
-                    <button type="submit" class="btn btn-success">
-                        <i class="bi bi-plus-circle"></i> Create Pool
-                    </button>
-                </div>
-            </EditForm>
-        </div>
-    </div>
-
-    <h3 class="mb-3">Existing Pools</h3>
-    @if (pools == null)
+    @if (isLoading)
     {
-        <div class="alert alert-info">Loading pools...</div>
-    }
-    else if (!pools.Any())
-    {
-        <div class="alert alert-warning">No pools found. Create one above!</div>
+        <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
     }
     else
     {
-        <div class="table-responsive">
-            <table class="table table-striped table-hover border">
-                <thead class="table-light">
-                    <tr>
-                        <th>Name</th>
-                        <th>Season</th>
-                        <th>Invite Code</th>
-                        <th class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var pool in pools)
-                    {
-                        <tr>
-                            <td><strong>@pool.Name</strong></td>
-                            <td>@pool.Season</td>
-                            <td><code>@pool.InviteCode</code></td>
-                            <td class="text-end">
-                                <button class="btn btn-sm btn-outline-primary" disabled title="Coming Soon">Edit</button>
-                                <button class="btn btn-sm btn-outline-danger" disabled title="Coming Soon">Delete</button>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+        <div class="row">
+            @* POOLS CARD *@
+            <div class="col-12 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-dark text-white">
+                        <i class="bi bi-collection-fill"></i> Active Pools
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Season</th>
+                                        <th>Invite Code</th>
+                                        <th>Lock Date (UTC)</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var pool in pools)
+                                    {
+                                        <tr>
+                                            <td class="fw-bold">@pool.Name</td>
+                                            <td>@pool.Season</td>
+                                            <td><code class="text-primary">@pool.InviteCode</code></td>
+                                            <td>
+                                                @pool.LockDate.ToString("g")
+                                                @if(DateTime.UtcNow > pool.LockDate)
+                                                {
+                                                    <span class="badge bg-danger ms-2">LOCKED</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-success ms-2">OPEN</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => EditPool(pool)">
+                                                    Edit
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* QUICK LINKS *@
+            <div class="col-md-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-calendar-event display-4 text-secondary"></i>
+                        <h5 class="mt-3">Games</h5>
+                        <p class="text-muted">Manage bowl games, times, and scores.</p>
+                        <a href="admin/games" class="btn btn-outline-primary stretched-link">Manage Games</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-people display-4 text-secondary"></i>
+                        <h5 class="mt-3">Users</h5>
+                        <p class="text-muted">View registered users and roles.</p>
+                        <a href="admin/users" class="btn btn-outline-primary stretched-link">Manage Users</a>
+                    </div>
+                </div>
+            </div>
+
+             <div class="col-md-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-list-check display-4 text-secondary"></i>
+                        <h5 class="mt-3">Entries</h5>
+                        <p class="text-muted">Manage player brackets manually.</p>
+                        @* We point to a theoretical list page or just let them add new *@
+                        <a href="admin/entry" class="btn btn-outline-primary stretched-link">New Entry</a>
+                    </div>
+                </div>
+            </div>
         </div>
     }
 </div>
 
+@* MODAL FOR POOL EDITING *@
+@if (showModal && editingPool != null)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(string.IsNullOrEmpty(editingPool.Id) ? "Create" : "Edit") Pool</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <EditForm Model="editingPool" OnValidSubmit="SavePool">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Pool Name</label>
+                            <InputText @bind-Value="editingPool.Name" class="form-control" placeholder="e.g. Office Pool" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Season</label>
+                            <InputNumber @bind-Value="editingPool.Season" class="form-control" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Invite Code</label>
+                            <InputText @bind-Value="editingPool.InviteCode" class="form-control" placeholder="Secret password" />
+                        </div>
+                         <div class="mb-3">
+                            <label class="form-label">Lock Date (UTC)</label>
+                            <input type="datetime-local" class="form-control" 
+                                   value="@editingPool.LockDate.ToString("yyyy-MM-ddTHH:mm")" 
+                                   @onchange="@(e => editingPool.LockDate = DateTime.Parse(e.Value?.ToString() ?? DateTime.Now.ToString()))" />
+                            <div class="form-text">Picks cannot be changed after this time.</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Pool</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
-    private List<BowlPool>? pools;
-    private BowlPool newPool = new BowlPool { Season = DateTime.Now.Year };
+    private List<BowlPool> pools = new();
+    private BowlPool? editingPool;
+    private bool isLoading = true;
+    private bool showModal = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -99,35 +167,53 @@
 
     private async Task LoadPools()
     {
+        isLoading = true;
         try
         {
-            pools = await Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
+            pools = await Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools") ?? new();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Dashboard] Error loading pools: {ex.Message}");
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
         }
     }
 
-    private async Task HandleCreatePool()
+    private void EditPool(BowlPool pool)
     {
-        try 
+        // Clone or use reference? For simplicity, reference, but careful with cancel.
+        // In prod, clone it. Here we just set defaults if new.
+        if (string.IsNullOrEmpty(pool.Id))
         {
-            var response = await Http.PostAsJsonAsync("api/CreatePool", newPool);
-            if (response.IsSuccessStatusCode)
-            {
-                // Reset form and reload list
-                newPool = new BowlPool { Season = DateTime.Now.Year }; 
-                await LoadPools();
-            }
-            else
-            {
-                Console.WriteLine($"[Dashboard] Creation failed: {response.StatusCode}");
-            }
+            pool.LockDate = DateTime.UtcNow.AddDays(7);
+            pool.Season = DateTime.Now.Year;
         }
-        catch (Exception ex)
+        editingPool = pool;
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        editingPool = null;
+    }
+
+    private async Task SavePool()
+    {
+        if (editingPool == null) return;
+
+        var response = await Http.PostAsJsonAsync("api/CreatePool", editingPool);
+        if (response.IsSuccessStatusCode)
         {
-            Console.WriteLine($"[Dashboard] Error creating pool: {ex.Message}");
+            showModal = false;
+            await LoadPools();
+        }
+        else
+        {
+            // Handle error (alert)
         }
     }
 }

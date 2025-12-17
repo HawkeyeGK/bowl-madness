@@ -1,0 +1,302 @@
+@page "/mypicks"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@using BowlPoolManager.Client.Helpers
+@attribute [Authorize]
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>My Picks</PageTitle>
+
+<div class="container mt-4 pb-5">
+    <div class="text-center mb-4">
+        <h1 class="fw-bold text-primary"><i class="bi bi-controller"></i> My Picks</h1>
+        @if (currentPool != null)
+        {
+            <p class="text-muted">
+                Pool: <strong>@currentPool.Name</strong> | 
+                Deadline: <span class="text-danger fw-bold">@currentPool.LockDate.ToLocalTime().ToString("g")</span>
+            </p>
+        }
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
+    }
+    else if (currentPool == null)
+    {
+        <div class="alert alert-warning text-center">
+            <strong>No Active Pools Found.</strong><br/>
+            Please contact the administrator to set up a pool.
+        </div>
+    }
+    else if (myEntry == null)
+    {
+        @* STATE: NOT JOINED *@
+        <div class="card shadow-sm mw-100 mx-auto" style="max-width: 500px;">
+            <div class="card-body p-4 text-center">
+                <i class="bi bi-shield-lock display-1 text-secondary mb-3"></i>
+                <h3 class="mb-3">Join the Pool</h3>
+                <p class="text-muted mb-4">Enter the invite code provided by the commissioner to create your bracket.</p>
+                
+                <EditForm Model="@joinModel" OnValidSubmit="InitializeEntry">
+                    <div class="mb-3">
+                        <InputText @bind-Value="joinModel.InviteCode" class="form-control form-control-lg text-center" placeholder="Enter Invite Code" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="text-danger mb-3 small">@errorMessage</div>
+                    }
+                    <button type="submit" class="btn btn-primary btn-lg w-100">Start Picking</button>
+                </EditForm>
+            </div>
+        </div>
+    }
+    else
+    {
+        @* STATE: JOINED (LOCKED or OPEN) *@
+        bool isLocked = DateTime.UtcNow > currentPool.LockDate;
+
+        @if (isLocked)
+        {
+            <div class="alert alert-warning text-center">
+                <i class="bi bi-lock-fill"></i> <strong>Picks are Locked!</strong><br/>
+                The deadline has passed. Good luck!
+            </div>
+        }
+        else
+        {
+             <div class="alert alert-info text-center">
+                <i class="bi bi-pencil-fill"></i> <strong>Picks are Open</strong><br/>
+                You can edit your picks until the deadline.
+            </div>
+        }
+
+        <EditForm Model="@myEntry" OnValidSubmit="SavePicks">
+            <DataAnnotationsValidator />
+            
+            @* ERROR / SUCCESS MESSAGES *@
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">@errorMessage</div>
+            }
+            @if (showSuccess)
+            {
+                <div class="alert alert-success alert-dismissible fade show">
+                    <i class="bi bi-check-circle-fill"></i> Picks saved successfully!
+                    <button type="button" class="btn-close" @onclick="() => showSuccess = false"></button>
+                </div>
+            }
+
+            @* PLAYER NAME *@
+            <div class="card mb-4 shadow-sm">
+                <div class="card-body">
+                    <label class="form-label fw-bold">Bracket Name (Your Name)</label>
+                    <InputText @bind-Value="myEntry.PlayerName" class="form-control" disabled="@isLocked" placeholder="e.g. John Doe" />
+                </div>
+            </div>
+
+            @* GAMES LIST *@
+            <div class="card shadow-sm mb-5">
+                <div class="card-header bg-dark text-white fw-bold">
+                    Make Your Picks (@myEntry.Picks.Count / @games.Count Selected)
+                </div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var game in games.OrderBy(g => g.StartTime))
+                    {
+                        string pick = myEntry.Picks.ContainsKey(game.Id) ? myEntry.Picks[game.Id] : "";
+                        bool isSelected = !string.IsNullOrEmpty(pick);
+                        
+                        <li class="list-group-item p-3 @(isSelected ? "bg-light-success" : "")">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-secondary">@game.BowlName</span>
+                                <span class="small text-muted">@DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d, h:mm tt")</span>
+                            </div>
+                            
+                            <div class="d-flex w-100 gap-2">
+                                @* HOME TEAM BUTTON *@
+                                <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_home")" 
+                                       checked="@(pick == game.TeamHome)" 
+                                       disabled="@isLocked"
+                                       @onchange="@(() => UpdatePick(game.Id, game.TeamHome))" autocomplete="off">
+                                <label class="btn btn-outline-primary flex-grow-1 @(pick == game.TeamHome ? "active fw-bold" : "")" for="@($"{game.Id}_home")">
+                                    @game.TeamHome
+                                </label>
+
+                                @* AWAY TEAM BUTTON *@
+                                <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_away")" 
+                                       checked="@(pick == game.TeamAway)" 
+                                       disabled="@isLocked"
+                                       @onchange="@(() => UpdatePick(game.Id, game.TeamAway))" autocomplete="off">
+                                <label class="btn btn-outline-primary flex-grow-1 @(pick == game.TeamAway ? "active fw-bold" : "")" for="@($"{game.Id}_away")">
+                                    @game.TeamAway
+                                </label>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+
+            @* TIEBREAKER *@
+            <div class="card mb-4 shadow-sm border-warning">
+                <div class="card-body bg-warning bg-opacity-10">
+                    <label class="form-label fw-bold text-dark">Tiebreaker: Total Points in Championship Game</label>
+                    <InputNumber @bind-Value="myEntry.TieBreakerPoints" class="form-control" disabled="@isLocked" />
+                    <div class="form-text">Estimate the combined score (e.g., 65).</div>
+                </div>
+            </div>
+
+            @* SUBMIT *@
+            @if (!isLocked)
+            {
+                <div class="d-grid gap-2 mb-5">
+                    <button type="submit" class="btn btn-success btn-lg" disabled="@(!IsComplete || isSaving)">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span> <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-save-fill"></i> <span>Submit Picks</span>
+                        }
+                    </button>
+                    @if (!IsComplete)
+                    {
+                        <div class="text-center text-danger small">
+                            You must pick all @games.Count games before submitting.
+                        </div>
+                    }
+                </div>
+            }
+        </EditForm>
+    }
+</div>
+
+@code {
+    // Models
+    private class JoinModel { public string InviteCode { get; set; } = ""; }
+    private JoinModel joinModel = new();
+    
+    // State
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private bool showSuccess = false;
+    private string errorMessage = "";
+    
+    // Data
+    private BowlPool? currentPool;
+    private List<BowlGame> games = new();
+    private BracketEntry? myEntry;
+
+    // Derived
+    private bool IsComplete => myEntry != null && games.Count > 0 && myEntry.Picks.Count == games.Count;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try 
+        {
+            isLoading = true;
+            // 1. Get Pools (Assume first for now)
+            var pools = await Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
+            currentPool = pools?.FirstOrDefault();
+
+            if (currentPool != null)
+            {
+                // 2. Get Games
+                games = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames") ?? new();
+
+                // 3. Get My Entry
+                var response = await Http.GetAsync($"api/GetMyEntry?poolId={currentPool.Id}");
+                if (response.IsSuccessStatusCode)
+                {
+                    myEntry = await response.Content.ReadFromJsonAsync<BracketEntry>();
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    // Not joined yet
+                    myEntry = null; 
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Error loading data: " + ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void InitializeEntry()
+    {
+        if (currentPool == null) return;
+        
+        // Local Validation of Invite Code (Quick check)
+        if (!string.Equals(joinModel.InviteCode, currentPool.InviteCode, StringComparison.OrdinalIgnoreCase))
+        {
+            errorMessage = "Invalid Invite Code.";
+            return;
+        }
+
+        errorMessage = "";
+        myEntry = new BracketEntry 
+        { 
+            PoolId = currentPool.Id 
+        };
+    }
+
+    private void UpdatePick(string gameId, string winner)
+    {
+        if (myEntry == null) return;
+        myEntry.Picks[gameId] = winner;
+    }
+
+    private async Task SavePicks()
+    {
+        if (myEntry == null || currentPool == null) return;
+
+        isSaving = true;
+        errorMessage = "";
+        showSuccess = false;
+
+        try
+        {
+            // Add Invite Code to URL if we are new (logic handled in API via header or just payload context, 
+            // actually API checks query param for new entries)
+            string url = "api/SaveMyEntry";
+            if (string.IsNullOrEmpty(myEntry.Id))
+            {
+                url += $"?inviteCode={joinModel.InviteCode}";
+            }
+
+            var response = await Http.PostAsJsonAsync(url, myEntry);
+
+            if (response.IsSuccessStatusCode)
+            {
+                myEntry = await response.Content.ReadFromJsonAsync<BracketEntry>();
+                showSuccess = true;
+                // Scroll to top or show toast
+            }
+            else
+            {
+                var errorText = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Save failed: {errorText}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

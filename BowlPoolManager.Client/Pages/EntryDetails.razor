@@ -1,8 +1,8 @@
 @page "/entry/{EntryId}"
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
-@using BowlPoolManager.Core.Helpers
 @using BowlPoolManager.Client.Helpers
+@using BowlPoolManager.Core.Helpers
 @inject HttpClient Http
 
 <div class="container mt-4">
@@ -24,18 +24,26 @@
     {
         <div class="alert alert-warning">Entry not found.</div>
     }
+    else if (entry.Picks == null) 
+    {
+        @* REDACTED STATE *@
+        <div class="alert alert-info text-center py-5">
+            <i class="bi bi-shield-lock display-1"></i>
+            <h2 class="mt-3">Picks Hidden</h2>
+            <p>This bracket is hidden until the pool locks.</p>
+        </div>
+    }
     else
     {
+        @* NORMAL VIEW *@
         <div class="card shadow-sm mb-4">
             <div class="card-body bg-light">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h2 class="fw-bold mb-0">@entry.PlayerName</h2>
                     
                     <div class="d-flex gap-2">
-                        @* NEW: Edit Button for Admins *@
                         <AuthorizeView Roles="@Constants.Roles.SuperAdmin">
                             <Authorized>
-                                @* FIX: Added leading slash to href to ensure absolute path *@
                                 <a href="/admin/entry/@entry.Id" class="btn btn-warning btn-sm shadow-sm">
                                     <i class="bi bi-pencil-square"></i> Edit Picks
                                 </a>
@@ -75,12 +83,12 @@
                 <tbody>
                     @foreach (var game in games.OrderBy(g => g.StartTime))
                     {
-                        // LOGIC: Determine Row Color & Status
+                        // Safe Dictionary Access
+                        string pick = "";
+                        bool hasPick = entry.Picks != null && entry.Picks.TryGetValue(game.Id, out pick);
+
                         string rowClass = "";
                         string pickStatusIcon = "";
-                        
-                        string pick = "";
-                        bool hasPick = entry.Picks.TryGetValue(game.Id, out pick);
 
                         if (game.Status == GameStatus.Final)
                         {
@@ -103,7 +111,6 @@
                         }
                         else
                         {
-                            // Future/In-Progress: Check if pick is dead
                             if (hasPick && eliminatedTeams.Contains(pick))
                             {
                                  rowClass = "table-danger";
@@ -111,7 +118,6 @@
                             }
                         }
 
-                        // LOGIC: Resolve Matchup Names (Real vs Predicted)
                         var (homeTeamName, awayTeamName) = GetDisplayTeams(game, entry);
 
                         <tr class="@rowClass">
@@ -157,17 +163,12 @@
 </div>
 
 @code {
-    [Parameter]
-    public string EntryId { get; set; } = string.Empty;
-
+    [Parameter] public string EntryId { get; set; } = string.Empty;
     private bool isLoading = true;
     private BracketEntry? entry;
     private List<BowlGame> games = new();
-    
-    // Stats
     private int currentScore = 0;
     private int maxPossible = 0;
-    
     private HashSet<string> eliminatedTeams = new(StringComparer.OrdinalIgnoreCase);
 
     protected override async Task OnInitializedAsync()
@@ -176,13 +177,11 @@
         {
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
             var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries");
-
             await Task.WhenAll(gamesTask, entriesTask);
 
             games = await gamesTask ?? new();
             var allEntries = await entriesTask ?? new();
 
-            // Calculate Eliminated Teams
             foreach (var g in games.Where(x => x.Status == GameStatus.Final))
             {
                 if (g.TeamHomeScore < g.TeamAwayScore) eliminatedTeams.Add(g.TeamHome);
@@ -191,7 +190,7 @@
 
             entry = allEntries.FirstOrDefault(e => e.Id == EntryId);
 
-            if (entry != null)
+            if (entry != null && entry.Picks != null)
             {
                 var stats = ScoringEngine.Calculate(games, new List<BracketEntry> { entry }).First();
                 currentScore = stats.Score;
@@ -202,31 +201,17 @@
         {
             Console.WriteLine($"Error loading entry: {ex.Message}");
         }
-        finally
-        {
-            isLoading = false;
-        }
+        finally { isLoading = false; }
     }
 
-    /// <summary>
-    /// Returns the Real teams if known, otherwise returns the User's Predicted teams from the bracket tree.
-    /// </summary>
     private (string Home, string Away) GetDisplayTeams(BowlGame game, BracketEntry? entry)
     {
         string home = game.TeamHome;
         string away = game.TeamAway;
 
-        // If specific teams are already known (Real Life), use them.
-        // If slots are empty, we fill them with the User's predictions from previous rounds.
-        if ((string.IsNullOrEmpty(home) || string.IsNullOrEmpty(away)) && entry != null)
+        if ((string.IsNullOrEmpty(home) || string.IsNullOrEmpty(away)) && entry != null && entry.Picks != null)
         {
-            // 1. Find the "Feeder Games" (Games that advance to this one)
-            var feeders = games
-                .Where(g => g.NextGameId == game.Id)
-                .OrderBy(g => g.StartTime) // Assumes standard bracket ordering (Top/Bottom)
-                .ToList();
-
-            // 2. Gather the user's winners from those feeder games into a Queue
+            var feeders = games.Where(g => g.NextGameId == game.Id).OrderBy(g => g.StartTime).ToList();
             var predictedWinners = new Queue<string>();
             foreach (var feeder in feeders)
             {
@@ -235,23 +220,12 @@
                     predictedWinners.Enqueue(winner);
                 }
             }
-
-            // 3. Fill the Empty Slots
-            if (string.IsNullOrEmpty(home) && predictedWinners.Count > 0)
-            {
-                home = predictedWinners.Dequeue();
-            }
-
-            if (string.IsNullOrEmpty(away) && predictedWinners.Count > 0)
-            {
-                away = predictedWinners.Dequeue();
-            }
+            if (string.IsNullOrEmpty(home) && predictedWinners.Count > 0) home = predictedWinners.Dequeue();
+            if (string.IsNullOrEmpty(away) && predictedWinners.Count > 0) away = predictedWinners.Dequeue();
         }
 
-        // Fallback for visual clarity if we still don't have a name
         if (string.IsNullOrEmpty(home)) home = "TBD";
         if (string.IsNullOrEmpty(away)) away = "TBD";
-
         return (home, away);
     }
 }
