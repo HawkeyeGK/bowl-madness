@@ -111,8 +111,8 @@ namespace BowlPoolManager.Api.Functions
             return response;
         }
 
-        [Function("GetMyEntry")]
-        public async Task<HttpResponseData> GetMyEntry([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
+        [Function("GetMyEntries")]
+        public async Task<HttpResponseData> GetMyEntries([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
             var principal = SecurityHelper.ParseSwaHeader(req);
             if (principal == null || string.IsNullOrEmpty(principal.UserId))
@@ -125,12 +125,10 @@ namespace BowlPoolManager.Api.Functions
 
             if (string.IsNullOrEmpty(poolId)) return req.CreateResponse(HttpStatusCode.BadRequest);
 
-            var entry = await _cosmosService.GetEntryByUserAsync(principal.UserId, poolId);
-
-            if (entry == null) return req.CreateResponse(HttpStatusCode.NotFound);
+            var entries = await _cosmosService.GetEntriesForUserAsync(principal.UserId, poolId);
 
             var response = req.CreateResponse(HttpStatusCode.OK);
-            await response.WriteAsJsonAsync(entry);
+            await response.WriteAsJsonAsync(entries);
             return response;
         }
 
@@ -169,23 +167,57 @@ namespace BowlPoolManager.Api.Functions
                     return forbidden;
                 }
 
-                var existingEntry = await _cosmosService.GetEntryByUserAsync(principal.UserId, entry.PoolId);
-                if (existingEntry == null)
+                // NAME UNIQUENESS CHECK
+                if (string.IsNullOrWhiteSpace(entry.PlayerName))
                 {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("Entry Name is required.");
+                    return badReq;
+                }
+
+                bool isNameTaken = await _cosmosService.IsBracketNameTakenAsync(entry.PoolId, entry.PlayerName, excludeId: entry.Id);
+                if (isNameTaken)
+                {
+                    var conflict = req.CreateResponse(HttpStatusCode.Conflict);
+                    await conflict.WriteStringAsync($"The name '{entry.PlayerName}' is already taken in this pool.");
+                    return conflict;
+                }
+
+                // DETERMINE INSERT VS UPDATE
+                if (string.IsNullOrEmpty(entry.Id))
+                {
+                    // NEW ENTRY -> CHECK INVITE CODE
                     var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
                     string? suppliedCode = query["inviteCode"];
 
+                    // If user already has entries, maybe we don't need invite code? 
+                    // Requirement says "check invite code if new entry". 
+                    // Assuming invite code is always needed for a "new" entry unless we decide otherwise. 
+                    // Let's stick to strict invite code check for any new creation to prevent spam.
                     if (!string.Equals(pool.InviteCode, suppliedCode, StringComparison.OrdinalIgnoreCase))
                     {
                         var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
                         await forbidden.WriteStringAsync("Invalid Invite Code.");
                         return forbidden;
                     }
+
+                    // Assign new ID
+                    entry.Id = Guid.NewGuid().ToString();
+                    entry.CreatedOn = DateTime.UtcNow;
                 }
                 else
                 {
-                    entry.Id = existingEntry.Id;
-                    entry.CreatedOn = existingEntry.CreatedOn; 
+                    // EXISTING ENTRY -> VERIFY OWNERSHIP
+                    var existingEntry = await _cosmosService.GetEntryAsync(entry.Id);
+                    if (existingEntry == null) return req.CreateResponse(HttpStatusCode.NotFound);
+
+                    if (existingEntry.UserId != principal.UserId)
+                    {
+                        return req.CreateResponse(HttpStatusCode.Unauthorized);
+                    }
+                    
+                    // Preserve original data
+                    entry.CreatedOn = existingEntry.CreatedOn;
                 }
 
                 var allGames = await _cosmosService.GetGamesAsync();

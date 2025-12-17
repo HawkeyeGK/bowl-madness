@@ -20,13 +20,15 @@ namespace BowlPoolManager.Api.Services
         Task<List<BowlGame>> GetGamesAsync();
         
         Task AddEntryAsync(BracketEntry entry);
-        // UPDATED: Optional PoolId filter
         Task<List<BracketEntry>> GetEntriesAsync(string? poolId = null);
         Task<BracketEntry?> GetEntryAsync(string id);
         Task DeleteEntryAsync(string id);
         
-        // NEW: Get Entry by User and Pool (for My Picks)
-        Task<BracketEntry?> GetEntryByUserAsync(string userId, string poolId);
+        // REFACTORED: Support multiple entries per user
+        Task<List<BracketEntry>> GetEntriesForUserAsync(string userId, string poolId);
+        
+        // NEW: Uniqueness Check
+        Task<bool> IsBracketNameTakenAsync(string poolId, string bracketName, string? excludeId = null);
 
         Task<List<UserProfile>> GetUsersAsync();
     }
@@ -58,15 +60,11 @@ namespace BowlPoolManager.Api.Services
         public async Task<List<BowlPool>> GetPoolsAsync() => 
             await GetListAsync<BowlPool>(Constants.DocumentTypes.BowlPool);
 
-        public async Task<BowlPool?> GetPoolAsync(string id)
-        {
-            return await GetDocumentAsync<BowlPool>(id);
-        }
+        public async Task<BowlPool?> GetPoolAsync(string id) => 
+            await GetDocumentAsync<BowlPool>(id);
 
-        public async Task<UserProfile?> GetUserAsync(string id)
-        {
-            return await GetDocumentAsync<UserProfile>(id);
-        }
+        public async Task<UserProfile?> GetUserAsync(string id) => 
+            await GetDocumentAsync<UserProfile>(id);
 
         public async Task UpsertUserAsync(UserProfile user) => 
             await UpsertDocumentAsync(user, user.Id);
@@ -97,10 +95,8 @@ namespace BowlPoolManager.Api.Services
             return await QueryAsync<BracketEntry>(new QueryDefinition(sql));
         }
 
-        public async Task<BracketEntry?> GetEntryAsync(string id)
-        {
-            return await GetDocumentAsync<BracketEntry>(id);
-        }
+        public async Task<BracketEntry?> GetEntryAsync(string id) => 
+            await GetDocumentAsync<BracketEntry>(id);
 
         public async Task DeleteEntryAsync(string id)
         {
@@ -108,15 +104,45 @@ namespace BowlPoolManager.Api.Services
             await _container.DeleteItemAsync<BracketEntry>(id, new PartitionKey(id));
         }
 
-        public async Task<BracketEntry?> GetEntryByUserAsync(string userId, string poolId)
+        public async Task<List<BracketEntry>> GetEntriesForUserAsync(string userId, string poolId)
         {
             var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BracketEntry}' AND c.userId = @userId AND c.poolId = @poolId";
             var queryDef = new QueryDefinition(sql)
                 .WithParameter("@userId", userId)
                 .WithParameter("@poolId", poolId);
 
-            var results = await QueryAsync<BracketEntry>(queryDef);
-            return results.FirstOrDefault();
+            return await QueryAsync<BracketEntry>(queryDef);
+        }
+
+        public async Task<bool> IsBracketNameTakenAsync(string poolId, string bracketName, string? excludeId = null)
+        {
+            if (_container == null) return false;
+
+            // Case-insensitive check for name uniqueness within a pool
+            var sql = $"SELECT VALUE COUNT(1) FROM c WHERE c.type = '{Constants.DocumentTypes.BracketEntry}' " +
+                      "AND c.poolId = @poolId AND StringEquals(c.playerName, @name, true)";
+
+            var queryDef = new QueryDefinition(sql)
+                .WithParameter("@poolId", poolId)
+                .WithParameter("@name", bracketName);
+
+            if (!string.IsNullOrEmpty(excludeId))
+            {
+                sql += " AND c.id != @excludeId";
+                queryDef = new QueryDefinition(sql)
+                    .WithParameter("@poolId", poolId)
+                    .WithParameter("@name", bracketName)
+                    .WithParameter("@excludeId", excludeId);
+            }
+
+            var iterator = _container.GetItemQueryIterator<int>(queryDef);
+            if (iterator.HasMoreResults)
+            {
+                var result = await iterator.ReadNextAsync();
+                return result.FirstOrDefault() > 0;
+            }
+
+            return false;
         }
 
         public async Task<List<UserProfile>> GetUsersAsync() => 
