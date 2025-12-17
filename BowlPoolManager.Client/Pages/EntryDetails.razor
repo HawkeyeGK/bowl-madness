@@ -2,7 +2,6 @@
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
 @using BowlPoolManager.Client.Helpers
-@using BowlPoolManager.Core.Helpers
 @inject HttpClient Http
 
 <div class="container mt-4">
@@ -30,7 +29,8 @@
         <div class="alert alert-info text-center py-5">
             <i class="bi bi-shield-lock display-1"></i>
             <h2 class="mt-3">Picks Hidden</h2>
-            <p>This bracket is hidden until the pool locks.</p>
+            @* FIXED TEXT *@
+            <p>This bracket is hidden until the pool unlocks.</p>
         </div>
     }
     else

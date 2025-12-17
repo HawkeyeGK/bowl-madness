@@ -1,0 +1,116 @@
+@page "/admin/entries"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Manage Entries</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-list-check"></i> Manage Entries</h1>
+        <div class="d-flex gap-2">
+            <a href="/admin/dashboard" class="btn btn-outline-secondary">Dashboard</a>
+            <a href="/admin/entry" class="btn btn-primary"><i class="bi bi-plus-lg"></i> New Entry</a>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
+    }
+    else if (entries.Count == 0)
+    {
+        <div class="alert alert-info">No entries found.</div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Player Name</th>
+                                <th>Tiebreaker</th>
+                                <th>Pool ID</th>
+                                <th>Created On (UTC)</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entry in entries)
+                            {
+                                <tr>
+                                    <td class="fw-bold">@entry.PlayerName</td>
+                                    <td>@entry.TieBreakerPoints</td>
+                                    <td><small class="text-muted">@entry.PoolId</small></td>
+                                    <td>@entry.CreatedOn.ToString("g")</td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="/admin/entry/@entry.Id" class="btn btn-outline-primary">Edit</a>
+                                            <button class="btn btn-outline-danger" @onclick="() => DeleteEntry(entry)">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<BracketEntry> entries = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEntries();
+    }
+
+    private async Task LoadEntries()
+    {
+        try
+        {
+            isLoading = true;
+            // Since we are Admin, the API will return full data (unredacted)
+            entries = await Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries") ?? new();
+            // Sort by creation date desc
+            entries = entries.OrderByDescending(e => e.CreatedOn).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task DeleteEntry(BracketEntry entry)
+    {
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete the bracket for '{entry.PlayerName}'?");
+        if (confirmed)
+        {
+            var response = await Http.DeleteAsync($"api/DeleteEntry?id={entry.Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadEntries(); // Refresh list
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("alert", "Failed to delete entry.");
+            }
+        }
+    }
+}
