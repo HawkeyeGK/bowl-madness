@@ -305,7 +305,7 @@
         }
     }
 
-    // NEW: Stable Slot Logic
+    // NEW: Robust Queue Logic
     private (string Home, string Away) GetMatchupSlots(BowlGame game)
     {
         string home = game.TeamHome;
@@ -313,27 +313,26 @@
 
         if (game.IsPlayoff)
         {
-             // Get feeders sorted by time (implicitly Top vs Bottom bracket usually)
+             // 1. Queue up feeders
              var feeders = games.Where(g => g.NextGameId == game.Id).OrderBy(g => g.StartTime).ToList();
-             
-             // Try to fill Home from Feeder 1
-             if (string.IsNullOrEmpty(home)) 
+             var feederQueue = new Queue<BowlGame>(feeders);
+
+             // 2. Fill Home Slot if empty/TBD
+             if (string.IsNullOrWhiteSpace(home) || home.Equals("TBD", StringComparison.OrdinalIgnoreCase))
              {
-                 if (feeders.Count > 0)
+                 if (feederQueue.TryDequeue(out var f1))
                  {
-                     var f1 = feeders[0];
                      if (myEntry != null && myEntry.Picks.TryGetValue(f1.Id, out var w1)) home = w1;
                      else home = "TBD";
                  }
                  else home = "TBD";
              }
-             
-             // Try to fill Away from Feeder 2
-             if (string.IsNullOrEmpty(away)) 
+
+             // 3. Fill Away Slot if empty/TBD
+             if (string.IsNullOrWhiteSpace(away) || away.Equals("TBD", StringComparison.OrdinalIgnoreCase))
              {
-                 if (feeders.Count > 1)
+                 if (feederQueue.TryDequeue(out var f2))
                  {
-                     var f2 = feeders[1];
                      if (myEntry != null && myEntry.Picks.TryGetValue(f2.Id, out var w2)) away = w2;
                      else away = "TBD";
                  }
@@ -341,9 +340,9 @@
              }
         }
 
-        // Fallback for standard games if they are somehow empty
-        if (string.IsNullOrEmpty(home)) home = "TBD";
-        if (string.IsNullOrEmpty(away)) away = "TBD";
+        // Fallback checks
+        if (string.IsNullOrWhiteSpace(home)) home = "TBD";
+        if (string.IsNullOrWhiteSpace(away)) away = "TBD";
         
         return (home, away);
     }
