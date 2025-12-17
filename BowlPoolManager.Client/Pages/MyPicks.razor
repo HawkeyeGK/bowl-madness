@@ -113,8 +113,12 @@
                         string pick = myEntry.Picks.ContainsKey(game.Id) ? myEntry.Picks[game.Id] : "";
                         bool isSelected = !string.IsNullOrEmpty(pick);
                         
-                        // LOGIC: Get Dynamic Options (Standard Teams OR Playoff Winners)
-                        var potentialTeams = GetPotentialTeams(game);
+                        // LOGIC: Get the two slots (Home/Away or TBD)
+                        var slots = GetMatchupSlots(game);
+                        
+                        // LOGIC: Disable if TBD or Locked
+                        bool isGameReady = slots.Home != "TBD" && slots.Away != "TBD";
+                        bool isDisabled = isLocked || !isGameReady;
 
                         <li class="list-group-item p-3 @(isSelected ? "bg-light-success" : "")">
                             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -122,30 +126,38 @@
                                 <span class="small text-muted">@DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d, h:mm tt")</span>
                             </div>
                             
-                            @if (potentialTeams.Any())
-                            {
-                                @* UPDATED: Use Grid Row/Col for equal widths *@
-                                <div class="row g-2">
-                                    @foreach(var teamName in potentialTeams)
-                                    {
-                                        <div class="col">
-                                            <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_{teamName}")" 
-                                                   checked="@(pick == teamName)" 
-                                                   disabled="@isLocked"
-                                                   @onchange="@(() => UpdatePick(game.Id, teamName))" autocomplete="off">
-                                            
-                                            <label class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center h-100 @(pick == teamName ? "active fw-bold" : "")" 
-                                                   for="@($"{game.Id}_{teamName}")">
-                                                @teamName
-                                            </label>
-                                        </div>
-                                    }
+                            <div class="row g-2">
+                                @* SLOT 1: HOME *@
+                                <div class="col">
+                                    <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_home")" 
+                                           checked="@(pick == slots.Home && slots.Home != "TBD")" 
+                                           disabled="@isDisabled"
+                                           @onchange="@(() => UpdatePick(game.Id, slots.Home))" autocomplete="off">
+                                    
+                                    <label class="btn @(isDisabled ? "btn-outline-secondary" : "btn-outline-primary") w-100 d-flex align-items-center justify-content-center h-100 @(pick == slots.Home && slots.Home != "TBD" ? "active fw-bold" : "")" 
+                                           for="@($"{game.Id}_home")">
+                                        @slots.Home
+                                    </label>
                                 </div>
-                            }
-                            else
+
+                                @* SLOT 2: AWAY *@
+                                <div class="col">
+                                    <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_away")" 
+                                           checked="@(pick == slots.Away && slots.Away != "TBD")" 
+                                           disabled="@isDisabled"
+                                           @onchange="@(() => UpdatePick(game.Id, slots.Away))" autocomplete="off">
+                                    
+                                    <label class="btn @(isDisabled ? "btn-outline-secondary" : "btn-outline-primary") w-100 d-flex align-items-center justify-content-center h-100 @(pick == slots.Away && slots.Away != "TBD" ? "active fw-bold" : "")" 
+                                           for="@($"{game.Id}_away")">
+                                        @slots.Away
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            @if (!isGameReady)
                             {
-                                <div class="text-muted small fst-italic text-center py-2 border rounded bg-light">
-                                    Teams TBD. Please make picks in previous rounds (e.g. Quarterfinals) to unlock options here.
+                                <div class="text-muted small fst-italic text-center mt-2">
+                                    Pick winners in previous rounds to unlock this game.
                                 </div>
                             }
                         </li>
@@ -201,9 +213,6 @@
     private List<BowlGame> games = new();
     private BracketEntry? myEntry;
 
-    // Modified to be slightly more lenient on the count if dynamic games aren't ready, 
-    // but strict "Atomic" submission usually requires full picks.
-    // For now, we stick to strict count.
     private bool IsComplete => myEntry != null && games.Count > 0 && myEntry.Picks.Count == games.Count;
 
     protected override async Task OnInitializedAsync()
@@ -254,8 +263,6 @@
     {
         if (myEntry == null) return;
         myEntry.Picks[gameId] = winner;
-        
-        // CRITICAL: Force UI update so downstream playoff games see this new winner immediately
         StateHasChanged();
     }
 
@@ -270,7 +277,6 @@
         try
         {
             string url = "api/SaveMyEntry";
-            // FIXED: Entry ID is never empty (auto-guid), so check the Join Model instead.
             if (!string.IsNullOrEmpty(joinModel.InviteCode))
             {
                 url += $"?inviteCode={joinModel.InviteCode}";
@@ -299,35 +305,46 @@
         }
     }
 
-    // NEW: Smart Logic to find "Who can play in this game?"
-    private List<string> GetPotentialTeams(BowlGame game)
+    // NEW: Stable Slot Logic
+    private (string Home, string Away) GetMatchupSlots(BowlGame game)
     {
-        var teams = new List<string>();
+        string home = game.TeamHome;
+        string away = game.TeamAway;
 
-        // 1. If Hardcoded (Standard Bowl), use them.
-        if (!string.IsNullOrEmpty(game.TeamHome)) teams.Add(game.TeamHome);
-        if (!string.IsNullOrEmpty(game.TeamAway)) teams.Add(game.TeamAway);
-
-        // 2. If it's a Playoff Game, look for Feeders
-        if (game.IsPlayoff && myEntry != null)
+        if (game.IsPlayoff)
         {
-            // Find games that feed into this one (NextGameId points TO us)
-            var feederGames = games.Where(g => g.NextGameId == game.Id).ToList();
-
-            foreach (var feeder in feederGames)
-            {
-                // Check if the user has picked a winner for the feeder
-                if (myEntry.Picks.TryGetValue(feeder.Id, out var winner))
-                {
-                    // Avoid duplicates if for some reason hardcoded + dynamic collide
-                    if (!teams.Contains(winner))
-                    {
-                        teams.Add(winner);
-                    }
-                }
-            }
+             // Get feeders sorted by time (implicitly Top vs Bottom bracket usually)
+             var feeders = games.Where(g => g.NextGameId == game.Id).OrderBy(g => g.StartTime).ToList();
+             
+             // Try to fill Home from Feeder 1
+             if (string.IsNullOrEmpty(home)) 
+             {
+                 if (feeders.Count > 0)
+                 {
+                     var f1 = feeders[0];
+                     if (myEntry != null && myEntry.Picks.TryGetValue(f1.Id, out var w1)) home = w1;
+                     else home = "TBD";
+                 }
+                 else home = "TBD";
+             }
+             
+             // Try to fill Away from Feeder 2
+             if (string.IsNullOrEmpty(away)) 
+             {
+                 if (feeders.Count > 1)
+                 {
+                     var f2 = feeders[1];
+                     if (myEntry != null && myEntry.Picks.TryGetValue(f2.Id, out var w2)) away = w2;
+                     else away = "TBD";
+                 }
+                 else away = "TBD";
+             }
         }
 
-        return teams;
+        // Fallback for standard games if they are somehow empty
+        if (string.IsNullOrEmpty(home)) home = "TBD";
+        if (string.IsNullOrEmpty(away)) away = "TBD";
+        
+        return (home, away);
     }
 }
