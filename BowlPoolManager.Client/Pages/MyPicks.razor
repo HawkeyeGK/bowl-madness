@@ -81,7 +81,6 @@
         <EditForm Model="@myEntry" OnValidSubmit="SavePicks">
             <DataAnnotationsValidator />
             
-            @* ERROR / SUCCESS MESSAGES *@
             @if (!string.IsNullOrEmpty(errorMessage))
             {
                 <div class="alert alert-danger">@errorMessage</div>
@@ -113,31 +112,36 @@
                         string pick = myEntry.Picks.ContainsKey(game.Id) ? myEntry.Picks[game.Id] : "";
                         bool isSelected = !string.IsNullOrEmpty(pick);
                         
+                        // LOGIC: Get Dynamic Options (Standard Teams OR Playoff Winners)
+                        var potentialTeams = GetPotentialTeams(game);
+
                         <li class="list-group-item p-3 @(isSelected ? "bg-light-success" : "")">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="badge bg-secondary">@game.BowlName</span>
                                 <span class="small text-muted">@DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d, h:mm tt")</span>
                             </div>
                             
-                            <div class="d-flex w-100 gap-2">
-                                @* HOME TEAM BUTTON *@
-                                <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_home")" 
-                                       checked="@(pick == game.TeamHome)" 
-                                       disabled="@isLocked"
-                                       @onchange="@(() => UpdatePick(game.Id, game.TeamHome))" autocomplete="off">
-                                <label class="btn btn-outline-primary flex-grow-1 @(pick == game.TeamHome ? "active fw-bold" : "")" for="@($"{game.Id}_home")">
-                                    @game.TeamHome
-                                </label>
-
-                                @* AWAY TEAM BUTTON *@
-                                <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_away")" 
-                                       checked="@(pick == game.TeamAway)" 
-                                       disabled="@isLocked"
-                                       @onchange="@(() => UpdatePick(game.Id, game.TeamAway))" autocomplete="off">
-                                <label class="btn btn-outline-primary flex-grow-1 @(pick == game.TeamAway ? "active fw-bold" : "")" for="@($"{game.Id}_away")">
-                                    @game.TeamAway
-                                </label>
-                            </div>
+                            @if (potentialTeams.Any())
+                            {
+                                <div class="d-flex w-100 gap-2">
+                                    @foreach(var teamName in potentialTeams)
+                                    {
+                                        <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_{teamName}")" 
+                                               checked="@(pick == teamName)" 
+                                               disabled="@isLocked"
+                                               @onchange="@(() => UpdatePick(game.Id, teamName))" autocomplete="off">
+                                        <label class="btn btn-outline-primary flex-grow-1 @(pick == teamName ? "active fw-bold" : "")" for="@($"{game.Id}_{teamName}")">
+                                            @teamName
+                                        </label>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="text-muted small fst-italic text-center py-2 border rounded bg-light">
+                                    Teams TBD. Please make picks in previous rounds (e.g. Quarterfinals) to unlock options here.
+                                </div>
+                            }
                         </li>
                     }
                 </ul>
@@ -179,22 +183,21 @@
 </div>
 
 @code {
-    // Models
     private class JoinModel { public string InviteCode { get; set; } = ""; }
     private JoinModel joinModel = new();
     
-    // State
     private bool isLoading = true;
     private bool isSaving = false;
     private bool showSuccess = false;
     private string errorMessage = "";
     
-    // Data
     private BowlPool? currentPool;
     private List<BowlGame> games = new();
     private BracketEntry? myEntry;
 
-    // Derived
+    // Modified to be slightly more lenient on the count if dynamic games aren't ready, 
+    // but strict "Atomic" submission usually requires full picks.
+    // For now, we stick to strict count.
     private bool IsComplete => myEntry != null && games.Count > 0 && myEntry.Picks.Count == games.Count;
 
     protected override async Task OnInitializedAsync()
@@ -202,16 +205,12 @@
         try 
         {
             isLoading = true;
-            // 1. Get Pools (Assume first for now)
             var pools = await Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
             currentPool = pools?.FirstOrDefault();
 
             if (currentPool != null)
             {
-                // 2. Get Games
                 games = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames") ?? new();
-
-                // 3. Get My Entry
                 var response = await Http.GetAsync($"api/GetMyEntry?poolId={currentPool.Id}");
                 if (response.IsSuccessStatusCode)
                 {
@@ -219,7 +218,6 @@
                 }
                 else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    // Not joined yet
                     myEntry = null; 
                 }
             }
@@ -237,25 +235,22 @@
     private void InitializeEntry()
     {
         if (currentPool == null) return;
-        
-        // Local Validation of Invite Code (Quick check)
         if (!string.Equals(joinModel.InviteCode, currentPool.InviteCode, StringComparison.OrdinalIgnoreCase))
         {
             errorMessage = "Invalid Invite Code.";
             return;
         }
-
         errorMessage = "";
-        myEntry = new BracketEntry 
-        { 
-            PoolId = currentPool.Id 
-        };
+        myEntry = new BracketEntry { PoolId = currentPool.Id };
     }
 
     private void UpdatePick(string gameId, string winner)
     {
         if (myEntry == null) return;
         myEntry.Picks[gameId] = winner;
+        
+        // CRITICAL: Force UI update so downstream playoff games see this new winner immediately
+        StateHasChanged();
     }
 
     private async Task SavePicks()
@@ -268,8 +263,6 @@
 
         try
         {
-            // Add Invite Code to URL if we are new (logic handled in API via header or just payload context, 
-            // actually API checks query param for new entries)
             string url = "api/SaveMyEntry";
             if (string.IsNullOrEmpty(myEntry.Id))
             {
@@ -282,7 +275,6 @@
             {
                 myEntry = await response.Content.ReadFromJsonAsync<BracketEntry>();
                 showSuccess = true;
-                // Scroll to top or show toast
             }
             else
             {
@@ -298,5 +290,37 @@
         {
             isSaving = false;
         }
+    }
+
+    // NEW: Smart Logic to find "Who can play in this game?"
+    private List<string> GetPotentialTeams(BowlGame game)
+    {
+        var teams = new List<string>();
+
+        // 1. If Hardcoded (Standard Bowl), use them.
+        if (!string.IsNullOrEmpty(game.TeamHome)) teams.Add(game.TeamHome);
+        if (!string.IsNullOrEmpty(game.TeamAway)) teams.Add(game.TeamAway);
+
+        // 2. If it's a Playoff Game, look for Feeders
+        if (game.IsPlayoff && myEntry != null)
+        {
+            // Find games that feed into this one (NextGameId points TO us)
+            var feederGames = games.Where(g => g.NextGameId == game.Id).ToList();
+
+            foreach (var feeder in feederGames)
+            {
+                // Check if the user has picked a winner for the feeder
+                if (myEntry.Picks.TryGetValue(feeder.Id, out var winner))
+                {
+                    // Avoid duplicates if for some reason hardcoded + dynamic collide
+                    if (!teams.Contains(winner))
+                    {
+                        teams.Add(winner);
+                    }
+                }
+            }
+        }
+
+        return teams;
     }
 }
