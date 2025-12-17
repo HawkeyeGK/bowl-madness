@@ -13,8 +13,6 @@ namespace BowlPoolManager.Core.Helpers
 
             foreach (var game in finalGames)
             {
-                // Note: We use strictly greater/less than. Ties in bowls are rare/impossible usually, 
-                // but this logic assumes a clear winner for elimination.
                 if (game.TeamHomeScore < game.TeamAwayScore) eliminatedTeams.Add(game.TeamHome);
                 else if (game.TeamAwayScore < game.TeamHomeScore) eliminatedTeams.Add(game.TeamAway);
             }
@@ -23,6 +21,20 @@ namespace BowlPoolManager.Core.Helpers
 
             foreach (var entry in entries)
             {
+                // SAFETY CHECK: Handle Redacted (Hidden) Entries
+                if (entry.Picks == null)
+                {
+                    rows.Add(new LeaderboardRow 
+                    { 
+                        Entry = entry, 
+                        Score = 0, 
+                        MaxPossible = 0, 
+                        CorrectPicks = 0,
+                        RoundScores = new Dictionary<PlayoffRound, int>()
+                    });
+                    continue;
+                }
+
                 int currentScore = 0;
                 int correct = 0;
                 
@@ -52,7 +64,12 @@ namespace BowlPoolManager.Core.Helpers
                         {
                             // Player picked correctly
                             currentScore += game.PointValue;
-                            roundScores[game.Round] += game.PointValue;
+                            
+                            if (roundScores.ContainsKey(game.Round))
+                            {
+                                roundScores[game.Round] += game.PointValue;
+                            }
+                            
                             correct++;
                             
                             // Banked points count towards max
@@ -80,7 +97,7 @@ namespace BowlPoolManager.Core.Helpers
                 });
             }
 
-            // UPDATED SORT ORDER: Total -> Max Potential -> Name
+            // SORT ORDER: Total -> Max Potential -> Name
             var sortedRows = rows.OrderByDescending(r => r.Score)
                                  .ThenByDescending(r => r.MaxPossible)
                                  .ThenBy(r => r.Entry.PlayerName)

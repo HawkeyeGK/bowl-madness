@@ -9,20 +9,26 @@ namespace BowlPoolManager.Api.Services
     {
         Task AddPoolAsync(BowlPool pool);
         Task<List<BowlPool>> GetPoolsAsync();
+        // NEW: Get Single Pool (for LockDate checks)
+        Task<BowlPool?> GetPoolAsync(string id);
+
         Task<UserProfile?> GetUserAsync(string id);
         Task UpsertUserAsync(UserProfile user);
+        
         Task AddGameAsync(BowlGame game);
         Task UpdateGameAsync(BowlGame game);
         Task<List<BowlGame>> GetGamesAsync();
+        
         Task AddEntryAsync(BracketEntry entry);
-        Task<List<BracketEntry>> GetEntriesAsync();
+        // UPDATED: Optional PoolId filter
+        Task<List<BracketEntry>> GetEntriesAsync(string? poolId = null);
         Task<BracketEntry?> GetEntryAsync(string id);
-
-        // NEW: Get All Users
-        Task<List<UserProfile>> GetUsersAsync();
-
-        // NEW: Delete Entry
         Task DeleteEntryAsync(string id);
+        
+        // NEW: Get Entry by User and Pool (for My Picks)
+        Task<BracketEntry?> GetEntryByUserAsync(string userId, string poolId);
+
+        Task<List<UserProfile>> GetUsersAsync();
     }
 
     public class CosmosDbService : ICosmosDbService
@@ -33,7 +39,6 @@ namespace BowlPoolManager.Api.Services
         {
             var connectionString = configuration["CosmosDbConnectionString"];
             
-            // Graceful fallback for build environments
             if (string.IsNullOrEmpty(connectionString)) 
             {
                  _container = null;
@@ -53,18 +58,14 @@ namespace BowlPoolManager.Api.Services
         public async Task<List<BowlPool>> GetPoolsAsync() => 
             await GetListAsync<BowlPool>(Constants.DocumentTypes.BowlPool);
 
+        public async Task<BowlPool?> GetPoolAsync(string id)
+        {
+            return await GetDocumentAsync<BowlPool>(id);
+        }
+
         public async Task<UserProfile?> GetUserAsync(string id)
         {
-            if (_container == null) return null;
-            try
-            {
-                ItemResponse<UserProfile> response = await _container.ReadItemAsync<UserProfile>(id, new PartitionKey(id));
-                return response.Resource;
-            }
-            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-            {
-                return null;
-            }
+            return await GetDocumentAsync<UserProfile>(id);
         }
 
         public async Task UpsertUserAsync(UserProfile user) => 
@@ -82,34 +83,44 @@ namespace BowlPoolManager.Api.Services
         public async Task AddEntryAsync(BracketEntry entry) => 
             await UpsertDocumentAsync(entry, entry.Id);
 
-        public async Task<List<BracketEntry>> GetEntriesAsync() => 
-            await GetListAsync<BracketEntry>(Constants.DocumentTypes.BracketEntry);
+        public async Task<List<BracketEntry>> GetEntriesAsync(string? poolId = null)
+        {
+            var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BracketEntry}'";
+            
+            if (!string.IsNullOrEmpty(poolId))
+            {
+                sql += " AND c.poolId = @poolId";
+                var queryDef = new QueryDefinition(sql).WithParameter("@poolId", poolId);
+                return await QueryAsync<BracketEntry>(queryDef);
+            }
+
+            return await QueryAsync<BracketEntry>(new QueryDefinition(sql));
+        }
 
         public async Task<BracketEntry?> GetEntryAsync(string id)
         {
-            if (_container == null) return null;
-            try
-            {
-                ItemResponse<BracketEntry> response = await _container.ReadItemAsync<BracketEntry>(id, new PartitionKey(id));
-                return response.Resource;
-            }
-            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-            {
-                return null;
-            }
+            return await GetDocumentAsync<BracketEntry>(id);
         }
 
-        // NEW: Get All Users Implementation
-        public async Task<List<UserProfile>> GetUsersAsync() => 
-            await GetListAsync<UserProfile>(Constants.DocumentTypes.UserProfile);
-
-        // NEW: Delete Implementation
         public async Task DeleteEntryAsync(string id)
         {
             if (_container == null) throw new InvalidOperationException("Database connection not initialized.");
-            // PartitionKey is /id
             await _container.DeleteItemAsync<BracketEntry>(id, new PartitionKey(id));
         }
+
+        public async Task<BracketEntry?> GetEntryByUserAsync(string userId, string poolId)
+        {
+            var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BracketEntry}' AND c.userId = @userId AND c.poolId = @poolId";
+            var queryDef = new QueryDefinition(sql)
+                .WithParameter("@userId", userId)
+                .WithParameter("@poolId", poolId);
+
+            var results = await QueryAsync<BracketEntry>(queryDef);
+            return results.FirstOrDefault();
+        }
+
+        public async Task<List<UserProfile>> GetUsersAsync() => 
+            await GetListAsync<UserProfile>(Constants.DocumentTypes.UserProfile);
 
         // --- INTERNAL GENERIC HELPERS ---
 
@@ -119,18 +130,32 @@ namespace BowlPoolManager.Api.Services
             await _container.UpsertItemAsync(item, new PartitionKey(id));
         }
 
-        private async Task<List<T>> GetListAsync<T>(string documentType)
+        private async Task<T?> GetDocumentAsync<T>(string id)
         {
-            // Simple generic query based on the 'type' discriminator
-            var sql = $"SELECT * FROM c WHERE c.type = '{documentType}'";
-            return await QueryAsync<T>(sql);
+            if (_container == null) return default;
+            try
+            {
+                ItemResponse<T> response = await _container.ReadItemAsync<T>(id, new PartitionKey(id));
+                return response.Resource;
+            }
+            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return default;
+            }
         }
 
-        private async Task<List<T>> QueryAsync<T>(string sqlQuery)
+        private async Task<List<T>> GetListAsync<T>(string documentType)
+        {
+            var sql = $"SELECT * FROM c WHERE c.type = '{documentType}'";
+            return await QueryAsync<T>(new QueryDefinition(sql));
+        }
+
+        // Updated to accept QueryDefinition for parameters
+        private async Task<List<T>> QueryAsync<T>(QueryDefinition queryDef)
         {
             if (_container == null) throw new InvalidOperationException("Database connection not initialized.");
 
-            var query = _container.GetItemQueryIterator<T>(new QueryDefinition(sqlQuery));
+            var query = _container.GetItemQueryIterator<T>(queryDef);
             var results = new List<T>();
 
             while (query.HasMoreResults)
@@ -140,6 +165,12 @@ namespace BowlPoolManager.Api.Services
             }
 
             return results;
+        }
+
+        // Backwards compatibility overload (if needed by other code not yet updated)
+        private async Task<List<T>> QueryAsync<T>(string sqlQuery)
+        {
+            return await QueryAsync<T>(new QueryDefinition(sqlQuery));
         }
     }
 }
