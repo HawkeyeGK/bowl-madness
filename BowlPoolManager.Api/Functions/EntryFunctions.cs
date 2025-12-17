@@ -37,17 +37,9 @@ namespace BowlPoolManager.Api.Functions
             // 2. Identify Requester & Resolve Role
             var principal = SecurityHelper.ParseSwaHeader(req);
             string currentUserId = principal?.UserId ?? string.Empty;
-            bool isAdmin = false;
-
-            // FIXED: Check Database for Admin Role (SWA Header is not enough)
-            if (!string.IsNullOrEmpty(currentUserId))
-            {
-                var userProfile = await _cosmosService.GetUserAsync(currentUserId);
-                if (userProfile != null && userProfile.AppRole == Constants.Roles.SuperAdmin)
-                {
-                    isAdmin = true;
-                }
-            }
+            
+            // REFACTORED: Use Centralized Helper
+            bool isAdmin = await SecurityHelper.IsSuperAdminAsync(req, _cosmosService);
 
             // 3. The Silencer (Redaction Logic)
             foreach (var entry in entries)
@@ -89,17 +81,9 @@ namespace BowlPoolManager.Api.Functions
             // SECURITY CHECK
             var principal = SecurityHelper.ParseSwaHeader(req);
             string currentUserId = principal?.UserId ?? string.Empty;
-            bool isAdmin = false;
-
-            // FIXED: Check Database for Admin Role
-            if (!string.IsNullOrEmpty(currentUserId))
-            {
-                var userProfile = await _cosmosService.GetUserAsync(currentUserId);
-                if (userProfile != null && userProfile.AppRole == Constants.Roles.SuperAdmin)
-                {
-                    isAdmin = true;
-                }
-            }
+            
+            // REFACTORED: Use Centralized Helper
+            bool isAdmin = await SecurityHelper.IsSuperAdminAsync(req, _cosmosService);
 
             // Check Ownership/Admin
             bool isMine = !string.IsNullOrEmpty(entry.UserId) && entry.UserId == currentUserId;

@@ -1,58 +1,80 @@
-using System.Text;
-using System.Text.Json;
 using Microsoft.Azure.Functions.Worker.Http;
 using BowlPoolManager.Core.Domain;
-using System.Net;
-using BowlPoolManager.Api.Services;
 using BowlPoolManager.Core;
+using BowlPoolManager.Api.Services; // Required for ICosmosDbService
+using System.Text.Json;
+using System.Text;
 
 namespace BowlPoolManager.Api.Helpers
 {
     public static class SecurityHelper
     {
+        public class ClientPrincipal
+        {
+            public string IdentityProvider { get; set; } = string.Empty;
+            public string UserId { get; set; } = string.Empty;
+            public string UserDetails { get; set; } = string.Empty;
+            public IEnumerable<string> UserRoles { get; set; } = new List<string>();
+        }
+
         public static ClientPrincipal? ParseSwaHeader(HttpRequestData req)
         {
-            try
-            {
-                if (!req.Headers.TryGetValues("x-ms-client-principal", out var headerValues)) return null;
-                var header = headerValues.FirstOrDefault();
-                if (string.IsNullOrEmpty(header)) return null;
-
-                var data = Convert.FromBase64String(header);
-                var json = Encoding.UTF8.GetString(data);
-                return JsonSerializer.Deserialize<ClientPrincipal>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            }
-            catch
+            if (!req.Headers.TryGetValues("x-ms-client-principal", out var headerValues))
             {
                 return null;
             }
+
+            var header = headerValues.FirstOrDefault();
+            if (string.IsNullOrEmpty(header)) return null;
+
+            var data = Convert.FromBase64String(header);
+            var decoded = Encoding.UTF8.GetString(data);
+            
+            return JsonSerializer.Deserialize<ClientPrincipal>(decoded, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
 
         /// <summary>
-        /// Validates that the request comes from an authenticated user who is a SuperAdmin.
-        /// Returns (true, null) if valid.
-        /// Returns (false, HttpResponseData) if invalid (Unauthorized or Forbidden).
+        /// Determines if the current request is from a SuperAdmin by verifying against the Database.
         /// </summary>
-        public static async Task<(bool IsValid, HttpResponseData? ErrorResponse)> ValidateSuperAdminAsync(
-            HttpRequestData req, 
-            ICosmosDbService cosmosService)
+        public static async Task<bool> IsSuperAdminAsync(HttpRequestData req, ICosmosDbService cosmosService)
         {
-            // 1. Authenticate
+            var principal = ParseSwaHeader(req);
+            if (string.IsNullOrEmpty(principal?.UserId)) return false;
+
+            var userProfile = await cosmosService.GetUserAsync(principal.UserId);
+            return userProfile != null && userProfile.AppRole == Constants.Roles.SuperAdmin;
+        }
+
+        public class AuthResult
+        {
+            public bool IsValid { get; set; }
+            public HttpResponseData? ErrorResponse { get; set; }
+        }
+
+        public static async Task<AuthResult> ValidateSuperAdminAsync(HttpRequestData req, ICosmosDbService cosmosService)
+        {
             var principal = ParseSwaHeader(req);
             if (principal == null || string.IsNullOrEmpty(principal.UserId))
             {
-                return (false, req.CreateResponse(HttpStatusCode.Unauthorized));
+                return new AuthResult 
+                { 
+                    IsValid = false, 
+                    ErrorResponse = req.CreateResponse(System.Net.HttpStatusCode.Unauthorized) 
+                };
             }
 
-            // 2. Authorize (SuperAdmin Only)
+            // DB LOOKUP (The Source of Truth)
             var userProfile = await cosmosService.GetUserAsync(principal.UserId);
             if (userProfile == null || userProfile.AppRole != Constants.Roles.SuperAdmin)
             {
-                // Log warning here if you had a logger passed in, otherwise relies on caller logging
-                return (false, req.CreateResponse(HttpStatusCode.Forbidden));
+                return new AuthResult 
+                { 
+                    IsValid = false, 
+                    ErrorResponse = req.CreateResponse(System.Net.HttpStatusCode.Forbidden) 
+                };
             }
 
-            return (true, null);
+            return new AuthResult { IsValid = true };
         }
     }
 }
