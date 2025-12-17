@@ -10,6 +10,7 @@
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
 @inject BowlPoolManager.Client.Services.AppState AppState
+@inject IJSRuntime JS
 
 <PageTitle>My Picks</PageTitle>
 
@@ -134,10 +135,17 @@
                                         </div>
                                     </div>
 
-                                    <div class="d-grid">
-                                        <button class="btn btn-outline-primary" @onclick="() => EditEntry(entry)">
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-outline-primary flex-grow-1" @onclick="() => EditEntry(entry)">
                                             <i class="bi bi-pencil-square"></i> @(IsLocked ? "View Picks" : "Edit Picks")
                                         </button>
+                                        
+                                        @if (!IsLocked)
+                                        {
+                                            <button class="btn btn-outline-danger" @onclick="() => DeleteEntry(entry)" title="Delete Bracket">
+                                                <i class="bi bi-trash-fill"></i>
+                                            </button>
+                                        }
                                     </div>
                                 </div>
                             </div>
@@ -426,6 +434,39 @@
     private void HandleInvalidSubmit()
     {
         TriggerToast("Please check the form for errors.", false);
+    }
+
+    private async Task DeleteEntry(BracketEntry entry)
+    {
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete the bracket '{entry.PlayerName}'? This action cannot be undone.");
+        if (!confirmed) return;
+
+        isSaving = true;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/DeleteMyEntry?id={entry.Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                myEntries.Remove(entry);
+                TriggerToast("Bracket deleted successfully.", true);
+                
+                AppState.NotifyDataChanged();
+                StateHasChanged();
+            }
+            else
+            {
+                var msg = await response.Content.ReadAsStringAsync();
+                TriggerToast($"Delete failed: {msg}", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            TriggerToast($"Error: {ex.Message}", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
     }
 
     private async Task SavePicks()

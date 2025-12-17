@@ -119,6 +119,47 @@ namespace BowlPoolManager.Api.Functions
             return response;
         }
 
+        [Function("DeleteMyEntry")]
+        public async Task<HttpResponseData> DeleteMyEntry([HttpTrigger(AuthorizationLevel.Anonymous, "delete")] HttpRequestData req)
+        {
+            _logger.LogInformation("User attempting to delete their entry.");
+            
+            var principal = SecurityHelper.ParseSwaHeader(req);
+            if (principal == null || string.IsNullOrEmpty(principal.UserId))
+            {
+                return req.CreateResponse(HttpStatusCode.Unauthorized);
+            }
+
+            var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+            var id = query["id"];
+
+            if (string.IsNullOrEmpty(id)) return req.CreateResponse(HttpStatusCode.BadRequest);
+
+            var entry = await _cosmosService.GetEntryAsync(id);
+            if (entry == null) return req.CreateResponse(HttpStatusCode.NotFound);
+
+            // 1. Verify Ownership
+            if (entry.UserId != principal.UserId)
+            {
+                return req.CreateResponse(HttpStatusCode.Forbidden);
+            }
+
+            // 2. Verify Pool Lock Status
+            if (!string.IsNullOrEmpty(entry.PoolId))
+            {
+                var pool = await _cosmosService.GetPoolAsync(entry.PoolId);
+                if (pool != null && DateTime.UtcNow > pool.LockDate)
+                {
+                    var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
+                    await forbidden.WriteStringAsync("Cannot delete entry. The pool is locked.");
+                    return forbidden;
+                }
+            }
+
+            await _cosmosService.DeleteEntryAsync(id);
+            return req.CreateResponse(HttpStatusCode.OK);
+        }
+
         [Function("SaveMyEntry")]
         public async Task<HttpResponseData> SaveMyEntry([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
         {
