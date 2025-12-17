@@ -1,4 +1,9 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+﻿@using BowlPoolManager.Core.Domain
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">
             <i class="bi bi-bowling-ball me-2"></i>Bowl Madness
@@ -24,7 +29,7 @@
                 @* MY PICKS *@
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="mypicks">
-                        <span class="bi bi-clipboard-check-fill me-2" aria-hidden="true"></span> My Picks
+                        <span class="bi bi-clipboard-check-fill me-2" aria-hidden="true"></span> @MyPicksText
                     </NavLink>
                 </div>
                 
@@ -69,11 +74,45 @@
 
 @code {
     private bool collapseNavMenu = true;
+    private string MyPicksText = "My Picks";
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            if (authState.User.Identity?.IsAuthenticated ?? false)
+            {
+                // 1. Get Pool Status
+                var pools = await Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
+                var currentPool = pools?.FirstOrDefault();
+
+                if (currentPool != null)
+                {
+                    bool isLocked = DateTime.UtcNow > currentPool.LockDate;
+
+                    // 2. If Open, check if user has entries
+                    if (!isLocked)
+                    {
+                        var myEntries = await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyEntries?poolId={currentPool.Id}");
+                        if (myEntries == null || !myEntries.Any())
+                        {
+                            MyPicksText = "Enter Your Picks";
+                        }
+                    }
+                }
+            }
+        }
+        catch 
+        {
+            // Fail silently to default "My Picks" if API or network has issues
+        }
     }
 }
