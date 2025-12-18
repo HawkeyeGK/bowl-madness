@@ -19,6 +19,27 @@
             <a href="/admin/entry" class="btn btn-primary"><i class="bi bi-plus-lg"></i> New Entry</a>
         </div>
     </div>
+    
+    @* POOL FILTER *@
+    <div class="card mb-4">
+        <div class="card-body py-2">
+            <div class="row align-items-center">
+                <div class="col-auto fw-bold">Filter by Pool:</div>
+                <div class="col-auto">
+                    <select class="form-select form-select-sm" @onchange="OnPoolFilterChanged">
+                        <option value="">-- All Pools --</option>
+                        @foreach (var pool in pools)
+                        {
+                            <option value="@pool.Id" selected="@(selectedPoolId == pool.Id)">@pool.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col text-end small text-muted">
+                    Showing @filteredEntries.Count entries
+                </div>
+            </div>
+        </div>
+    </div>
 
     @if (isLoading)
     {
@@ -26,7 +47,7 @@
             <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
         </div>
     }
-    else if (entries.Count == 0)
+    else if (filteredEntries.Count == 0)
     {
         <div class="alert alert-info">No entries found.</div>
     }
@@ -39,20 +60,19 @@
                         <thead class="table-light">
                             <tr>
                                 <th>Player Name</th>
-                                <th>Email</th> @* NEW: Email Column *@
+                                <th>Email</th>
+                                <th>Pool</th>
                                 <th>Tiebreaker</th>
-                                @* REMOVED: Pool ID *@
-                                <th>Created On (CT)</th> @* UPDATED: Timezone *@
+                                <th>Created On (CT)</th>
                                 <th class="text-end">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var entry in entries)
+                            @foreach (var entry in filteredEntries)
                             {
                                 <tr>
                                     <td class="fw-bold">@entry.PlayerName</td>
                                     <td>
-                                        @* NEW: Email Lookup *@
                                         @if (userEmailMap.TryGetValue(entry.UserId, out var email))
                                         {
                                             <a href="mailto:@email" class="text-decoration-none">@email</a>
@@ -62,8 +82,13 @@
                                             <span class="text-muted small fst-italic">Manual / Unknown</span>
                                         }
                                     </td>
+                                    <td>
+                                        @{
+                                            var poolName = pools.FirstOrDefault(p => p.Id == entry.PoolId)?.Name ?? "Unknown";
+                                        }
+                                        <span class="badge bg-light text-dark border">@poolName</span>
+                                    </td>
                                     <td>@entry.TieBreakerPoints</td>
-                                    @* UPDATED: Use Helper for Central Time *@
                                     <td>@DateTimeHelper.ToCentral(entry.CreatedOn).ToString("g")</td>
                                     <td class="text-end">
                                         <div class="btn-group btn-group-sm">
@@ -82,9 +107,13 @@
 </div>
 
 @code {
-    private List<BracketEntry> entries = new();
-    private Dictionary<string, string> userEmailMap = new(); // NEW: Lookup
+    private List<BracketEntry> allEntries = new();
+    private List<BracketEntry> filteredEntries = new();
+    private List<BowlPool> pools = new();
+    private Dictionary<string, string> userEmailMap = new();
     private bool isLoading = true;
+    
+    private string selectedPoolId = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -97,21 +126,25 @@
         {
             isLoading = true;
             
-            // 1. Fetch Entries and Users in parallel
-            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries");
+            // 1. Fetch Global Data
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
+            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries"); // No poolId = get all
             var usersTask = Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers");
 
-            await Task.WhenAll(entriesTask, usersTask);
+            await Task.WhenAll(poolsTask, entriesTask, usersTask);
 
-            // 2. Populate Data
-            entries = await entriesTask ?? new();
+            pools = await poolsTask ?? new();
+            allEntries = await entriesTask ?? new();
             var users = await usersTask ?? new();
 
-            // 3. Build Lookup Map (UserId -> Email)
+            // 2. Build Lookup Map
             userEmailMap = users.ToDictionary(u => u.Id, u => u.Email);
-
-            // 4. Sort
-            entries = entries.OrderByDescending(e => e.CreatedOn).ToList();
+            
+            // 3. Sort Descending
+            allEntries = allEntries.OrderByDescending(e => e.CreatedOn).ToList();
+            
+            // 4. Initial Filter
+            FilterData();
         }
         catch (Exception ex)
         {
@@ -120,6 +153,24 @@
         finally
         {
             isLoading = false;
+        }
+    }
+    
+    private void OnPoolFilterChanged(ChangeEventArgs e)
+    {
+        selectedPoolId = e.Value?.ToString() ?? "";
+        FilterData();
+    }
+    
+    private void FilterData()
+    {
+        if (string.IsNullOrEmpty(selectedPoolId))
+        {
+            filteredEntries = allEntries;
+        }
+        else
+        {
+            filteredEntries = allEntries.Where(e => e.PoolId == selectedPoolId).ToList();
         }
     }
 
@@ -131,7 +182,7 @@
             var response = await Http.DeleteAsync($"api/DeleteEntry?id={entry.Id}");
             if (response.IsSuccessStatusCode)
             {
-                await LoadData(); // Refresh list
+                await LoadData();
             }
             else
             {
