@@ -3,25 +3,40 @@
 @using BowlPoolManager.Core
 @using BowlPoolManager.Client.Helpers
 @using BowlPoolManager.Core.Helpers
+@using Microsoft.AspNetCore.Components.Authorization
 @inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Leaderboard</PageTitle>
 
 <div class="container-fluid mt-4">
     <div class="text-center mb-5">
-        @* UPDATED H1: Generic Page Title *@
         <h1 class="display-4 fw-bold text-primary">
             <i class="bi bi-trophy-fill"></i> Leaderboard
         </h1>
         
-        @* UPDATED SUBTITLE: Pool Name + Lock Date *@
+        @if (pools != null && pools.Count > 1)
+        {
+            <div class="d-flex justify-content-center align-items-center mb-2">
+                <select class="form-select w-auto fw-bold text-center border-primary" @onchange="OnPoolChanged">
+                    @foreach (var pool in pools)
+                    {
+                        <option value="@pool.Id" selected="@(pool.Id == currentPool?.Id)">@pool.Name</option>
+                    }
+                </select>
+            </div>
+        }
+        else if (currentPool != null)
+        {
+            <h2 class="h4 text-secondary">@currentPool.Name</h2>
+        }
+
         <p class="lead text-muted">
             @if (currentPool != null)
             {
-                <strong>@currentPool.Name</strong>
-                <span class="mx-2">|</span> 
                 <span class="text-danger fw-bold fs-6">
-                    <i class="bi bi-clock"></i> Picks Lock at @DateTimeHelper.ToCentral(currentPool.LockDate).ToString("MMM d, h:mm tt") CT
+                    <i class="bi bi-clock"></i> 
+                    Picks Lock at @DateTimeHelper.ToCentral(currentPool.LockDate).ToString("MMM d, h:mm tt") CT
                 </span>
             }
             else
@@ -39,7 +54,9 @@
     }
     else if (leaderboard == null || !leaderboard.Any())
     {
-        <div class="alert alert-info text-center">No entries found. The season hasn't started yet!</div>
+        <div class="alert alert-info text-center">
+            No entries found for <strong>@(currentPool?.Name ?? "this pool")</strong>.
+        </div>
     }
     else
     {
@@ -68,7 +85,6 @@
                                 bool isRedacted = row.Entry.Picks == null;
                                 <tr>
                                     <td class="ps-4 text-start">@row.Rank</td>
-                                    
                                     <td class="text-start fw-bold">
                                         <a href="entry/@row.Entry.Id" class="text-decoration-none text-dark">
                                             @if (isRedacted)
@@ -78,7 +94,6 @@
                                             @row.Entry.PlayerName
                                         </a>
                                     </td>
-                                    
                                     <td class="fs-5 text-primary fw-bold">@row.Score</td>
                                     <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.Standard]</td>
                                     <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.Round1]</td>
@@ -129,6 +144,7 @@
 
 @code {
     private bool isLoading = true;
+    private List<BowlPool> pools = new();
     private BowlPool? currentPool;
     private List<BowlGame> games = new();
     private List<BracketEntry> entries = new();
@@ -143,23 +159,37 @@
     {
         try
         {
-            // UPDATED: Fetch pools to get lock date
+            isLoading = true;
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
-            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries");
-
-            await Task.WhenAll(poolsTask, gamesTask, entriesTask);
+            var myEntriesTask = FetchMyEntriesSafe();
             
-            var pools = await poolsTask ?? new();
-            currentPool = pools.FirstOrDefault();
+            await Task.WhenAll(poolsTask, gamesTask, myEntriesTask);
             
+            pools = await poolsTask ?? new();
             games = await gamesTask ?? new();
-            entries = await entriesTask ?? new();
+            var myEntries = await myEntriesTask;
             
             totalFinalGames = games.Count(g => g.Status == GameStatus.Final);
+
+            // SMART DEFAULT LOGIC
+            if (myEntries.Any())
+            {
+                // Find pool of most recent entry
+                var lastEntry = myEntries.OrderByDescending(e => e.CreatedOn).First();
+                currentPool = pools.FirstOrDefault(p => p.Id == lastEntry.PoolId);
+            }
             
-            leaderboard = ScoringEngine.Calculate(games, entries);
-            Sort(sortColumn, forceToggle: false);
+            // Fallback
+            if (currentPool == null)
+            {
+                currentPool = pools.FirstOrDefault();
+            }
+
+            if (currentPool != null)
+            {
+                await LoadEntriesForPool(currentPool.Id);
+            }
         }
         catch (Exception ex)
         {
@@ -168,6 +198,48 @@
         finally
         {
             isLoading = false;
+        }
+    }
+
+    private async Task<List<BracketEntry>> FetchMyEntriesSafe()
+    {
+        try 
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            if (auth.User.Identity?.IsAuthenticated == true)
+            {
+                return await Http.GetFromJsonAsync<List<BracketEntry>>("api/GetMyEntries") ?? new();
+            }
+        }
+        catch { /* Ignore auth errors on public page */ }
+        return new();
+    }
+
+    private async Task OnPoolChanged(ChangeEventArgs e)
+    {
+        var poolId = e.Value?.ToString();
+        if (string.IsNullOrEmpty(poolId)) return;
+
+        currentPool = pools.FirstOrDefault(p => p.Id == poolId);
+        if (currentPool != null)
+        {
+            isLoading = true;
+            await LoadEntriesForPool(currentPool.Id);
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadEntriesForPool(string poolId)
+    {
+        try
+        {
+            entries = await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetEntries?poolId={poolId}") ?? new();
+            leaderboard = ScoringEngine.Calculate(games, entries);
+            Sort(sortColumn, forceToggle: false);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching entries: {ex.Message}");
         }
     }
 
