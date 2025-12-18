@@ -11,6 +11,8 @@ namespace BowlPoolManager.Api.Services
         Task<List<BowlPool>> GetPoolsAsync();
         // NEW: Get Single Pool (for LockDate checks)
         Task<BowlPool?> GetPoolAsync(string id);
+        // NEW: Get Pool by Invite Code
+        Task<BowlPool?> GetPoolByInviteCodeAsync(string inviteCode);
 
         Task<UserProfile?> GetUserAsync(string id);
         Task UpsertUserAsync(UserProfile user);
@@ -63,6 +65,18 @@ namespace BowlPoolManager.Api.Services
         public async Task<BowlPool?> GetPoolAsync(string id) => 
             await GetDocumentAsync<BowlPool>(id);
 
+        public async Task<BowlPool?> GetPoolByInviteCodeAsync(string inviteCode)
+        {
+            if (_container == null) return null;
+            
+            // Case-insensitive lookup
+            var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BowlPool}' AND StringEquals(c.inviteCode, @inviteCode, true)";
+            var queryDef = new QueryDefinition(sql).WithParameter("@inviteCode", inviteCode);
+            
+            var results = await QueryAsync<BowlPool>(queryDef);
+            return results.FirstOrDefault();
+        }
+
         public async Task<UserProfile?> GetUserAsync(string id) => 
             await GetDocumentAsync<UserProfile>(id);
 
@@ -106,10 +120,23 @@ namespace BowlPoolManager.Api.Services
 
         public async Task<List<BracketEntry>> GetEntriesForUserAsync(string userId, string poolId)
         {
-            var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BracketEntry}' AND c.userId = @userId AND c.poolId = @poolId";
-            var queryDef = new QueryDefinition(sql)
-                .WithParameter("@userId", userId)
-                .WithParameter("@poolId", poolId);
+            // Note: If poolId is null/empty, we return all entries for that user across all pools.
+            var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BracketEntry}' AND c.userId = @userId";
+            
+            QueryDefinition queryDef;
+
+            if (!string.IsNullOrEmpty(poolId))
+            {
+                sql += " AND c.poolId = @poolId";
+                queryDef = new QueryDefinition(sql)
+                    .WithParameter("@userId", userId)
+                    .WithParameter("@poolId", poolId);
+            }
+            else
+            {
+                queryDef = new QueryDefinition(sql)
+                    .WithParameter("@userId", userId);
+            }
 
             return await QueryAsync<BracketEntry>(queryDef);
         }
