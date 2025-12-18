@@ -19,7 +19,7 @@
 
 <div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
     <nav class="flex-column">
-        
+       
         @* LEADERBOARD (Home) *@
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
@@ -38,13 +38,13 @@
                 
                 @* SCOREBOARD *@
                 <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="results">
+                     <NavLink class="nav-link" href="results">
                         <span class="bi bi-display me-2" aria-hidden="true"></span> Scoreboard
                     </NavLink>
                 </div>
 
                 <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="print-bracket">
+                     <NavLink class="nav-link" href="print-bracket">
                         <span class="bi bi-printer-fill me-2" aria-hidden="true"></span> Print Bracket
                     </NavLink>
                 </div>
@@ -54,7 +54,7 @@
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="login">
                         <span class="bi bi-box-arrow-in-right me-2" aria-hidden="true"></span> Log In To Enter Picks
-                    </NavLink>
+                   </NavLink>
                 </div>
             </NotAuthorized>
         </AuthorizeView>
@@ -62,7 +62,7 @@
         @* ADMIN SECTION *@
         <AuthorizeView Roles="SuperAdmin">
             <Authorized>
-                <div class="nav-item px-3 mt-4">
+                 <div class="nav-item px-3 mt-4">
                     <div class="text-white-50 small text-uppercase fw-bold px-3 mb-1">Admin</div>
                 </div>
                 <div class="nav-item px-3">
@@ -75,6 +75,11 @@
                         <span class="bi bi-pencil-square me-2" aria-hidden="true"></span> Enter Results
                     </NavLink>
                 </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="admin/entries">
+                        <span class="bi bi-list-check me-2" aria-hidden="true"></span> Manage Entries
+                    </NavLink>
+                </div>
             </Authorized>
         </AuthorizeView>
     </nav>
@@ -84,12 +89,10 @@
     private bool collapseNavMenu = true;
     private string MyPicksText = "My Picks";
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
-
     private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
 
     protected override async Task OnInitializedAsync()
     {
-        // Subscribe to events
         AppState.OnChange += StateHasChangedWrapper;
         await UpdateNavText();
     }
@@ -107,25 +110,17 @@
             var authState = await AuthStateProvider.GetAuthenticationStateAsync();
             if (authState.User.Identity?.IsAuthenticated ?? false)
             {
-                var pools = await Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
-                var currentPool = pools?.FirstOrDefault();
-
-                if (currentPool != null)
+                // Fetch ALL entries (global) - No poolId param
+                var myEntries = await Http.GetFromJsonAsync<List<BracketEntry>>("api/GetMyEntries");
+                if (myEntries == null || !myEntries.Any())
                 {
-                    bool isLocked = DateTime.UtcNow > currentPool.LockDate;
-                    if (!isLocked)
-                    {
-                        var myEntries = await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyEntries?poolId={currentPool.Id}");
-                        if (myEntries == null || !myEntries.Any())
-                        {
-                            MyPicksText = "Enter Your Picks";
-                            return; 
-                        }
-                    }
+                    MyPicksText = "Enter Your Picks";
+                }
+                else
+                {
+                    MyPicksText = "My Picks";
                 }
             }
-            // Default
-            MyPicksText = "My Picks";
         }
         catch 
         {
