@@ -31,6 +31,8 @@ namespace BowlPoolManager.Api.Functions
 
             var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
             string? poolIdFilter = query["poolId"];
+            
+            // NOTE: Leaderboard always filters by poolId, but logic remains valid if global view needed later
             var entries = await _cosmosService.GetEntriesAsync(poolIdFilter);
 
             // Security Check
@@ -108,11 +110,9 @@ namespace BowlPoolManager.Api.Functions
             }
 
             var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
-            var poolId = query["poolId"];
+            string? poolId = query["poolId"]; // Nullable: If null, return ALL entries for user
 
-            if (string.IsNullOrEmpty(poolId)) return req.CreateResponse(HttpStatusCode.BadRequest);
-
-            var entries = await _cosmosService.GetEntriesForUserAsync(principal.UserId, poolId);
+            var entries = await _cosmosService.GetEntriesForUserAsync(principal.UserId, poolId ?? "");
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(entries);
@@ -179,17 +179,62 @@ namespace BowlPoolManager.Api.Functions
                 // Enforce User Ownership
                 entry.UserId = principal.UserId;
 
-                if (string.IsNullOrEmpty(entry.PoolId))
+                // --- 1. RESOLVE POOL ID ---
+                BowlPool? pool = null;
+
+                // Case A: Existing Entry (Update)
+                if (!string.IsNullOrEmpty(entry.Id))
                 {
-                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
-                    await badReq.WriteStringAsync("Pool ID is required.");
-                    return badReq;
+                    var existingEntry = await _cosmosService.GetEntryAsync(entry.Id);
+                    if (existingEntry != null)
+                    {
+                        if (existingEntry.UserId != principal.UserId) return req.CreateResponse(HttpStatusCode.Forbidden);
+                        
+                        entry.PoolId = existingEntry.PoolId; // Cannot switch pools on update
+                        entry.CreatedOn = existingEntry.CreatedOn;
+                    }
+                    else
+                    {
+                        return req.CreateResponse(HttpStatusCode.NotFound);
+                    }
+                }
+                // Case B: New Entry (Create)
+                else
+                {
+                    // If PoolId is missing, we MUST have an invite code to find it
+                    if (string.IsNullOrEmpty(entry.PoolId))
+                    {
+                        var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+                        string? suppliedCode = query["inviteCode"];
+
+                        if (string.IsNullOrWhiteSpace(suppliedCode))
+                        {
+                            var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                            await badReq.WriteStringAsync("Invite Code is required to join a pool.");
+                            return badReq;
+                        }
+
+                        pool = await _cosmosService.GetPoolByInviteCodeAsync(suppliedCode);
+                        if (pool == null)
+                        {
+                            var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                            await badReq.WriteStringAsync("Invalid Invite Code. Pool not found.");
+                            return badReq;
+                        }
+                        
+                        entry.PoolId = pool.Id;
+                        entry.Id = Guid.NewGuid().ToString();
+                    }
                 }
 
-                // 1. Check Pool Status
-                var pool = await _cosmosService.GetPoolAsync(entry.PoolId);
-                if (pool == null) return req.CreateResponse(HttpStatusCode.NotFound);
+                // If pool wasn't loaded yet (Update case), load it now
+                if (pool == null)
+                {
+                    pool = await _cosmosService.GetPoolAsync(entry.PoolId);
+                    if (pool == null) return req.CreateResponse(HttpStatusCode.NotFound);
+                }
 
+                // --- 2. LOCK CHECK ---
                 if (DateTime.UtcNow > pool.LockDate)
                 {
                     var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
@@ -197,63 +242,17 @@ namespace BowlPoolManager.Api.Functions
                     return forbidden;
                 }
 
-                // 2. Determine Create vs Update
-                bool isUpdate = false;
-                if (!string.IsNullOrEmpty(entry.Id))
-                {
-                    var existingEntry = await _cosmosService.GetEntryAsync(entry.Id);
-                    
-                    if (existingEntry != null)
-                    {
-                        if (existingEntry.UserId != principal.UserId)
-                        {
-                            return req.CreateResponse(HttpStatusCode.Forbidden); 
-                        }
-                        isUpdate = true;
-                        entry.CreatedOn = existingEntry.CreatedOn;
-                    }
-                }
-
-                // 3. Invite Code Check (Skipped if user already has verified entries)
-                if (!isUpdate)
-                {
-                    // Check if they are already in the pool
-                    var userEntries = await _cosmosService.GetEntriesForUserAsync(principal.UserId, entry.PoolId);
-                    bool alreadyJoined = userEntries.Any();
-
-                    if (!alreadyJoined)
-                    {
-                        // First time entering? Check the code.
-                        var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
-                        string? suppliedCode = query["inviteCode"];
-
-                        if (!string.IsNullOrEmpty(pool.InviteCode) && 
-                            !string.Equals(pool.InviteCode, suppliedCode, StringComparison.OrdinalIgnoreCase))
-                        {
-                            var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
-                            await forbidden.WriteStringAsync("Invalid Invite Code.");
-                            return forbidden;
-                        }
-                    }
-                }
-
-                // 4. Name Uniqueness Check
-                if (string.IsNullOrWhiteSpace(entry.PlayerName))
-                {
-                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
-                    await badReq.WriteStringAsync("Bracket Name is required.");
-                    return badReq;
-                }
-
-                bool isNameTaken = await _cosmosService.IsBracketNameTakenAsync(entry.PoolId, entry.PlayerName, isUpdate ? entry.Id : null);
+                // --- 3. DUPLICATE CHECK ---
+                // Only check if name changed or new
+                bool isNameTaken = await _cosmosService.IsBracketNameTakenAsync(entry.PoolId, entry.PlayerName, entry.Id);
                 if (isNameTaken)
                 {
                     var conflict = req.CreateResponse(HttpStatusCode.Conflict);
-                    await conflict.WriteStringAsync($"The bracket name '{entry.PlayerName}' is already taken. Please choose another.");
+                    await conflict.WriteStringAsync($"The bracket name '{entry.PlayerName}' is already taken in the '{pool.Name}' pool.");
                     return conflict;
                 }
 
-                // 5. Game Count Validation
+                // --- 4. GAME COUNT CHECK ---
                 var allGames = await _cosmosService.GetGamesAsync();
                 if (entry.Picks.Count != allGames.Count)
                 {
@@ -262,12 +261,7 @@ namespace BowlPoolManager.Api.Functions
                     return badReq;
                 }
 
-                // 6. Save
-                if (!isUpdate)
-                {
-                    entry.Id = Guid.NewGuid().ToString();
-                }
-
+                // --- 5. SAVE ---
                 await _cosmosService.AddEntryAsync(entry);
 
                 var response = req.CreateResponse(HttpStatusCode.OK);
@@ -281,6 +275,56 @@ namespace BowlPoolManager.Api.Functions
             }
         }
 
+        [Function("MoveEntry")]
+        public async Task<HttpResponseData> MoveEntry([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+        {
+            _logger.LogInformation("Admin moving entry to new pool.");
+            try
+            {
+                // SuperAdmin Only
+                var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
+                if (!authResult.IsValid) return authResult.ErrorResponse!;
+
+                var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+                string? entryId = query["entryId"];
+                string? newPoolId = query["newPoolId"];
+
+                if (string.IsNullOrEmpty(entryId) || string.IsNullOrEmpty(newPoolId)) 
+                    return req.CreateResponse(HttpStatusCode.BadRequest);
+
+                var entry = await _cosmosService.GetEntryAsync(entryId);
+                if (entry == null) return req.CreateResponse(HttpStatusCode.NotFound);
+
+                var newPool = await _cosmosService.GetPoolAsync(newPoolId);
+                if (newPool == null) 
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("Target Pool not found.");
+                    return badReq;
+                }
+
+                // Name Conflict Check in Destination
+                bool isTaken = await _cosmosService.IsBracketNameTakenAsync(newPoolId, entry.PlayerName, entry.Id);
+                if (isTaken)
+                {
+                    var conflict = req.CreateResponse(HttpStatusCode.Conflict);
+                    await conflict.WriteStringAsync($"Bracket name '{entry.PlayerName}' is already taken in the destination pool '{newPool.Name}'.");
+                    return conflict;
+                }
+
+                // Move
+                entry.PoolId = newPoolId;
+                await _cosmosService.AddEntryAsync(entry); // Upsert
+
+                return req.CreateResponse(HttpStatusCode.OK);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "MoveEntry failed.");
+                return req.CreateResponse(HttpStatusCode.InternalServerError);
+            }
+        }
+        
         [Function("SaveEntry")]
         public async Task<HttpResponseData> SaveEntry([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
         {
