@@ -40,18 +40,42 @@
                 <div class="alert alert-danger">@errorMessage</div>
             }
 
-            @* PLAYER INFO *@
+            @* PLAYER & POOL INFO *@
             <div class="card mb-4 shadow-sm">
-                <div class="card-header bg-primary text-white">Player Details</div>
+                <div class="card-header bg-primary text-white">Player & Pool Details</div>
                 <div class="card-body">
                     <div class="row g-3">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label fw-bold">Player Name</label>
                             <InputText class="form-control" @bind-Value="entry.PlayerName" placeholder="e.g. John Doe" />
                             <ValidationMessage For="@(() => entry.PlayerName)" />
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">Tiebreaker (Total Points in Championship)</label>
+                         <div class="col-md-4">
+                            <label class="form-label fw-bold">Pool</label>
+                            @if (string.IsNullOrEmpty(EntryId))
+                            {
+                                @* CREATE MODE: Select Pool *@
+                                <InputSelect class="form-select" @bind-Value="entry.PoolId">
+                                    <option value="">-- Select Pool --</option>
+                                    @foreach (var p in pools)
+                                    {
+                                        <option value="@p.Id">@p.Name</option>
+                                    }
+                                </InputSelect>
+                            }
+                            else
+                            {
+                                @* EDIT MODE: Read Only + Move Button *@
+                                <div class="input-group">
+                                    <input type="text" class="form-control" value="@(pools.FirstOrDefault(p => p.Id == entry.PoolId)?.Name ?? "Unknown")" disabled />
+                                    <button class="btn btn-outline-warning" type="button" @onclick="() => showMoveModal = true">
+                                        <i class="bi bi-arrow-left-right"></i> Move
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Tiebreaker</label>
                             <InputNumber class="form-control" @bind-Value="entry.TieBreakerPoints" />
                         </div>
                     </div>
@@ -76,17 +100,10 @@
                                     <div class="col-md-6 col-lg-4">
                                         <div class="p-2 border rounded bg-light h-100">
                                             <div class="small fw-bold text-muted mb-1">@game.BowlName</div>
-                                              
-                                            @{
-                                                var options = GetTeamsForGame(game);
-                                            }
-
+                                            @{ var options = GetTeamsForGame(game); }
                                             <select class="form-select" value="@GetPick(game.Id)" @onchange="@(e => UpdatePick(game.Id, e.Value?.ToString()))">
                                                 <option value="">-- Select Winner --</option>
-                                                @foreach (var team in options)
-                                                {
-                                                    <option value="@team">@team</option>
-                                                }
+                                                @foreach (var team in options) { <option value="@team">@team</option> }
                                             </select>
                                         </div>
                                     </div>
@@ -108,7 +125,6 @@
                                 <div class="p-2 border rounded h-100">
                                     <div class="small fw-bold text-muted mb-1">@game.BowlName</div>
                                     <div class="small text-secondary mb-2">@game.TeamHome vs @game.TeamAway</div>
-                                    
                                     <select class="form-select" value="@GetPick(game.Id)" @onchange="@(e => UpdatePick(game.Id, e.Value?.ToString()))">
                                         <option value="">-- Select Winner --</option>
                                         @if (!string.IsNullOrEmpty(game.TeamHome)) { <option value="@game.TeamHome">@game.TeamHome</option> }
@@ -122,40 +138,53 @@
             </div>
 
             <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-5">
-                <button type="button" class="btn btn-secondary me-2" @onclick="ResetForm" disabled="@isSaving">
-                    Clear / Reset
-                </button>
-                
+                <button type="button" class="btn btn-secondary me-2" @onclick="ResetForm" disabled="@isSaving">Clear / Reset</button>
                 @if (!string.IsNullOrEmpty(EntryId))
                 {
-                    <button type="button" class="btn btn-danger me-2" @onclick="DeleteEntry" disabled="@isSaving">
-                        <i class="bi bi-trash"></i> Delete
-                    </button>
+                    <button type="button" class="btn btn-danger me-2" @onclick="DeleteEntry" disabled="@isSaving"><i class="bi bi-trash"></i> Delete</button>
                 }
-
                 <button type="submit" class="btn btn-success btn-lg px-5" disabled="@isSaving">
-                    @if (isSaving)
-                    {
-                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        <span>Saving...</span>
-                    }
-                    else
-                    {
-                        <i class="bi bi-save"></i> <span>Save Entry</span>
-                    }
+                    @if (isSaving) { <span class="spinner-border spinner-border-sm me-2"></span><span>Saving...</span> }
+                    else { <i class="bi bi-save"></i> <span>Save Entry</span> }
                 </button>
             </div>
-
         </EditForm>
         
+        @* MOVE MODAL *@
+        @if (showMoveModal)
+        {
+            <div class="modal show d-block" style="background-color: rgba(0,0,0,0.5);">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Move Entry to Pool</h5>
+                            <button type="button" class="btn-close" @onclick="() => showMoveModal = false"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Select the new pool for <strong>@entry.PlayerName</strong>:</p>
+                            <select class="form-select" @bind="targetPoolId">
+                                <option value="">-- Select Target Pool --</option>
+                                @foreach (var p in pools.Where(p => p.Id != entry.PoolId))
+                                {
+                                    <option value="@p.Id">@p.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="() => showMoveModal = false">Cancel</button>
+                            <button type="button" class="btn btn-warning" @onclick="ExecuteMove">Confirm Move</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
         @if (showToast)
         {
             <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1050">
                 <div class="toast show align-items-center text-white bg-success border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true">
                     <div class="d-flex">
-                        <div class="toast-body fs-6">
-                             <i class="bi bi-check-circle-fill me-2"></i> @toastMessage
-                        </div>
+                        <div class="toast-body fs-6"><i class="bi bi-check-circle-fill me-2"></i> @toastMessage</div>
                         <button type="button" class="btn-close btn-close-white me-2 m-auto" @onclick="() => showToast = false"></button>
                     </div>
                 </div>
@@ -165,19 +194,21 @@
 </div>
 
 @code {
-    [Parameter]
-    public string? EntryId { get; set; }
+    [Parameter] public string? EntryId { get; set; }
 
     private List<BowlGame>? games;
+    private List<BowlPool> pools = new();
     private BracketEntry entry = new BracketEntry();
     private string? statusMessage;
     private string? errorMessage;
     private bool isLoading = true;
-    
-    // UX State
     private bool isSaving = false;
     private bool showToast = false;
     private string toastMessage = "";
+    
+    // Move Modal
+    private bool showMoveModal = false;
+    private string targetPoolId = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -189,7 +220,13 @@
         try
         {
             isLoading = true;
-            games = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
+            
+            await Task.WhenAll(gamesTask, poolsTask);
+            
+            games = await gamesTask ?? new();
+            pools = await poolsTask ?? new();
 
             if (!string.IsNullOrEmpty(EntryId))
             {
@@ -197,7 +234,6 @@
                 if (existingEntry != null)
                 {
                     entry = existingEntry;
-                    // FIX: Ensure picks is not null to prevent NullReferenceException
                     if (entry.Picks == null) entry.Picks = new Dictionary<string, string>();
                 }
                 else
@@ -205,10 +241,14 @@
                     errorMessage = "Entry not found.";
                 }
             }
+            else
+            {
+                // Set default pool if only one exists
+                if (pools.Count == 1) entry.PoolId = pools[0].Id;
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading data: {ex.Message}");
             errorMessage = $"Error loading data: {ex.Message}";
         }
         finally
@@ -217,65 +257,57 @@
         }
     }
 
-    private string GetRoundName(PlayoffRound round) => round switch
-    {
-        PlayoffRound.Round1 => "First Round",
-        PlayoffRound.QuarterFinal => "Quarterfinals",
-        PlayoffRound.SemiFinal => "Semifinals",
-        PlayoffRound.Championship => "National Championship",
-        _ => "Playoffs"
-    };
-
-    // FIX: Add null checks
-    private string GetPick(string gameId)
-    {
-        if (entry.Picks == null) return "";
-        return entry.Picks.ContainsKey(gameId) ? entry.Picks[gameId] : "";
-    }
-
-    private void UpdatePick(string gameId, string? selection)
-    {
-        if (entry.Picks == null) entry.Picks = new Dictionary<string, string>();
-
-        if (string.IsNullOrEmpty(selection))
-        {
-            if (entry.Picks.ContainsKey(gameId)) entry.Picks.Remove(gameId);
-        }
-        else
-        {
-            entry.Picks[gameId] = selection;
-        }
-        StateHasChanged();
-    }
+    private string GetRoundName(PlayoffRound round) => round switch { PlayoffRound.Round1 => "First Round", PlayoffRound.QuarterFinal => "Quarterfinals", PlayoffRound.SemiFinal => "Semifinals", PlayoffRound.Championship => "National Championship", _ => "Playoffs" };
+    private string GetPick(string gameId) { if (entry.Picks == null) return ""; return entry.Picks.ContainsKey(gameId) ? entry.Picks[gameId] : ""; }
+    private void UpdatePick(string gameId, string? selection) { if (entry.Picks == null) entry.Picks = new Dictionary<string, string>(); if (string.IsNullOrEmpty(selection)) { if (entry.Picks.ContainsKey(gameId)) entry.Picks.Remove(gameId); } else { entry.Picks[gameId] = selection; } StateHasChanged(); }
 
     private List<string> GetTeamsForGame(BowlGame game)
     {
         var teams = new List<string>();
         if (!string.IsNullOrEmpty(game.TeamHome)) teams.Add(game.TeamHome);
         if (!string.IsNullOrEmpty(game.TeamAway)) teams.Add(game.TeamAway);
-
-        // FIX: Add null check for entry.Picks
-        if (game.IsPlayoff && games != null && entry.Picks != null)
-        {
+        if (game.IsPlayoff && games != null && entry.Picks != null) {
             var feederGames = games.Where(g => g.NextGameId == game.Id).ToList();
-            foreach (var feeder in feederGames)
-            {
-                if (entry.Picks.TryGetValue(feeder.Id, out var winnerOfFeeder))
-                {
-                    teams.Add(winnerOfFeeder);
-                }
-            }
+            foreach (var feeder in feederGames) { if (entry.Picks.TryGetValue(feeder.Id, out var winnerOfFeeder)) { teams.Add(winnerOfFeeder); } }
         }
         return teams.Distinct().ToList();
     }
 
+    private async Task ExecuteMove()
+    {
+        if (string.IsNullOrEmpty(targetPoolId)) return;
+        
+        try 
+        {
+            var response = await Http.PostAsync($"api/MoveEntry?entryId={entry.Id}&newPoolId={targetPoolId}", null);
+            if (response.IsSuccessStatusCode)
+            {
+                entry.PoolId = targetPoolId; // Update local state
+                showMoveModal = false;
+                toastMessage = "Entry moved successfully.";
+                showToast = true;
+            }
+            else 
+            {
+                string msg = await response.Content.ReadAsStringAsync();
+                await JS.InvokeVoidAsync("alert", $"Move Failed: {msg}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
     private async Task HandleSave()
     {
-        statusMessage = null;
-        errorMessage = null;
-        showToast = false;
-
-        isSaving = true;
+        if (string.IsNullOrEmpty(entry.PoolId))
+        {
+            errorMessage = "Please select a pool.";
+            return;
+        }
+        
+        statusMessage = null; errorMessage = null; showToast = false; isSaving = true;
         try
         {
             var response = await Http.PostAsJsonAsync("api/SaveEntry", entry);
@@ -283,71 +315,32 @@
             {
                 toastMessage = "Changes saved successfully!";
                 showToast = true;
-                
-                if (string.IsNullOrEmpty(EntryId))
-                {
-                    statusMessage = $"Entry for {entry.PlayerName} saved!";
-                    ResetForm();
-                }
-
-                _ = Task.Delay(3000).ContinueWith(t => 
-                {
-                    showToast = false;
-                    InvokeAsync(StateHasChanged);
-                });
+                if (string.IsNullOrEmpty(EntryId)) { statusMessage = $"Entry for {entry.PlayerName} saved!"; ResetForm(); }
+                _ = Task.Delay(3000).ContinueWith(t => { showToast = false; InvokeAsync(StateHasChanged); });
             }
-            else
-            {
-                errorMessage = "Failed to save entry. Please try again.";
-            }
+            else { errorMessage = "Failed to save entry."; }
         }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error: {ex.Message}";
-        }
-        finally
-        {
-            isSaving = false;
-        }
+        catch (Exception ex) { errorMessage = $"Error: {ex.Message}"; }
+        finally { isSaving = false; }
     }
 
     private async Task DeleteEntry()
     {
         if (string.IsNullOrEmpty(EntryId)) return;
-
         bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete the entry for {entry.PlayerName}?");
-        if (confirmed)
-        {
+        if (confirmed) {
             isSaving = true;
-            try
-            {
+            try {
                 var response = await Http.DeleteAsync($"api/DeleteEntry?id={EntryId}");
-                if (response.IsSuccessStatusCode)
-                {
-                    Nav.NavigateTo("/admin/entries");
-                }
-                else
-                {
-                    errorMessage = "Error deleting entry. Please check the logs.";
-                }
-            }
-            catch(Exception ex)
-            {
-                errorMessage = $"Error: {ex.Message}";
-            }
-            finally
-            {
-                isSaving = false;
-            }
+                if (response.IsSuccessStatusCode) { Nav.NavigateTo("/admin/entries"); } else { errorMessage = "Error deleting entry."; }
+            } catch(Exception ex) { errorMessage = $"Error: {ex.Message}"; } finally { isSaving = false; }
         }
     }
 
     private void ResetForm()
     {
         entry = new BracketEntry();
-        if (!string.IsNullOrEmpty(EntryId))
-        {
-            Nav.NavigateTo("/admin/entries");
-        }
+        if (pools.Count == 1) entry.PoolId = pools[0].Id; // Re-apply default
+        if (!string.IsNullOrEmpty(EntryId)) { Nav.NavigateTo("/admin/entries"); }
     }
 }
