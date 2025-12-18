@@ -337,7 +337,8 @@
 
         // We don't know the pool yet - the backend will derive it from the code on save.
         // We just start an empty entry.
-        activeEntry = new BracketEntry(); // PoolId empty
+        activeEntry = new BracketEntry(); 
+        activeEntry.Id = ""; // FIX: Clear default ID so backend knows it's a CREATE operation
         viewMode = ViewMode.Editor;
     }
 
