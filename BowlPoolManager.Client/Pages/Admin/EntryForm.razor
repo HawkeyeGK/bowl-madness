@@ -40,21 +40,23 @@
                 <div class="alert alert-danger">@errorMessage</div>
             }
 
-            @* PLAYER & POOL INFO *@
+            @* PLAYER, POOL & OWNER INFO *@
             <div class="card mb-4 shadow-sm">
-                <div class="card-header bg-primary text-white">Player & Pool Details</div>
+                <div class="card-header bg-primary text-white">Entry Details</div>
                 <div class="card-body">
                     <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Player Name</label>
-                            <InputText class="form-control" @bind-Value="entry.PlayerName" placeholder="e.g. John Doe" />
+                        @* 1. Player Name *@
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Bracket Name</label>
+                            <InputText class="form-control" @bind-Value="entry.PlayerName" placeholder="e.g. John's Picks" />
                             <ValidationMessage For="@(() => entry.PlayerName)" />
                         </div>
-                         <div class="col-md-4">
+
+                        @* 2. Pool Selection *@
+                        <div class="col-md-3">
                             <label class="form-label fw-bold">Pool</label>
                             @if (string.IsNullOrEmpty(EntryId))
                             {
-                                @* CREATE MODE: Select Pool *@
                                 <InputSelect class="form-select" @bind-Value="entry.PoolId">
                                     <option value="">-- Select Pool --</option>
                                     @foreach (var p in pools)
@@ -65,7 +67,6 @@
                             }
                             else
                             {
-                                @* EDIT MODE: Read Only + Move Button *@
                                 <div class="input-group">
                                     <input type="text" class="form-control" value="@(pools.FirstOrDefault(p => p.Id == entry.PoolId)?.Name ?? "Unknown")" disabled />
                                     <button class="btn btn-outline-warning" type="button" @onclick="() => showMoveModal = true">
@@ -74,7 +75,22 @@
                                 </div>
                             }
                         </div>
-                        <div class="col-md-4">
+
+                        @* 3. Owner Selection (NEW) *@
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Owner (User)</label>
+                            <InputSelect class="form-select" @bind-Value="entry.UserId">
+                                <option value="">-- Unassigned --</option>
+                                @foreach (var u in users)
+                                {
+                                    <option value="@u.Id">@u.Email</option>
+                                }
+                            </InputSelect>
+                            <div class="form-text small">Who manages this bracket?</div>
+                        </div>
+
+                        @* 4. Tiebreaker *@
+                        <div class="col-md-3">
                             <label class="form-label fw-bold">Tiebreaker</label>
                             <InputNumber class="form-control" @bind-Value="entry.TieBreakerPoints" />
                         </div>
@@ -198,6 +214,7 @@
 
     private List<BowlGame>? games;
     private List<BowlPool> pools = new();
+    private List<UserProfile> users = new();
     private BracketEntry entry = new BracketEntry();
     private string? statusMessage;
     private string? errorMessage;
@@ -222,11 +239,13 @@
             isLoading = true;
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
+            var usersTask = Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers"); // Fetch Users
             
-            await Task.WhenAll(gamesTask, poolsTask);
+            await Task.WhenAll(gamesTask, poolsTask, usersTask);
             
             games = await gamesTask ?? new();
             pools = await poolsTask ?? new();
+            users = await usersTask ?? new();
 
             if (!string.IsNullOrEmpty(EntryId))
             {
