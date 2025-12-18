@@ -414,6 +414,8 @@
             string url = "api/SaveMyEntry";
             if (!string.IsNullOrEmpty(joinModel.InviteCode) && string.IsNullOrEmpty(activeEntry.PoolId))
             {
+                // SAFETY: Double check ID is empty
+                activeEntry.Id = "";
                 url += $"?inviteCode={joinModel.InviteCode}";
             }
 
