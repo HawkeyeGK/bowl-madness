@@ -127,28 +127,38 @@
             var entryPool = pools.FirstOrDefault(p => p.Id == activeEntry.PoolId);
             bool isLocked = entryPool != null && DateTime.UtcNow > entryPool.LockDate;
             
-            <div class="d-flex align-items-center mb-4">
-                <button class="btn btn-outline-secondary me-3" @onclick="BackToDashboard">
-                     <i class="bi bi-arrow-left"></i> Back
-                </button>
-                <div>
-                    <h2 class="fw-bold mb-0">
-                        @(string.IsNullOrEmpty(activeEntry.Id) ? "New Entry" : "Edit Entry")
-                    </h2>
-                    @if (entryPool != null)
-                    {
-                        <div class="small text-muted">@entryPool.Name</div>
-                    }
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="d-flex align-items-center">
+                    <button class="btn btn-outline-secondary me-3" @onclick="BackToDashboard">
+                         <i class="bi bi-arrow-left"></i> Back
+                    </button>
+                    <div>
+                        <h2 class="fw-bold mb-0">
+                            @(string.IsNullOrEmpty(activeEntry.Id) ? "New Entry" : "Edit Entry")
+                        </h2>
+                        @if (entryPool != null)
+                        {
+                            <div class="small text-muted">@entryPool.Name</div>
+                        }
 
-                    @if (isLocked)
-                    {
-                         <span class="badge bg-warning text-dark"><i class="bi bi-lock-fill"></i> Locked</span>
-                     }
-                    else if (entryPool != null)
-                    {
-                         <span class="text-muted small">Deadline: @entryPool.LockDate.ToLocalTime().ToString("g")</span>
-                     }
+                        @if (isLocked)
+                        {
+                             <span class="badge bg-warning text-dark"><i class="bi bi-lock-fill"></i> Locked</span>
+                         }
+                        else if (entryPool != null)
+                        {
+                             <span class="text-muted small">Deadline: @entryPool.LockDate.ToLocalTime().ToString("g")</span>
+                         }
+                    </div>
                 </div>
+                
+                @* PRINT BUTTON (New) *@
+                @if(!string.IsNullOrEmpty(activeEntry.Id)) 
+                {
+                    <a href="print-bracket/@activeEntry.Id" target="_blank" class="btn btn-outline-secondary">
+                        <i class="bi bi-printer me-2"></i> Print Picks
+                    </a>
+                }
             </div>
 
             <EditForm Model="@activeEntry" OnValidSubmit="SavePicks" OnInvalidSubmit="HandleInvalidSubmit">
