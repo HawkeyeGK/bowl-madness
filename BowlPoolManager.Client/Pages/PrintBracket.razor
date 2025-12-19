@@ -75,7 +75,7 @@ else
                     }
                 </div>
 
-                @* QUARTERFINALS *@
+                @* QUARTERFINALS (Updated to use Dynamic Participants) *@
                 <div class="round-col">
                     <div class="round-header">Quarterfinals</div>
                     @foreach (var game in quarterGames)
@@ -161,7 +161,8 @@ else
         .no-print { display: none !important; }
         .game-box { break-inside: avoid; background-color: transparent !important; border-color: #000 !important; }
         .match-card { background-color: transparent !important; }
-        /* FIX: Use box-shadow for print as well */
+        
+        /* Force high contrast in print */
         .user-pick { 
             box-shadow: inset 0 0 0 2px #dc3545 !important;
             background-color: #fff0f0 !important; 
@@ -172,8 +173,8 @@ else
 
     .print-wrapper { font-family: 'Arial Narrow', sans-serif; color: #000; max-width: 100%; }
 
-    /* Highlights for User Picks (Screen & Print) */
-    /* FIX: Replaced border with inset box-shadow. This guarantees no size change and no clipping. */
+    /* Highlights for User Picks */
+    /* BOX MODEL FIX: Use inset box-shadow to prevent size changes and clipping */
     .user-pick { 
         box-shadow: inset 0 0 0 2px #dc3545;
         background-color: #fff0f0; 
@@ -216,15 +217,7 @@ else
     .game-meta-row { font-size: 0.6rem; font-weight: bold; border-bottom: 1px solid #ccc; margin-bottom: 2px; display: flex; justify-content: space-between; }
     .meta-right { font-weight: normal; font-size: 0.55rem; }
     
-    .team-slot { 
-        box-sizing: border-box;
-        border-bottom: 1px solid #eee; 
-        height: 18px; 
-        line-height: 16px; 
-        overflow: hidden; 
-        white-space: nowrap; 
-        margin-bottom: 1px; 
-    }
+    .team-slot { border-bottom: 1px solid #eee; height: 18px; line-height: 16px; overflow: hidden; white-space: nowrap; margin-bottom: 1px; }
     .champ-card { border: 2px solid #000; height: auto; min-height: 90px; padding-bottom: 5px; display: flex; flex-direction: column; justify-content: space-between; }
     .champ-line { margin-top: 8px; text-align: center; border-top: 1px dotted #ccc; padding-top: 4px; }
     .line-draw { font-weight: bold; }
@@ -245,7 +238,6 @@ else
     private List<BowlGame>? games;
     private BracketEntry? userEntry;
     
-    // Sorted Lists for Bracket Display
     private List<BowlGame> standardGames = new();
     private List<BowlGame> round1Games = new();
     private List<BowlGame> quarterGames = new();
@@ -275,22 +267,17 @@ else
             {
                 userEntry = await Http.GetFromJsonAsync<BracketEntry>($"api/GetEntry?id={EntryId}");
             }
-            catch { /* Ignore if not found or unauthorized */ }
+            catch { }
         }
     }
 
     private void PrepareBracket()
     {
         if (games == null) return;
-        // 1. Standard Games
         standardGames = games.Where(g => !g.IsPlayoff).OrderBy(g => g.StartTime).ToList();
-        // 2. Championship
         champGames = games.Where(g => g.IsPlayoff && g.Round == PlayoffRound.Championship).OrderBy(g => g.StartTime).ToList();
-        // 3. Semis
         semiGames = SortRoundByNext(PlayoffRound.SemiFinal, champGames);
-        // 4. Quarters
         quarterGames = SortRoundByNext(PlayoffRound.QuarterFinal, semiGames);
-        // 5. Round 1
         round1Games = SortRoundByNext(PlayoffRound.Round1, quarterGames);
     }
 
@@ -304,9 +291,6 @@ else
         }).ThenBy(g => g.StartTime).ToList();
     }
 
-    // --- RENDERING HELPERS ---
-
-    // 1. Styling the User's Pick (Red Box)
     private string GetPickClass(string gameId, string? teamName)
     {
         if (userEntry == null || string.IsNullOrEmpty(teamName)) return "";
@@ -317,34 +301,25 @@ else
         return "";
     }
 
-    // 2. Dynamic Slot Filling (Advancement Logic)
     private (string? Top, string? Bottom) GetParticipants(BowlGame game)
     {
-        // Default Logic: If teams are fixed (like Round 1), use them
         string? top = game.TeamHome;
         string? bottom = game.TeamAway;
 
-        // Dynamic Logic: If teams are TBD (Semis/Champ), find who advanced
+        // If TBD, find feeders (Used for Quarters, Semis, Finals)
         if (string.IsNullOrEmpty(top) || top == "TBD" || string.IsNullOrEmpty(bottom) || bottom == "TBD")
         {
-            // Find the 2 games that feed into this one
             var feeders = games!.Where(g => g.NextGameId == game.Id).OrderBy(g => g.StartTime).ToList();
-            
             if (feeders.Count >= 1) top = GetWinnerOf(feeders[0]);
             if (feeders.Count >= 2) bottom = GetWinnerOf(feeders[1]);
         }
-
         return (top, bottom);
     }
 
-    // Helper to find who the user picked to win a specific game
     private string? GetWinnerOf(BowlGame game)
     {
-        if (userEntry != null && userEntry.Picks.TryGetValue(game.Id, out var winner))
-        {
-            return winner; // User's predicted winner becomes the participant in the next round
-        }
-        return null; // Empty line
+        if (userEntry != null && userEntry.Picks.TryGetValue(game.Id, out var winner)) return winner;
+        return null;
     }
 
     private string FormatTimeShort(DateTime utc) => DateTimeHelper.ToCentral(utc).ToString("MMM d h:mm tt") + " CT";
