@@ -80,10 +80,11 @@ else
                     <div class="round-header">Quarterfinals</div>
                     @foreach (var game in quarterGames)
                     {
+                        var participants = GetParticipants(game);
                         <div class="match-card">
                             <div class="game-meta-row">@game.BowlName <span class="meta-right">@FormatTimeShort(game.StartTime)</span></div>
-                            <div class="team-slot @GetPickClass(game.Id, game.TeamHome)">@RenderSlot(game.TeamHome)</div>
-                            <div class="team-slot @GetPickClass(game.Id, game.TeamAway)">@RenderSlot(game.TeamAway)</div>
+                            <div class="team-slot @GetPickClass(game.Id, participants.Top)">@RenderSlot(participants.Top)</div>
+                            <div class="team-slot @GetPickClass(game.Id, participants.Bottom)">@RenderSlot(participants.Bottom)</div>
                         </div>
                     }
                 </div>
