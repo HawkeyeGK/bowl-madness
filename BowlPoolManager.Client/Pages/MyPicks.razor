@@ -238,7 +238,8 @@
                 @if (!isLocked)
                 {
                     <div class="d-grid gap-2 mb-5">
-                        <button type="submit" class="btn btn-success btn-lg" disabled="@(!IsComplete || isSaving)">
+                        @* NOTE: Button is now always enabled (unless saving) to allow validation feedback *@
+                        <button type="submit" class="btn btn-success btn-lg" disabled="@isSaving">
                             @if (isSaving)
                             {
                                 <span class="spinner-border spinner-border-sm me-2"></span> <span>Saving...</span>
@@ -406,6 +407,19 @@
 
     private async Task SavePicks()
     {
+        // --- VALIDATION: CHECK MISSING PICKS ---
+        var missingGames = games.Where(g => !activeEntry.Picks.ContainsKey(g.Id) || string.IsNullOrEmpty(activeEntry.Picks[g.Id]))
+                                .OrderBy(g => g.StartTime)
+                                .ToList();
+
+        if (missingGames.Any())
+        {
+            string gameList = string.Join(", ", missingGames.Select(g => g.BowlName));
+            TriggerToast($"Please select a winner for: {gameList}", false);
+            return;
+        }
+
+        // --- PROCEED TO SAVE ---
         isSaving = true;
         errorMessage = "";
 
