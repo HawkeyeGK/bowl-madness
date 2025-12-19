@@ -168,7 +168,15 @@ else
     .print-wrapper { font-family: 'Arial Narrow', sans-serif; color: #000; max-width: 100%; }
 
     /* Highlights for User Picks (Screen & Print) */
-    .user-pick { border: 2px solid #dc3545; background-color: #fff0f0; font-weight: bold; border-radius: 3px; padding-left: 2px; }
+    .user-pick { 
+        border: 2px solid #dc3545; 
+        background-color: #fff0f0; 
+        font-weight: bold; 
+        border-radius: 3px; 
+        padding-left: 2px;
+        position: relative;
+        z-index: 10;
+    }
     .handwritten { color: #dc3545; font-weight: 800; font-family: "Courier New", Courier, monospace; font-size: 1.1em; letter-spacing: -0.5px; }
 
     /* HEADER */
@@ -204,7 +212,15 @@ else
     .game-meta-row { font-size: 0.6rem; font-weight: bold; border-bottom: 1px solid #ccc; margin-bottom: 2px; display: flex; justify-content: space-between; }
     .meta-right { font-weight: normal; font-size: 0.55rem; }
     
-    .team-slot { border-bottom: 1px solid #eee; height: 18px; line-height: 16px; overflow: hidden; white-space: nowrap; margin-bottom: 1px; }
+    .team-slot { 
+        box-sizing: border-box;
+        border-bottom: 1px solid #eee; 
+        height: 18px; 
+        line-height: 16px; 
+        overflow: hidden; 
+        white-space: nowrap; 
+        margin-bottom: 1px; 
+    }
     .champ-card { border: 2px solid #000; height: auto; min-height: 90px; padding-bottom: 5px; display: flex; flex-direction: column; justify-content: space-between; }
     .champ-line { margin-top: 8px; text-align: center; border-top: 1px dotted #ccc; padding-top: 4px; }
     .line-draw { font-weight: bold; }
