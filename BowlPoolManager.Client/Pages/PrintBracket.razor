@@ -1,4 +1,5 @@
 @page "/print-bracket"
+@page "/print-bracket/{EntryId}"
 @layout BowlPoolManager.Client.Layout.PrintLayout
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
@@ -25,7 +26,9 @@ else
             <div class="inputs-area">
                 <div class="input-group">
                     <span class="label">Name:</span>
-                    <div class="line" style="width: 300px;"></div>
+                    <div class="line" style="width: 300px;">
+                        @if(userEntry != null) { <span class="handwritten">@userEntry.PlayerName</span> }
+                    </div>
                 </div>
                 <div class="input-group">
                     <span class="label">Email:</span>
@@ -33,7 +36,7 @@ else
                 </div>
             </div>
             <div class="title-area">
-                <h1 class="m-0">BOWL MADNESS 2025</h1>
+                <h1 class="m-0">BOWL MADNESS @DateTime.Now.Year</h1>
                 <div class="url-text">Bowl-Madness.com</div>
             </div>
         </div>
@@ -49,9 +52,9 @@ else
                         @FormatCompact(game)
                     </div>
                     <div class="matchup">
-                        <div class="team">@game.TeamHome</div>
+                        <div class="team @GetPickClass(game.Id, game.TeamHome)">@game.TeamHome</div>
                         <div class="vs">vs</div>
-                        <div class="team">@game.TeamAway</div>
+                        <div class="team @GetPickClass(game.Id, game.TeamAway)">@game.TeamAway</div>
                     </div>
                 </div>
             }
@@ -66,8 +69,8 @@ else
                     {
                         <div class="match-card">
                             <div class="game-meta-row">@game.BowlName <span class="meta-right">@FormatTimeShort(game.StartTime)</span></div>
-                            <div class="team-slot">@game.TeamHome</div>
-                            <div class="team-slot">@game.TeamAway</div>
+                            <div class="team-slot @GetPickClass(game.Id, game.TeamHome)">@game.TeamHome</div>
+                            <div class="team-slot @GetPickClass(game.Id, game.TeamAway)">@game.TeamAway</div>
                         </div>
                     }
                 </div>
@@ -79,8 +82,8 @@ else
                     {
                         <div class="match-card">
                             <div class="game-meta-row">@game.BowlName <span class="meta-right">@FormatTimeShort(game.StartTime)</span></div>
-                            <div class="team-slot">@RenderSlot(game.TeamHome)</div>
-                            <div class="team-slot">@RenderSlot(game.TeamAway)</div>
+                            <div class="team-slot @GetPickClass(game.Id, game.TeamHome)">@RenderSlot(game.TeamHome)</div>
+                            <div class="team-slot @GetPickClass(game.Id, game.TeamAway)">@RenderSlot(game.TeamAway)</div>
                         </div>
                     }
                 </div>
@@ -90,10 +93,11 @@ else
                     <div class="round-header">Semifinals</div>
                     @foreach (var game in semiGames)
                     {
+                        var participants = GetParticipants(game);
                         <div class="match-card spacer-lg">
                             <div class="game-meta-row">@game.BowlName</div>
-                            <div class="team-slot">_________________</div>
-                            <div class="team-slot">_________________</div>
+                            <div class="team-slot @GetPickClass(game.Id, participants.Top)">@RenderSlot(participants.Top)</div>
+                            <div class="team-slot @GetPickClass(game.Id, participants.Bottom)">@RenderSlot(participants.Bottom)</div>
                         </div>
                     }
                 </div>
@@ -103,14 +107,22 @@ else
                     <div class="round-header">Championship</div>
                     @foreach (var game in champGames)
                     {
+                        var participants = GetParticipants(game);
                         <div class="match-card champ-card">
                             <div class="game-meta-row text-center">@game.BowlName</div>
-                            <div class="team-slot">_________________</div>
-                            <div class="team-slot">_________________</div>
+                            <div class="team-slot @GetPickClass(game.Id, participants.Top)">@RenderSlot(participants.Top)</div>
+                            <div class="team-slot @GetPickClass(game.Id, participants.Bottom)">@RenderSlot(participants.Bottom)</div>
                             
                             <div class="champ-line">
                                 <span class="small fw-bold me-1">CHAMPION:</span>
-                                <span class="line-draw">_________________</span>
+                                @if (userEntry != null && userEntry.Picks.TryGetValue(game.Id, out var winner))
+                                {
+                                    <span class="line-draw handwritten text-danger">@winner</span>
+                                }
+                                else
+                                {
+                                    <span class="line-draw">_________________</span>
+                                }
                             </div>
                         </div>
                     }
@@ -123,7 +135,7 @@ else
                 <strong>Standard Bowls:</strong> Circle the winner (@GetPointValue(false) pt each).<br/>
                 <strong>Playoffs:</strong> Write winners on lines in NEXT bracket.<br/>
                 <strong>Scoring:</strong> 
-                First Round: @GetPointValue(true, PlayoffRound.Round1) | 
+                First Round: @GetPointValue(true, PlayoffRound.Round1) |
                 Quarterfinals: @GetPointValue(true, PlayoffRound.QuarterFinal) | 
                 Semifinals: @GetPointValue(true, PlayoffRound.SemiFinal) | 
                 Championship: @GetPointValue(true, PlayoffRound.Championship) pts.
@@ -131,7 +143,9 @@ else
             
             <div class="tiebreaker-row">
                 <span class="fw-bold">Tiebreaker: Total points in the ReliaQuest Bowl (Iowa vs Vanderbilt)</span>
-                <div class="line" style="width: 80px;"></div>
+                <div class="line" style="width: 80px; text-align: center;">
+                     @if(userEntry != null) { <span class="handwritten">@userEntry.TieBreakerPoints</span> }
+                </div>
             </div>
         </div>
     </div>
@@ -142,20 +156,27 @@ else
     :root { --border-color: #888; --bg-color: #f8f9fa; }
     @@media print {
         @@page { size: landscape; margin: 0.25in; }
-        body { zoom: 95%; background-color: white !important; }
+        body { zoom: 95%; background-color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .no-print { display: none !important; }
         .game-box { break-inside: avoid; background-color: transparent !important; border-color: #000 !important; }
         .match-card { background-color: transparent !important; }
+        /* Force colors in print */
+        .user-pick { border: 2px solid #dc3545 !important; background-color: #fff0f0 !important; font-weight: bold; }
+        .handwritten { color: #dc3545 !important; font-weight: bold; font-family: "Courier New", Courier, monospace; }
     }
 
     .print-wrapper { font-family: 'Arial Narrow', sans-serif; color: #000; max-width: 100%; }
+
+    /* Highlights for User Picks (Screen & Print) */
+    .user-pick { border: 2px solid #dc3545; background-color: #fff0f0; font-weight: bold; border-radius: 3px; padding-left: 2px; }
+    .handwritten { color: #dc3545; font-weight: 800; font-family: "Courier New", Courier, monospace; font-size: 1.1em; letter-spacing: -0.5px; }
 
     /* HEADER */
     .header-row { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 6px; }
     .inputs-area { display: flex; gap: 20px; width: 70%; }
     .input-group { display: flex; align-items: flex-end; gap: 5px; }
     .input-group .label { font-weight: bold; font-size: 0.85rem; white-space: nowrap; }
-    .input-group .line { border-bottom: 1px solid #000; height: 1px; }
+    .input-group .line { border-bottom: 1px solid #000; height: 18px; line-height: 18px; padding-left: 5px; }
     .title-area { text-align: right; }
     .title-area h1 { font-size: 1.4rem; font-weight: 900; line-height: 1; margin: 0; }
     .url-text { font-size: 0.9rem; font-weight: bold; text-transform: uppercase; color: #444; }
@@ -168,6 +189,7 @@ else
     .game-meta { font-size: 0.6rem; color: #444; margin-bottom: 1px; white-space: nowrap; overflow: hidden; }
     .matchup { display: flex; flex-direction: column; justify-content: center; line-height: 1.1; font-weight: 600; font-size: 0.75rem; }
     .vs { display: none; }
+    .team { padding: 1px 2px; }
 
     /* BRACKET SECTION */
     .bracket-section { border-top: 2px solid #000; padding-top: 5px; margin-top: 5px; position: relative; }
@@ -182,7 +204,7 @@ else
     .game-meta-row { font-size: 0.6rem; font-weight: bold; border-bottom: 1px solid #ccc; margin-bottom: 2px; display: flex; justify-content: space-between; }
     .meta-right { font-weight: normal; font-size: 0.55rem; }
     
-    .team-slot { border-bottom: 1px solid #eee; height: 16px; line-height: 16px; overflow: hidden; white-space: nowrap; margin-bottom: 1px; }
+    .team-slot { border-bottom: 1px solid #eee; height: 18px; line-height: 16px; overflow: hidden; white-space: nowrap; margin-bottom: 1px; }
     .champ-card { border: 2px solid #000; height: auto; min-height: 90px; padding-bottom: 5px; display: flex; flex-direction: column; justify-content: space-between; }
     .champ-line { margin-top: 8px; text-align: center; border-top: 1px dotted #ccc; padding-top: 4px; }
     .line-draw { font-weight: bold; }
@@ -194,11 +216,14 @@ else
     .rules-content { margin-bottom: 10px; line-height: 1.4; }
     
     .tiebreaker-row { display: flex; align-items: flex-end; gap: 10px; }
-    .tiebreaker-row .line { border-bottom: 1px solid #000; height: 1px; }
+    .tiebreaker-row .line { border-bottom: 1px solid #000; height: 18px; }
 </style>
 
 @code {
+    [Parameter] public string? EntryId { get; set; }
+
     private List<BowlGame>? games;
+    private BracketEntry? userEntry;
     
     // Sorted Lists for Bracket Display
     private List<BowlGame> standardGames = new();
@@ -211,52 +236,98 @@ else
     {
         try 
         {
-            var allGames = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
-            games = allGames ?? new();
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
+            var entryTask = FetchEntry();
+
+            await Task.WhenAll(gamesTask, entryTask);
+
+            games = await gamesTask ?? new();
             PrepareBracket();
         }
         catch(Exception ex) { Console.WriteLine(ex.Message); }
     }
 
+    private async Task FetchEntry()
+    {
+        if (!string.IsNullOrEmpty(EntryId))
+        {
+            try 
+            {
+                userEntry = await Http.GetFromJsonAsync<BracketEntry>($"api/GetEntry?id={EntryId}");
+            }
+            catch { /* Ignore if not found or unauthorized */ }
+        }
+    }
+
     private void PrepareBracket()
     {
         if (games == null) return;
-
-        // 1. Standard Games (No specific order needed, just time)
+        // 1. Standard Games
         standardGames = games.Where(g => !g.IsPlayoff).OrderBy(g => g.StartTime).ToList();
-
-        // 2. Championship (The Anchor)
+        // 2. Championship
         champGames = games.Where(g => g.IsPlayoff && g.Round == PlayoffRound.Championship).OrderBy(g => g.StartTime).ToList();
-
-        // 3. Semis - Sort by which Champ game they feed into
+        // 3. Semis
         semiGames = SortRoundByNext(PlayoffRound.SemiFinal, champGames);
-
-        // 4. Quarters - Sort by which Semi they feed into
+        // 4. Quarters
         quarterGames = SortRoundByNext(PlayoffRound.QuarterFinal, semiGames);
-
-        // 5. Round 1 - Sort by which Quarter they feed into
+        // 5. Round 1
         round1Games = SortRoundByNext(PlayoffRound.Round1, quarterGames);
     }
 
-    // Helper: Sorts current round based on the order of the games in the next round
     private List<BowlGame> SortRoundByNext(PlayoffRound currentRound, List<BowlGame> nextRoundSorted)
     {
         var roundGames = games!.Where(g => g.IsPlayoff && g.Round == currentRound).ToList();
-
         return roundGames.OrderBy(g => 
         {
-            // Find index of the target game in the next round's sorted list
             var targetIndex = nextRoundSorted.FindIndex(next => next.Id == g.NextGameId);
-            // If unlinked, push to bottom
             return targetIndex == -1 ? int.MaxValue : targetIndex;
-        })
-        .ThenBy(g => g.StartTime) // Secondary sort for pairs feeding the same game
-        .ToList();
+        }).ThenBy(g => g.StartTime).ToList();
     }
 
-    // Replaces explicit "CT" append with DateTimeHelper logic + suffix
-    private string FormatTimeShort(DateTime utc) => DateTimeHelper.ToCentral(utc).ToString("MMM d h:mm tt") + " CT";
+    // --- RENDERING HELPERS ---
 
+    // 1. Styling the User's Pick (Red Box)
+    private string GetPickClass(string gameId, string? teamName)
+    {
+        if (userEntry == null || string.IsNullOrEmpty(teamName)) return "";
+        if (userEntry.Picks.TryGetValue(gameId, out var pick) && pick == teamName)
+        {
+            return "user-pick";
+        }
+        return "";
+    }
+
+    // 2. Dynamic Slot Filling (Advancement Logic)
+    private (string? Top, string? Bottom) GetParticipants(BowlGame game)
+    {
+        // Default Logic: If teams are fixed (like Round 1), use them
+        string? top = game.TeamHome;
+        string? bottom = game.TeamAway;
+
+        // Dynamic Logic: If teams are TBD (Semis/Champ), find who advanced
+        if (string.IsNullOrEmpty(top) || top == "TBD" || string.IsNullOrEmpty(bottom) || bottom == "TBD")
+        {
+            // Find the 2 games that feed into this one
+            var feeders = games!.Where(g => g.NextGameId == game.Id).OrderBy(g => g.StartTime).ToList();
+            
+            if (feeders.Count >= 1) top = GetWinnerOf(feeders[0]);
+            if (feeders.Count >= 2) bottom = GetWinnerOf(feeders[1]);
+        }
+
+        return (top, bottom);
+    }
+
+    // Helper to find who the user picked to win a specific game
+    private string? GetWinnerOf(BowlGame game)
+    {
+        if (userEntry != null && userEntry.Picks.TryGetValue(game.Id, out var winner))
+        {
+            return winner; // User's predicted winner becomes the participant in the next round
+        }
+        return null; // Empty line
+    }
+
+    private string FormatTimeShort(DateTime utc) => DateTimeHelper.ToCentral(utc).ToString("MMM d h:mm tt") + " CT";
     private string FormatCompact(BowlGame g)
     {
         var time = DateTimeHelper.ToCentral(g.StartTime);

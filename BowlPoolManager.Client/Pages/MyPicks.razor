@@ -84,6 +84,12 @@
                                         <button class="btn btn-outline-primary flex-grow-1" @onclick="() => EditEntry(entry)">
                                             <i class="bi bi-pencil-square"></i> View/Edit
                                         </button>
+                                        
+                                        @* PRINT BUTTON *@
+                                        <a href="print-bracket/@entry.Id" target="_blank" class="btn btn-outline-secondary" title="Print Bracket">
+                                            <i class="bi bi-printer"></i>
+                                        </a>
+
                                         <button class="btn btn-outline-danger" @onclick="() => DeleteEntry(entry)" title="Delete Bracket">
                                             <i class="bi bi-trash-fill"></i>
                                         </button>
