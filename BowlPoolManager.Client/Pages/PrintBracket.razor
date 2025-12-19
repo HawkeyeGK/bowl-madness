@@ -301,17 +301,32 @@ else
         return "";
     }
 
+    // FIX: Surgical Participant Filling
     private (string? Top, string? Bottom) GetParticipants(BowlGame game)
     {
         string? top = game.TeamHome;
         string? bottom = game.TeamAway;
 
-        // If TBD, find feeders (Used for Quarters, Semis, Finals)
-        if (string.IsNullOrEmpty(top) || top == "TBD" || string.IsNullOrEmpty(bottom) || bottom == "TBD")
+        // Determine if we need to find feeder games
+        bool topNeedsFill = string.IsNullOrEmpty(top) || top == "TBD";
+        bool bottomNeedsFill = string.IsNullOrEmpty(bottom) || bottom == "TBD";
+
+        if (topNeedsFill || bottomNeedsFill)
         {
             var feeders = games!.Where(g => g.NextGameId == game.Id).OrderBy(g => g.StartTime).ToList();
-            if (feeders.Count >= 1) top = GetWinnerOf(feeders[0]);
-            if (feeders.Count >= 2) bottom = GetWinnerOf(feeders[1]);
+            var feederQueue = new Queue<BowlGame>(feeders);
+
+            // ONLY fill Top if it is TBD
+            if (topNeedsFill && feederQueue.Count > 0)
+            {
+                top = GetWinnerOf(feederQueue.Dequeue());
+            }
+
+            // ONLY fill Bottom if it is TBD
+            if (bottomNeedsFill && feederQueue.Count > 0)
+            {
+                bottom = GetWinnerOf(feederQueue.Dequeue());
+            }
         }
         return (top, bottom);
     }
