@@ -67,7 +67,7 @@
                         <thead class="bg-primary text-white">
                             <tr>
                                 <th class="ps-4 text-start cursor-pointer" @onclick='() => Sort("Rank")'>Rank @RenderSortIcon("Rank")</th>
-                                <th class="text-start cursor-pointer" @onclick='() => Sort("Player")'>Player @RenderSortIcon("Player")</th>
+                                <th class="cursor-pointer" @onclick='() => Sort("Player")'>Player @RenderSortIcon("Player")</th>
                                 <th class="fw-bold cursor-pointer" @onclick='() => Sort("Score")'>Total @RenderSortIcon("Score")</th>
                                 <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Bowls")'>Bowls @RenderSortIcon("Bowls")</th>
                                 <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Round1")'>1st Rnd @RenderSortIcon("Round1")</th>
@@ -85,7 +85,7 @@
                                 bool isRedacted = row.Entry.Picks == null;
                                 <tr>
                                     <td class="ps-4 text-start">@row.Rank</td>
-                                    <td class="text-start fw-bold">
+                                    <td class="fw-bold">
                                         <a href="entry/@row.Entry.Id" class="text-decoration-none text-dark">
                                             @if (isRedacted)
                                             {
