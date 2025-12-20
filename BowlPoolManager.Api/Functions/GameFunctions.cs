@@ -15,11 +15,14 @@ namespace BowlPoolManager.Api.Functions
     {
         private readonly ILogger _logger;
         private readonly ICosmosDbService _cosmosService;
+        private readonly ICfbdService _cfbdService; // NEW Dependency
 
-        public GameFunctions(ILoggerFactory loggerFactory, ICosmosDbService cosmosService)
+        // UPDATED Constructor
+        public GameFunctions(ILoggerFactory loggerFactory, ICosmosDbService cosmosService, ICfbdService cfbdService)
         {
             _logger = loggerFactory.CreateLogger<GameFunctions>();
             _cosmosService = cosmosService;
+            _cfbdService = cfbdService;
         }
 
         [Function("GetGames")]
@@ -33,6 +36,27 @@ namespace BowlPoolManager.Api.Functions
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(sortedGames);
+            return response;
+        }
+
+        // NEW: Endpoint to fetch external API games for linking
+        [Function("GetExternalGames")]
+        public async Task<HttpResponseData> GetExternalGames([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
+        {
+            _logger.LogInformation("Getting external games.");
+
+            // Security Check (SuperAdmin only)
+            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
+            if (!authResult.IsValid)
+            {
+                return authResult.ErrorResponse!;
+            }
+
+            // Hardcoded to 2024 for this season. Could be dynamic later.
+            var games = await _cfbdService.GetPostseasonGamesAsync(2024);
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            await response.WriteAsJsonAsync(games);
             return response;
         }
 

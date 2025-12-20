@@ -1,0 +1,161 @@
+@page "/admin/linker"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core.Dtos
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<h3 class="mb-4">🔗 Game Linker</h3>
+
+<div class="alert alert-info">
+    Use this tool to connect local games to the live data feed. <br/>
+    <strong>Instructions:</strong> Find the matching external game in the dropdown and click "Link".
+</div>
+
+@if (IsLoading)
+{
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Local Game</th>
+                    <th>Date</th>
+                    <th>Current Link</th>
+                    <th>External Match (CFBD)</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var game in LocalGames)
+                {
+                    <tr class="@(IsLinked(game) ? "table-success" : "")">
+                        <td>
+                            <strong>@game.BowlName</strong><br/>
+                            <span class="text-muted small">@game.TeamHome vs @game.TeamAway</span>
+                        </td>
+                        <td>@game.StartTime.ToLocalTime().ToString("MMM dd, h:mm tt")</td>
+                        <td>
+                            @if(IsLinked(game))
+                            {
+                                <span class="badge bg-success">Linked: @game.ExternalId</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning text-dark">Unlinked</span>
+                            }
+                        </td>
+                        <td>
+                            <select class="form-select" @bind="LinkSelections[game.Id]">
+                                <option value="">-- Select Matching Game --</option>
+                                @foreach (var ext in ExternalGames)
+                                {
+                                    <option value="@ext.Id">@ext.HomeTeam vs @ext.AwayTeam (@ext.Notes)</option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <button class="btn btn-primary btn-sm" 
+                                    @onclick="() => SaveLink(game)"
+                                    disabled="@IsSaving">
+                                Link
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private bool IsLoading = true;
+    private bool IsSaving = false;
+    private List<BowlGame> LocalGames = new();
+    private List<CfbdGameDto> ExternalGames = new();
+    
+    // Tracks the selected dropdown value for each local game ID
+    private Dictionary<string, string> LinkSelections = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        IsLoading = true;
+        try
+        {
+            // Fetch Local
+            LocalGames = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames") ?? new();
+            
+            // Fetch External (This endpoint requires Admin auth, handled by cookie/API)
+            ExternalGames = await Http.GetFromJsonAsync<List<CfbdGameDto>>("api/GetExternalGames") ?? new();
+            
+            // Initialize selections based on existing links
+            foreach(var game in LocalGames)
+            {
+                if (!string.IsNullOrEmpty(game.ExternalId))
+                {
+                    LinkSelections[game.Id] = game.ExternalId;
+                }
+                else
+                {
+                    LinkSelections[game.Id] = "";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading data: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private bool IsLinked(BowlGame game) => !string.IsNullOrEmpty(game.ExternalId);
+
+    private async Task SaveLink(BowlGame game)
+    {
+        if (!LinkSelections.ContainsKey(game.Id)) return;
+
+        var selectedExtId = LinkSelections[game.Id];
+        if (string.IsNullOrEmpty(selectedExtId)) return;
+
+        IsSaving = true;
+        
+        // Update local object
+        game.ExternalId = selectedExtId;
+
+        try
+        {
+            // Post update
+            var response = await Http.PostAsJsonAsync("api/SaveGame", game);
+            if (response.IsSuccessStatusCode)
+            {
+                // Refresh list or just UI state? 
+                // We updated the object reference, so UI should reflect on render.
+                StateHasChanged();
+            }
+            else
+            {
+                Console.WriteLine("Failed to save link.");
+            }
+        }
+        catch (Exception ex)
+        {
+             Console.WriteLine($"Error saving link: {ex.Message}");
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+}
