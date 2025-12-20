@@ -15,6 +15,11 @@ builder.Services
     .AddApplicationInsightsTelemetryWorkerService()
     .ConfigureFunctionsApplicationInsights();
 
+// --- NEW: Register HTTP Client and External Service ---
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<ICfbdService, CfbdService>();
+// -----------------------------------------------------
+
 // 1. Register Cosmos Service
 builder.Services.AddSingleton<ICosmosDbService, CosmosDbService>();
 

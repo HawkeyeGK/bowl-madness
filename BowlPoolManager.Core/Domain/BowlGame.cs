@@ -13,6 +13,12 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("bowlName")]
         public string BowlName { get; set; } = string.Empty;
 
+        // --- NEW: External Linkage ---
+        [JsonProperty("externalId")]
+        [JsonPropertyName("externalId")]
+        public string? ExternalId { get; set; }
+        // -----------------------------
+
         [JsonProperty("startTime")]
         [JsonPropertyName("startTime")]
         public DateTime StartTime { get; set; } = DateTime.UtcNow;
