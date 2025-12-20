@@ -126,6 +126,195 @@
         {
             isLoading = true;
             
+            // FIX: Repointed to standard endpoints
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
+            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries"); 
+            var usersTask = Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers");
+
+            await Task.WhenAll(poolsTask, entriesTask, usersTask);
+
+            pools = await poolsTask ?? new();
+            allEntries = await entriesTask ?? new();
+            var users = await usersTask ?? new();
+            
+            userEmailMap = users.ToDictionary(u => u.Id, u => u.Email);
+            
+            allEntries = allEntries.OrderByDescending(e => e.CreatedOn).ToList();
+            
+            FilterData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private void OnPoolFilterChanged(ChangeEventArgs e)
+    {
+        selectedPoolId = e.Value?.ToString() ?? "";
+        FilterData();
+    }
+    
+    private void FilterData()
+    {
+        if (string.IsNullOrEmpty(selectedPoolId))
+        {
+            filteredEntries = allEntries;
+        }
+        else
+        {
+            filteredEntries = allEntries.Where(e => e.PoolId == selectedPoolId).ToList();
+        }
+    }
+
+    private async Task DeleteEntry(BracketEntry entry)
+    {
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete the bracket for '{entry.PlayerName}'?");
+        if (confirmed)
+        {
+            var response = await Http.DeleteAsync($"api/DeleteEntry?id={entry.Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadData();
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("alert", "Failed to delete entry.");
+            }
+        }
+    }
+}
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@using BowlPoolManager.Client.Helpers
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Manage Entries</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-list-check"></i> Manage Entries</h1>
+        <div class="d-flex gap-2">
+            <a href="/admin/dashboard" class="btn btn-outline-secondary">Dashboard</a>
+            <a href="/admin/entry" class="btn btn-primary"><i class="bi bi-plus-lg"></i> New Entry</a>
+        </div>
+    </div>
+    
+    @* POOL FILTER *@
+    <div class="card mb-4">
+        <div class="card-body py-2">
+            <div class="row align-items-center">
+                <div class="col-auto fw-bold">Filter by Pool:</div>
+                <div class="col-auto">
+                    <select class="form-select form-select-sm" @onchange="OnPoolFilterChanged">
+                        <option value="">-- All Pools --</option>
+                        @foreach (var pool in pools)
+                        {
+                            <option value="@pool.Id" selected="@(selectedPoolId == pool.Id)">@pool.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col text-end small text-muted">
+                    Showing @filteredEntries.Count entries
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
+    }
+    else if (filteredEntries.Count == 0)
+    {
+        <div class="alert alert-info">No entries found.</div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Player Name</th>
+                                <th>Email</th>
+                                <th>Pool</th>
+                                <th>Tiebreaker</th>
+                                <th>Created On (CT)</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entry in filteredEntries)
+                            {
+                                <tr>
+                                    <td class="fw-bold">@entry.PlayerName</td>
+                                    <td>
+                                        @if (userEmailMap.TryGetValue(entry.UserId, out var email))
+                                        {
+                                            <a href="mailto:@email" class="text-decoration-none">@email</a>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small fst-italic">Manual / Unknown</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @{
+                                            var poolName = pools.FirstOrDefault(p => p.Id == entry.PoolId)?.Name ?? "Unknown";
+                                        }
+                                        <span class="badge bg-light text-dark border">@poolName</span>
+                                    </td>
+                                    <td>@entry.TieBreakerPoints</td>
+                                    <td>@DateTimeHelper.ToCentral(entry.CreatedOn).ToString("g")</td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="/admin/entry/@entry.Id" class="btn btn-outline-primary">Edit</a>
+                                            <button class="btn btn-outline-danger" @onclick="() => DeleteEntry(entry)">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<BracketEntry> allEntries = new();
+    private List<BracketEntry> filteredEntries = new();
+    private List<BowlPool> pools = new();
+    private Dictionary<string, string> userEmailMap = new();
+    private bool isLoading = true;
+    
+    private string selectedPoolId = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            isLoading = true;
+            
             // USE DEDICATED ADMIN ENDPOINTS
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
             var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/AdminGetEntries"); 
