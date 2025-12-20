@@ -1,7 +1,6 @@
-using System.Net.Http.Json;
-using System.Text.Json; // Required for JsonSerializerOptions
 using Microsoft.Extensions.Logging;
 using BowlPoolManager.Core.Dtos;
+using Newtonsoft.Json; // Switching to Newtonsoft for robust handling
 
 namespace BowlPoolManager.Api.Services
 {
@@ -37,28 +36,30 @@ namespace BowlPoolManager.Api.Services
             {
                 var url = $"/games?year={year}&seasonType=postseason";
                 
-                // --- ROBUST SERIALIZATION SETTINGS ---
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower, // Handles home_team -> HomeTeam
-                    NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
-                };
-                
-                // Debug: Log the attempt
-                _logger.LogInformation($"Fetching CFBD Games for {year}...");
+                _logger.LogInformation($"Fetching CFBD Games (Raw String) for {year}...");
 
-                var games = await _httpClient.GetFromJsonAsync<List<CfbdGameDto>>(url, options);
+                // 1. Fetch Raw String
+                var json = await _httpClient.GetStringAsync(url);
+
+                // 2. Debug Log (First 200 chars to verify format)
+                if (!string.IsNullOrEmpty(json))
+                {
+                    var snippet = json.Length > 200 ? json.Substring(0, 200) : json;
+                    _logger.LogInformation($"CFBD Response Snippet: {snippet}");
+                }
+
+                // 3. Deserialize using Newtonsoft
+                // This uses the [JsonProperty("home_team")] attributes we added to the DTO
+                var games = JsonConvert.DeserializeObject<List<CfbdGameDto>>(json);
                 
-                // Debug: Log the result
                 if (games != null && games.Any())
                 {
                     var first = games.First();
-                    _logger.LogInformation($"Fetched {games.Count} games. First Game: {first.Notes} | {first.HomeTeam} vs {first.AwayTeam}");
+                    _logger.LogInformation($"Parsed {games.Count} games. Sample: {first.Notes} | {first.HomeTeam} vs {first.AwayTeam}");
                 }
                 else
                 {
-                    _logger.LogWarning("Fetched games list was empty or null.");
+                    _logger.LogWarning("Deserialized list was empty.");
                 }
 
                 return games ?? new List<CfbdGameDto>();
