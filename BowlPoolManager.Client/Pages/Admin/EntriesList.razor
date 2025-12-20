@@ -126,10 +126,10 @@
         {
             isLoading = true;
             
-            // 1. Fetch Global Data
+            // USE DEDICATED ADMIN ENDPOINTS
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
-            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries"); // No poolId = get all
-            var usersTask = Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers");
+            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/AdminGetEntries"); 
+            var usersTask = Http.GetFromJsonAsync<List<UserProfile>>("api/AdminGetUsers");
 
             await Task.WhenAll(poolsTask, entriesTask, usersTask);
 
@@ -137,13 +137,10 @@
             allEntries = await entriesTask ?? new();
             var users = await usersTask ?? new();
 
-            // 2. Build Lookup Map
             userEmailMap = users.ToDictionary(u => u.Id, u => u.Email);
             
-            // 3. Sort Descending
             allEntries = allEntries.OrderByDescending(e => e.CreatedOn).ToList();
             
-            // 4. Initial Filter
             FilterData();
         }
         catch (Exception ex)

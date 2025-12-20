@@ -118,7 +118,8 @@
         try
         {
             isLoading = true;
-            users = await Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers");
+            // FIX: Use dedicated Admin endpoint
+            users = await Http.GetFromJsonAsync<List<UserProfile>>("api/AdminGetUsers");
         }
         catch (Exception ex)
         {
