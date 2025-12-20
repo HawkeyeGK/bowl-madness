@@ -5,5 +5,7 @@ namespace BowlPoolManager.Api.Services
     public interface ICfbdService
     {
         Task<List<CfbdGameDto>> GetPostseasonGamesAsync(int year);
+        // NEW: For diagnostics
+        Task<string> GetRawPostseasonGamesJsonAsync(int year);
     }
 }

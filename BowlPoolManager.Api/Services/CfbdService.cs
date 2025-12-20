@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 using BowlPoolManager.Core.Dtos;
-using Newtonsoft.Json; // Switching to Newtonsoft for robust handling
+using Newtonsoft.Json; 
 
 namespace BowlPoolManager.Api.Services
 {
@@ -19,15 +19,32 @@ namespace BowlPoolManager.Api.Services
 
         public async Task<List<CfbdGameDto>> GetPostseasonGamesAsync(int year)
         {
-            var apiKey = Environment.GetEnvironmentVariable("CfbdApiKey");
-            
-            if (string.IsNullOrEmpty(apiKey))
+            // Reuse the raw fetch to ensure consistency
+            var json = await GetRawPostseasonGamesJsonAsync(year);
+            if (string.IsNullOrEmpty(json)) return new List<CfbdGameDto>();
+
+            try 
             {
-                _logger.LogError("CfbdApiKey is missing from configuration.");
+                return JsonConvert.DeserializeObject<List<CfbdGameDto>>(json) ?? new List<CfbdGameDto>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Deserialization failed.");
                 return new List<CfbdGameDto>();
             }
+        }
 
-            if (!_httpClient.DefaultRequestHeaders.Contains("Authorization"))
+        public async Task<string> GetRawPostseasonGamesJsonAsync(int year)
+        {
+            var apiKey = Environment.GetEnvironmentVariable("CfbdApiKey");
+            
+            // Allow running without key for debug (API returns error usually, but handles crash)
+            if (string.IsNullOrEmpty(apiKey)) 
+            {
+                 _logger.LogWarning("CfbdApiKey is missing.");
+            }
+
+            if (!_httpClient.DefaultRequestHeaders.Contains("Authorization") && !string.IsNullOrEmpty(apiKey))
             {
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
             }
@@ -35,39 +52,12 @@ namespace BowlPoolManager.Api.Services
             try
             {
                 var url = $"/games?year={year}&seasonType=postseason";
-                
-                _logger.LogInformation($"Fetching CFBD Games (Raw String) for {year}...");
-
-                // 1. Fetch Raw String
-                var json = await _httpClient.GetStringAsync(url);
-
-                // 2. Debug Log (First 200 chars to verify format)
-                if (!string.IsNullOrEmpty(json))
-                {
-                    var snippet = json.Length > 200 ? json.Substring(0, 200) : json;
-                    _logger.LogInformation($"CFBD Response Snippet: {snippet}");
-                }
-
-                // 3. Deserialize using Newtonsoft
-                // This uses the [JsonProperty("home_team")] attributes we added to the DTO
-                var games = JsonConvert.DeserializeObject<List<CfbdGameDto>>(json);
-                
-                if (games != null && games.Any())
-                {
-                    var first = games.First();
-                    _logger.LogInformation($"Parsed {games.Count} games. Sample: {first.Notes} | {first.HomeTeam} vs {first.AwayTeam}");
-                }
-                else
-                {
-                    _logger.LogWarning("Deserialized list was empty.");
-                }
-
-                return games ?? new List<CfbdGameDto>();
+                return await _httpClient.GetStringAsync(url);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to fetch games from CFBD.");
-                return new List<CfbdGameDto>();
+                _logger.LogError(ex, "Raw fetch failed.");
+                return $"Error fetching data: {ex.Message}";
             }
         }
     }

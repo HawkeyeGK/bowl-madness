@@ -6,8 +6,7 @@ using BowlPoolManager.Api.Services;
 using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Core;
 using System.Text.Json;
-using System.Text;
-using BowlPoolManager.Api.Helpers; // Added reference
+using BowlPoolManager.Api.Helpers;
 
 namespace BowlPoolManager.Api.Functions
 {
@@ -15,9 +14,8 @@ namespace BowlPoolManager.Api.Functions
     {
         private readonly ILogger _logger;
         private readonly ICosmosDbService _cosmosService;
-        private readonly ICfbdService _cfbdService; // NEW Dependency
+        private readonly ICfbdService _cfbdService;
 
-        // UPDATED Constructor
         public GameFunctions(ILoggerFactory loggerFactory, ICosmosDbService cosmosService, ICfbdService cfbdService)
         {
             _logger = loggerFactory.CreateLogger<GameFunctions>();
@@ -28,75 +26,55 @@ namespace BowlPoolManager.Api.Functions
         [Function("GetGames")]
         public async Task<HttpResponseData> GetGames([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
-            _logger.LogInformation("Getting all games.");
             var games = await _cosmosService.GetGamesAsync();
-            
-            // Optional: Sort by date
             var sortedGames = games.OrderBy(g => g.StartTime).ToList();
-
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(sortedGames);
             return response;
         }
 
-        // NEW: Endpoint to fetch external API games for linking
         [Function("GetExternalGames")]
         public async Task<HttpResponseData> GetExternalGames([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
-            _logger.LogInformation("Getting external games.");
-
-            // Security Check (SuperAdmin only)
             var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
-            if (!authResult.IsValid)
-            {
-                return authResult.ErrorResponse!;
-            }
+            if (!authResult.IsValid) return authResult.ErrorResponse!;
 
-            // Hardcoded to 2024 for this season. Could be dynamic later.
             var games = await _cfbdService.GetPostseasonGamesAsync(2024);
-
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(games);
             return response;
         }
+        
+        // --- NEW DIAGNOSTIC ENDPOINT ---
+        [Function("GetRawCfbdGames")]
+        public async Task<HttpResponseData> GetRawCfbdGames([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
+        {
+            _logger.LogInformation("Debugging Raw CFBD JSON.");
+            
+            // Light security check (Admin only recommended)
+            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
+            if (!authResult.IsValid) return authResult.ErrorResponse!;
+
+            var json = await _cfbdService.GetRawPostseasonGamesJsonAsync(2024);
+            
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            // Return as JSON so browser formats it, but it is just a string pass-through
+            response.Headers.Add("Content-Type", "application/json");
+            await response.WriteStringAsync(json);
+            return response;
+        }
+        // -------------------------------
 
         [Function("SaveGame")]
         public async Task<HttpResponseData> SaveGame([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
         {
-            _logger.LogInformation("Saving a game.");
+             var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
+             if (!authResult.IsValid) return authResult.ErrorResponse!;
 
-            try
-            {
-                // Security Check
-                var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
-                if (!authResult.IsValid)
-                {
-                    _logger.LogWarning("SaveGame blocked: Unauthorized or Forbidden.");
-                    return authResult.ErrorResponse!;
-                }
-
-                // 3. Process
-                var game = await JsonSerializer.DeserializeAsync<BowlGame>(req.Body);
-                if (game == null)
-                {
-                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
-                    await badReq.WriteStringAsync("Invalid game data.");
-                    return badReq;
-                }
-
-                // We use Update (Upsert) to handle both Create and Edit scenarios
-                await _cosmosService.UpdateGameAsync(game);
-
-                var response = req.CreateResponse(HttpStatusCode.OK);
-                await response.WriteAsJsonAsync(game);
-                return response;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "SaveGame failed.");
-                return req.CreateResponse(HttpStatusCode.InternalServerError);
-            }
+             var game = await JsonSerializer.DeserializeAsync<BowlGame>(req.Body);
+             if (game != null) await _cosmosService.UpdateGameAsync(game);
+             
+             return req.CreateResponse(HttpStatusCode.OK);
         }
-
     }
 }

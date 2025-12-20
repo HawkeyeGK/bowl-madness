@@ -1,0 +1,47 @@
+@page "/admin/debug-raw"
+@inject HttpClient Http
+
+<h3>🕵️ Raw API Inspector</h3>
+
+<p>This page displays the exact text returned by CollegeFootballData.com, bypassing all internal DTOs.</p>
+
+<button class="btn btn-primary mb-3" @onclick="LoadRaw">Refresh Raw Data</button>
+
+@if (IsLoading)
+{
+    <p>Loading...</p>
+}
+else
+{
+    @if (!string.IsNullOrEmpty(RawJson))
+    {
+        <div class="card">
+            <div class="card-body" style="background-color: #f8f9fa;">
+                <pre style="max-height: 600px; overflow: auto;">@RawJson</pre>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private string RawJson = "";
+    private bool IsLoading = false;
+
+    private async Task LoadRaw()
+    {
+        IsLoading = true;
+        try
+        {
+            // Calls the new endpoint that returns pure string
+            RawJson = await Http.GetStringAsync("api/GetRawCfbdGames");
+        }
+        catch (Exception ex)
+        {
+            RawJson = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+}
