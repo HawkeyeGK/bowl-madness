@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json; // Required for JsonSerializerOptions
 using Microsoft.Extensions.Logging;
 using BowlPoolManager.Core.Dtos;
 
@@ -19,7 +20,6 @@ namespace BowlPoolManager.Api.Services
 
         public async Task<List<CfbdGameDto>> GetPostseasonGamesAsync(int year)
         {
-            // Retrieve key from Environment Variables (set in local.settings.json or Azure Config)
             var apiKey = Environment.GetEnvironmentVariable("CfbdApiKey");
             
             if (string.IsNullOrEmpty(apiKey))
@@ -28,7 +28,6 @@ namespace BowlPoolManager.Api.Services
                 return new List<CfbdGameDto>();
             }
 
-            // Add Authorization Header if not present
             if (!_httpClient.DefaultRequestHeaders.Contains("Authorization"))
             {
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
@@ -36,9 +35,32 @@ namespace BowlPoolManager.Api.Services
 
             try
             {
-                // Fetch postseason games
                 var url = $"/games?year={year}&seasonType=postseason";
-                var games = await _httpClient.GetFromJsonAsync<List<CfbdGameDto>>(url);
+                
+                // --- ROBUST SERIALIZATION SETTINGS ---
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower, // Handles home_team -> HomeTeam
+                    NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
+                };
+                
+                // Debug: Log the attempt
+                _logger.LogInformation($"Fetching CFBD Games for {year}...");
+
+                var games = await _httpClient.GetFromJsonAsync<List<CfbdGameDto>>(url, options);
+                
+                // Debug: Log the result
+                if (games != null && games.Any())
+                {
+                    var first = games.First();
+                    _logger.LogInformation($"Fetched {games.Count} games. First Game: {first.Notes} | {first.HomeTeam} vs {first.AwayTeam}");
+                }
+                else
+                {
+                    _logger.LogWarning("Fetched games list was empty or null.");
+                }
+
                 return games ?? new List<CfbdGameDto>();
             }
             catch (Exception ex)
