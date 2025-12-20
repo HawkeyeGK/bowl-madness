@@ -4,12 +4,7 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 
-<h3 class="mb-4">🔗 Game Linker</h3>
-
-<div class="alert alert-info">
-    Use this tool to connect local games to the live data feed. <br/>
-    <strong>Instructions:</strong> Find the matching external game in the dropdown and click "Link".
-</div>
+<h3 class="mb-4">🔗 Game Linker (Smart Mode)</h3>
 
 @if (IsLoading)
 {
@@ -26,7 +21,6 @@ else
                     <th>Local Game</th>
                     <th>Date</th>
                     <th>Current Link</th>
-                    <th>External Match (CFBD)</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -50,19 +44,8 @@ else
                             }
                         </td>
                         <td>
-                            <select class="form-select" @bind="LinkSelections[game.Id]">
-                                <option value="">-- Select Matching Game --</option>
-                                @foreach (var ext in ExternalGames)
-                                {
-                                    <option value="@ext.Id">@ext.HomeTeam vs @ext.AwayTeam (@ext.Notes)</option>
-                                }
-                            </select>
-                        </td>
-                        <td>
-                            <button class="btn btn-primary btn-sm" 
-                                    @onclick="() => SaveLink(game)"
-                                    disabled="@IsSaving">
-                                Link
+                            <button class="btn btn-outline-primary btn-sm" @onclick="() => OpenLinkModal(game)">
+                                @(IsLinked(game) ? "Edit Link" : "Link Game")
                             </button>
                         </td>
                     </tr>
@@ -72,14 +55,103 @@ else
     </div>
 }
 
+@if (ShowModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Link Game: @SelectedLocalGame?.BowlName</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Select Matching API Game:</label>
+                        <select class="form-select" @onchange="OnApiGameSelected">
+                            <option value="">-- Choose Game --</option>
+                            @foreach (var ext in ExternalGames)
+                            {
+                                <option value="@ext.Id" selected="@(SelectedApiGame?.Id == ext.Id)">
+                                    @FormatApiGameLabel(ext)
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    @if (SelectedApiGame != null && SelectedLocalGame != null)
+                    {
+                        <div class="card bg-light mb-3">
+                            <div class="card-body">
+                                <h6 class="card-title text-uppercase text-muted small fw-bold">Validation</h6>
+                                <div class="row align-items-center text-center">
+                                    <div class="col-5">
+                                        <div class="fw-bold">Local Data</div>
+                                        <div class="text-primary">@SelectedLocalGame.TeamHome</div>
+                                        <div class="text-primary">@SelectedLocalGame.TeamAway</div>
+                                    </div>
+                                    <div class="col-2">
+                                        <span class="oi oi-arrow-right"></span>
+                                    </div>
+                                    <div class="col-5">
+                                        <div class="fw-bold">API Data</div>
+                                        <div class="text-success">@SelectedApiGame.HomeTeam</div>
+                                        <div class="text-success">@SelectedApiGame.AwayTeam</div>
+                                    </div>
+                                </div>
+                                
+                                <hr/>
+
+                                @if (NamesMatch)
+                                {
+                                    <div class="alert alert-success py-2 mb-0">
+                                        <span class="oi oi-check"></span> <strong>Perfect Match!</strong> Team names are identical.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="alert alert-warning py-2 mb-2">
+                                        <span class="oi oi-warning"></span> <strong>Name Mismatch</strong><br/>
+                                        Local names differ from API names.
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="syncNames" @bind="SyncTeamNames">
+                                        <label class="form-check-label fw-bold" for="syncNames">
+                                            Update local team names to match API?
+                                        </label>
+                                        <div class="form-text">Recommended for consistent scoring updates.</div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" 
+                            disabled="@(SelectedApiGame == null || IsSaving)"
+                            @onclick="SaveLink">
+                        @if (IsSaving) { <span>Saving...</span> } else { <span>Confirm Link</span> }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private bool IsLoading = true;
     private bool IsSaving = false;
+    
+    // Modal State
+    private bool ShowModal = false;
+    private BowlGame? SelectedLocalGame;
+    private CfbdGameDto? SelectedApiGame;
+    private bool SyncTeamNames = false;
+
     private List<BowlGame> LocalGames = new();
     private List<CfbdGameDto> ExternalGames = new();
-    
-    // Tracks the selected dropdown value for each local game ID
-    private Dictionary<string, string> LinkSelections = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -91,24 +163,8 @@ else
         IsLoading = true;
         try
         {
-            // Fetch Local
             LocalGames = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames") ?? new();
-            
-            // Fetch External (This endpoint requires Admin auth, handled by cookie/API)
             ExternalGames = await Http.GetFromJsonAsync<List<CfbdGameDto>>("api/GetExternalGames") ?? new();
-            
-            // Initialize selections based on existing links
-            foreach(var game in LocalGames)
-            {
-                if (!string.IsNullOrEmpty(game.ExternalId))
-                {
-                    LinkSelections[game.Id] = game.ExternalId;
-                }
-                else
-                {
-                    LinkSelections[game.Id] = "";
-                }
-            }
         }
         catch (Exception ex)
         {
@@ -122,36 +178,100 @@ else
 
     private bool IsLinked(BowlGame game) => !string.IsNullOrEmpty(game.ExternalId);
 
-    private async Task SaveLink(BowlGame game)
+    private string FormatApiGameLabel(CfbdGameDto game)
     {
-        if (!LinkSelections.ContainsKey(game.Id)) return;
+        // Format: "Rose Bowl: Michigan vs Washington"
+        var label = $"{game.Notes ?? "Bowl Game"}: {game.HomeTeam} vs {game.AwayTeam}";
+        return label;
+    }
 
-        var selectedExtId = LinkSelections[game.Id];
-        if (string.IsNullOrEmpty(selectedExtId)) return;
+    private void OpenLinkModal(BowlGame game)
+    {
+        SelectedLocalGame = game;
+        SelectedApiGame = null;
+        SyncTeamNames = false;
+        
+        // If already linked, try to pre-select the API game
+        if (!string.IsNullOrEmpty(game.ExternalId))
+        {
+            var match = ExternalGames.FirstOrDefault(x => x.Id.ToString() == game.ExternalId);
+            if (match != null)
+            {
+                SelectedApiGame = match;
+                CheckNameMatch();
+            }
+        }
+
+        ShowModal = true;
+    }
+
+    private void CloseModal()
+    {
+        ShowModal = false;
+        SelectedLocalGame = null;
+        SelectedApiGame = null;
+    }
+
+    private void OnApiGameSelected(ChangeEventArgs e)
+    {
+        var idStr = e.Value?.ToString();
+        if (int.TryParse(idStr, out int id))
+        {
+            SelectedApiGame = ExternalGames.FirstOrDefault(x => x.Id == id);
+            // Default to syncing names if there is a mismatch
+            CheckNameMatch();
+            if (!NamesMatch) SyncTeamNames = true;
+        }
+        else
+        {
+            SelectedApiGame = null;
+        }
+    }
+
+    private bool NamesMatch = true;
+
+    private void CheckNameMatch()
+    {
+        if (SelectedLocalGame == null || SelectedApiGame == null) return;
+        
+        bool homeMatch = string.Equals(SelectedLocalGame.TeamHome, SelectedApiGame.HomeTeam, StringComparison.OrdinalIgnoreCase);
+        bool awayMatch = string.Equals(SelectedLocalGame.TeamAway, SelectedApiGame.AwayTeam, StringComparison.OrdinalIgnoreCase);
+
+        NamesMatch = homeMatch && awayMatch;
+    }
+
+    private async Task SaveLink()
+    {
+        if (SelectedLocalGame == null || SelectedApiGame == null) return;
 
         IsSaving = true;
-        
-        // Update local object
-        game.ExternalId = selectedExtId;
+
+        // 1. Update Link
+        SelectedLocalGame.ExternalId = SelectedApiGame.Id.ToString();
+
+        // 2. Optional: Sync Names
+        if (SyncTeamNames)
+        {
+            SelectedLocalGame.TeamHome = SelectedApiGame.HomeTeam ?? SelectedLocalGame.TeamHome;
+            SelectedLocalGame.TeamAway = SelectedApiGame.AwayTeam ?? SelectedLocalGame.TeamAway;
+        }
 
         try
         {
-            // Post update
-            var response = await Http.PostAsJsonAsync("api/SaveGame", game);
+            var response = await Http.PostAsJsonAsync("api/SaveGame", SelectedLocalGame);
             if (response.IsSuccessStatusCode)
             {
-                // Refresh list or just UI state? 
-                // We updated the object reference, so UI should reflect on render.
-                StateHasChanged();
+                // UI Refresh not strictly needed if we updated the object reference, but good for safety
+                CloseModal();
             }
             else
             {
-                Console.WriteLine("Failed to save link.");
+                Console.WriteLine("Failed to save.");
             }
         }
         catch (Exception ex)
         {
-             Console.WriteLine($"Error saving link: {ex.Message}");
+            Console.WriteLine($"Error: {ex.Message}");
         }
         finally
         {
