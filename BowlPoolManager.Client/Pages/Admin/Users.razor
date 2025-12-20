@@ -2,6 +2,7 @@
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
 @using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
 @attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
 @inject HttpClient Http
 
@@ -118,7 +119,7 @@
         try
         {
             isLoading = true;
-            // FIX: Repointed to standard endpoint
+            // Target the standard UserFunctions endpoint
             users = await Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers");
         }
         catch (Exception ex)
@@ -149,161 +150,6 @@
         {
              user.IsDisabled = originalState;
             Console.WriteLine($"Error: {ex.Message}");
-        }
-    }
-}
-@using BowlPoolManager.Core.Domain
-@using BowlPoolManager.Core
-@using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
-@inject HttpClient Http
-
-<PageTitle>User Management</PageTitle>
-
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1><i class="bi bi-people-fill"></i> User Management</h1>
-            <p class="text-muted">View and manage registered users.</p>
-        </div>
-        <a href="/admin/dashboard" class="btn btn-outline-secondary">Back to Dashboard</a>
-    </div>
-
-    @if (isLoading)
-    {
-        <div class="d-flex justify-content-center">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        </div>
-    }
-    else if (users == null || !users.Any())
-    {
-        <div class="alert alert-warning">No users found.</div>
-    }
-    else
-    {
-        <div class="card shadow-sm">
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover mb-0 align-middle">
-                        <thead class="bg-light">
-                            <tr>
-                                <th>Name / Email</th>
-                                <th>Role</th>
-                                <th>Status</th>
-                                <th class="text-end pe-3">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var user in users.OrderBy(u => u.DisplayName))
-                            {
-                                <tr class="@(user.IsDisabled ? "table-danger" : "")">
-                                    <td>
-                                        <div class="fw-bold">@user.DisplayName</div>
-                                        <div class="small text-muted">@user.Email</div>
-                                        <div class="small text-muted fw-normal d-block d-md-none">@user.Id</div>
-                                    </td>
-                                    <td>
-                                        @if (user.AppRole == Constants.Roles.SuperAdmin)
-                                        {
-                                            <span class="badge bg-danger">@user.AppRole</span>
-                                        }
-                                        else if (user.AppRole == Constants.Roles.Admin)
-                                        {
-                                            <span class="badge bg-warning text-dark">@user.AppRole</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge bg-info text-dark">@user.AppRole</span>
-                                        }
-                                    </td>
-                                    <td>
-                                        @if (user.IsDisabled)
-                                        {
-                                            <span class="badge bg-danger">
-                                                <i class="bi bi-slash-circle"></i> Disabled
-                                            </span>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge bg-success">Active</span>
-                                        }
-                                    </td>
-                                    <td class="text-end pe-3">
-                                        <button class="btn btn-sm @(user.IsDisabled ? "btn-outline-success" : "btn-outline-danger")" 
-                                                @onclick="() => ToggleUser(user)"
-                                                title="@(user.IsDisabled ? "Enable User" : "Disable User")">
-                                            @if (user.IsDisabled)
-                                            {
-                                                <span><i class="bi bi-check-circle"></i> Enable</span>
-                                            }
-                                            else
-                                            {
-                                                <span><i class="bi bi-slash-circle"></i> Disable</span>
-                                            }
-                                        </button>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="card-footer text-muted small">
-                Total Users: @users.Count
-            </div>
-        </div>
-    }
-</div>
-
-@code {
-    private List<UserProfile>? users;
-    private bool isLoading = true;
-
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadUsers();
-    }
-
-    private async Task LoadUsers()
-    {
-        try
-        {
-            isLoading = true;
-            // FIX: Use dedicated Admin endpoint
-            users = await Http.GetFromJsonAsync<List<UserProfile>>("api/AdminGetUsers");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading users: {ex.Message}");
-        }
-        finally
-        {
-            isLoading = false;
-        }
-    }
-
-    private async Task ToggleUser(UserProfile user)
-    {
-        // Optimistic UI update (feels faster)
-        bool originalState = user.IsDisabled;
-        user.IsDisabled = !user.IsDisabled;
-
-        try
-        {
-            var response = await Http.PostAsync($"api/ToggleUserStatus?userId={user.Id}", null);
-            if (!response.IsSuccessStatusCode)
-            {
-                // Revert on failure
-                user.IsDisabled = originalState;
-                Console.WriteLine("Failed to toggle status");
-            }
-        }
-        catch (Exception ex)
-        {
-             user.IsDisabled = originalState;
-             Console.WriteLine($"Error: {ex.Message}");
         }
     }
 }
