@@ -3,7 +3,6 @@ using Newtonsoft.Json;
 
 namespace BowlPoolManager.Core.Dtos
 {
-    // UPDATED: Now supports both Newtonsoft and System.Text.Json to prevent serialization mismatches
     public class CfbdGameDto
     {
         [JsonProperty("id")]
@@ -18,32 +17,34 @@ namespace BowlPoolManager.Core.Dtos
         [JsonPropertyName("week")]
         public int Week { get; set; }
 
-        [JsonProperty("season_type")]
-        [JsonPropertyName("season_type")]
+        // FIXED: Updated to camelCase to match API response
+        [JsonProperty("seasonType")] 
+        [JsonPropertyName("seasonType")]
         public string? SeasonType { get; set; }
 
-        [JsonProperty("start_date")]
-        [JsonPropertyName("start_date")]
+        [JsonProperty("startDate")]
+        [JsonPropertyName("startDate")]
         public DateTime? StartDate { get; set; }
 
         [JsonProperty("completed")]
         [JsonPropertyName("completed")]
         public bool Completed { get; set; }
 
-        [JsonProperty("home_team")]
-        [JsonPropertyName("home_team")]
+        // THE FIX: "homeTeam" (camelCase)
+        [JsonProperty("homeTeam")]
+        [JsonPropertyName("homeTeam")]
         public string? HomeTeam { get; set; }
 
-        [JsonProperty("home_points")]
-        [JsonPropertyName("home_points")]
+        [JsonProperty("homePoints")]
+        [JsonPropertyName("homePoints")]
         public int? HomePoints { get; set; }
 
-        [JsonProperty("away_team")]
-        [JsonPropertyName("away_team")]
+        [JsonProperty("awayTeam")]
+        [JsonPropertyName("awayTeam")]
         public string? AwayTeam { get; set; }
 
-        [JsonProperty("away_points")]
-        [JsonPropertyName("away_points")]
+        [JsonProperty("awayPoints")]
+        [JsonPropertyName("awayPoints")]
         public int? AwayPoints { get; set; }
 
         [JsonProperty("notes")]
