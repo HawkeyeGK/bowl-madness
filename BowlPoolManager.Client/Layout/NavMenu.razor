@@ -26,6 +26,20 @@
                 <span class="bi bi-trophy-fill me-2" aria-hidden="true"></span> Leaderboard
             </NavLink>
         </div>
+
+        @* SCOREBOARD *@
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="results">
+                <span class="bi bi-display me-2" aria-hidden="true"></span> Scoreboard
+            </NavLink>
+        </div>
+
+        @* PRINT BRACKET *@
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="print-bracket">
+                <span class="bi bi-printer-fill me-2" aria-hidden="true"></span> Print Bracket
+            </NavLink>
+        </div>
         
         <AuthorizeView>
             <Authorized>
@@ -36,18 +50,7 @@
                     </NavLink>
                 </div>
                 
-                @* SCOREBOARD *@
-                <div class="nav-item px-3">
-                     <NavLink class="nav-link" href="results">
-                        <span class="bi bi-display me-2" aria-hidden="true"></span> Scoreboard
-                    </NavLink>
-                </div>
 
-                <div class="nav-item px-3">
-                     <NavLink class="nav-link" href="print-bracket">
-                        <span class="bi bi-printer-fill me-2" aria-hidden="true"></span> Print Bracket
-                    </NavLink>
-                </div>
             </Authorized>
             <NotAuthorized>
                 @* LOGIN CALL TO ACTION *@
