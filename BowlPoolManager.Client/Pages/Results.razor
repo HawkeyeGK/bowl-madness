@@ -44,7 +44,6 @@
                         <tbody>
                             @foreach (var game in games.OrderBy(g => g.StartTime))
                             {
-                                // Determine Styling for Final Games
                                 string homeClass = "";
                                 string awayClass = "";
                                 
@@ -63,7 +62,6 @@
                                 }
                                 else
                                 {
-                                    // Future Games: Bold the seeded/known teams, standard for TBD
                                     homeClass = string.IsNullOrEmpty(game.TeamHome) ? "text-muted fst-italic" : "fw-bold";
                                     awayClass = string.IsNullOrEmpty(game.TeamAway) ? "text-muted fst-italic" : "fw-bold";
                                 }
@@ -76,10 +74,25 @@
 
                                     <td style="width: 30%">
                                         <strong>@game.BowlName</strong>
+                                        
+                                        @* --- STATUS TAGS --- *@
                                         @if (game.IsPlayoff)
                                         {
                                             <span class="badge bg-warning text-dark ms-1">Playoff</span>
                                         }
+
+                                        @if (game.Status == GameStatus.Final)
+                                        {
+                                            <span class="badge bg-danger ms-1">Final</span>
+                                        }
+                                        else if (game.Status == GameStatus.InProgress)
+                                        {
+                                            <span class="badge bg-success ms-1">
+                                                <span class="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style="width: 6px; height: 6px;"></span>
+                                                @(string.IsNullOrEmpty(game.GameDetail) ? "In Progress" : game.GameDetail)
+                                            </span>
+                                        }
+                                        
                                         <div class="small text-muted mt-1">
                                             <i class="bi bi-geo-alt"></i> @game.Location
                                             <span class="mx-1">&bull;</span>
@@ -93,18 +106,18 @@
                                                 <span>@(string.IsNullOrEmpty(game.TeamHome) ? "TBD" : game.TeamHome)</span>
                                                 @if(game.TeamHomeScore.HasValue)
                                                 {
-                                                   <span>@game.TeamHomeScore</span>
+                                                    <span>@game.TeamHomeScore</span>
                                                 }
-                                           </div>
+                                            </div>
 
                                             <div class="@awayClass d-flex justify-content-between mt-1">
-                                                 <span>@(string.IsNullOrEmpty(game.TeamAway) ? "TBD" : game.TeamAway)</span>
+                                                <span>@(string.IsNullOrEmpty(game.TeamAway) ? "TBD" : game.TeamAway)</span>
                                                 @if(game.TeamAwayScore.HasValue)
                                                 {
                                                     <span>@game.TeamAwayScore</span>
                                                 }
                                             </div>
-                                         </div>
+                                        </div>
                                     </td>
 
                                     <td class="text-center fw-bold fs-5">
@@ -129,11 +142,10 @@
     {
         try
         {
-            // Load games (Triggers refresh)
             games = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames") ?? new();
-            
-            // Fetch timestamp (Post-refresh)
-            LastUpdate = await Http.GetFromJsonAsync<DateTime>("api/GetLastScoreUpdate");
+            try {
+                LastUpdate = await Http.GetFromJsonAsync<DateTime>("api/GetLastScoreUpdate");
+            } catch { /* Handle gracefully if missing */ }
         }
         catch (Exception ex)
         {
