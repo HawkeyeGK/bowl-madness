@@ -7,7 +7,7 @@ using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Core;
 using System.Text.Json;
 using BowlPoolManager.Api.Helpers;
-using System.Threading; // FIXED: Required for SemaphoreSlim
+using System.Threading;
 
 namespace BowlPoolManager.Api.Functions
 {
@@ -17,8 +17,7 @@ namespace BowlPoolManager.Api.Functions
         private readonly ICosmosDbService _cosmosService;
         private readonly ICfbdService _cfbdService;
 
-        // STATIC STATE: Persists between function invocations
-        // This prevents spamming the API. We only check if it's been > 2 minutes.
+        // STATIC STATE
         private static DateTime _lastRefresh = DateTime.MinValue;
         private static readonly SemaphoreSlim _refreshLock = new SemaphoreSlim(1, 1);
         private const int RefreshIntervalMinutes = 2; 
@@ -33,17 +32,14 @@ namespace BowlPoolManager.Api.Functions
         [Function("GetGames")]
         public async Task<HttpResponseData> GetGames([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
-            // 1. Fetch Current Data
             var games = await _cosmosService.GetGamesAsync();
 
-            // 2. LAZY LOAD CHECK: Is it time to refresh scores?
+            // LAZY LOAD CHECK
             if (DateTime.UtcNow > _lastRefresh.AddMinutes(RefreshIntervalMinutes))
             {
-                // Ensure only one user triggers the update at a time
                 await _refreshLock.WaitAsync();
                 try
                 {
-                    // Double-check timestamp inside the lock
                     if (DateTime.UtcNow > _lastRefresh.AddMinutes(RefreshIntervalMinutes))
                     {
                         _logger.LogInformation("Lazy Loading: Refreshing scores from CFBD...");
@@ -54,7 +50,6 @@ namespace BowlPoolManager.Api.Functions
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error refreshing scores.");
-                    // Fail silently so the user still gets the cached data
                 }
                 finally
                 {
@@ -62,24 +57,21 @@ namespace BowlPoolManager.Api.Functions
                 }
             }
 
-            // 3. Return Data
             var sortedGames = games.OrderBy(g => g.StartTime).ToList();
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(sortedGames);
             return response;
         }
 
-        // --- NEW ENDPOINT: Returns the last update time ---
         [Function("GetLastScoreUpdate")]
         public async Task<HttpResponseData> GetLastScoreUpdate([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
             var response = req.CreateResponse(HttpStatusCode.OK);
-            // Return as JSON string so Client can parse as DateTime
             await response.WriteAsJsonAsync(_lastRefresh);
             return response;
         }
 
-        // --- BRIDGE UPDATE LOGIC ---
+        // --- FIXED BRIDGE UPDATE LOGIC ---
         private async Task PerformScoreUpdate(List<BowlGame> games)
         {
             var linkedGames = games
@@ -89,7 +81,6 @@ namespace BowlPoolManager.Api.Functions
 
             if (!linkedGames.Any()) return;
 
-            // Fetch 2025 Data
             var apiGames = await _cfbdService.GetPostseasonGamesAsync(2025);
             
             bool anyChanged = false;
@@ -101,34 +92,38 @@ namespace BowlPoolManager.Api.Functions
 
                 bool gameChanged = false;
 
-                // Resolve Local Home Score
+                // --- SAFE UPDATE: Only overwrite if API has a value ---
+
+                // Resolve Home Score
                 if (!string.IsNullOrEmpty(localGame.ApiHomeTeam))
                 {
-                    int? newScore = null;
+                    int? apiScore = null;
                     if (string.Equals(apiGame.HomeTeam, localGame.ApiHomeTeam, StringComparison.OrdinalIgnoreCase))
-                        newScore = apiGame.HomePoints;
+                        apiScore = apiGame.HomePoints;
                     else if (string.Equals(apiGame.AwayTeam, localGame.ApiHomeTeam, StringComparison.OrdinalIgnoreCase))
-                        newScore = apiGame.AwayPoints;
+                        apiScore = apiGame.AwayPoints;
 
-                    if (newScore != localGame.TeamHomeScore)
+                    // FIX: Only update if apiScore HAS A VALUE (Prevents null overwrite)
+                    if (apiScore.HasValue && apiScore != localGame.TeamHomeScore)
                     {
-                        localGame.TeamHomeScore = newScore;
+                        localGame.TeamHomeScore = apiScore;
                         gameChanged = true;
                     }
                 }
 
-                // Resolve Local Away Score
+                // Resolve Away Score
                 if (!string.IsNullOrEmpty(localGame.ApiAwayTeam))
                 {
-                    int? newScore = null;
+                    int? apiScore = null;
                     if (string.Equals(apiGame.HomeTeam, localGame.ApiAwayTeam, StringComparison.OrdinalIgnoreCase))
-                        newScore = apiGame.HomePoints;
+                        apiScore = apiGame.HomePoints;
                     else if (string.Equals(apiGame.AwayTeam, localGame.ApiAwayTeam, StringComparison.OrdinalIgnoreCase))
-                        newScore = apiGame.AwayPoints;
+                        apiScore = apiGame.AwayPoints;
 
-                    if (newScore != localGame.TeamAwayScore)
+                    // FIX: Only update if apiScore HAS A VALUE
+                    if (apiScore.HasValue && apiScore != localGame.TeamAwayScore)
                     {
-                        localGame.TeamAwayScore = newScore;
+                        localGame.TeamAwayScore = apiScore;
                         gameChanged = true;
                     }
                 }
@@ -141,6 +136,7 @@ namespace BowlPoolManager.Api.Functions
                 }
                 else 
                 {
+                    // If not final, but time has passed, mark InProgress
                     if (DateTime.UtcNow >= localGame.StartTime.AddMinutes(-15)) 
                         localGame.Status = GameStatus.InProgress;
                 }
