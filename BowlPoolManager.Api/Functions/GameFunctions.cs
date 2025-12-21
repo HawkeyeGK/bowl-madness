@@ -79,7 +79,6 @@ namespace BowlPoolManager.Api.Functions
             if (!linkedGames.Any()) return;
 
             var apiGames = await _cfbdService.GetScoreboardGamesAsync();
-            
             bool anyChanged = false;
 
             foreach (var localGame in linkedGames)
@@ -89,8 +88,7 @@ namespace BowlPoolManager.Api.Functions
 
                 bool gameChanged = false;
                 
-                // STRICT EQUALITY MATCHING
-                // Check local 'ApiHomeTeam' against both API slots in case of a swap
+                // 1. MATCH HOME SCORE (Swap-Aware)
                 int? homeScore = null;
                 if (!string.IsNullOrEmpty(localGame.ApiHomeTeam))
                 {
@@ -106,7 +104,7 @@ namespace BowlPoolManager.Api.Functions
                     gameChanged = true;
                 }
                 
-                // Check local 'ApiAwayTeam' against both API slots in case of a swap
+                // 2. MATCH AWAY SCORE (Swap-Aware)
                 int? awayScore = null;
                 if (!string.IsNullOrEmpty(localGame.ApiAwayTeam))
                 {
@@ -122,18 +120,34 @@ namespace BowlPoolManager.Api.Functions
                     gameChanged = true;
                 }
 
+                // 3. UPDATE STATUS & GAME DETAIL (New Logic)
                 var oldStatus = localGame.Status;
-                if (apiGame.Completed)
+                var oldDetail = localGame.GameDetail;
+
+                // CFBD Status: "scheduled", "in_progress", "final"
+                if (apiGame.Completed || apiGame.StatusRaw == "final")
                 {
                     localGame.Status = GameStatus.Final;
+                    localGame.GameDetail = "Final";
                 }
-                else 
+                else if (apiGame.StatusRaw == "in_progress" || (DateTime.UtcNow >= localGame.StartTime.AddMinutes(-15) && !apiGame.Completed))
                 {
-                    if (DateTime.UtcNow >= localGame.StartTime.AddMinutes(-15)) 
-                        localGame.Status = GameStatus.InProgress;
+                    localGame.Status = GameStatus.InProgress;
+                    
+                    // Format Time: "3rd • 10:45"
+                    if (apiGame.Period.HasValue)
+                    {
+                        string p = apiGame.Period switch { 1 => "1st", 2 => "2nd", 3 => "3rd", 4 => "4th", _ => "OT" };
+                        localGame.GameDetail = $"{p} • {apiGame.Clock ?? "00:00"}";
+                    }
+                    else
+                    {
+                        localGame.GameDetail = "In Progress";
+                    }
                 }
 
-                if (localGame.Status != oldStatus) gameChanged = true;
+                if (localGame.Status != oldStatus || localGame.GameDetail != oldDetail) 
+                    gameChanged = true;
 
                 if (gameChanged)
                 {
@@ -142,10 +156,7 @@ namespace BowlPoolManager.Api.Functions
                 }
             }
 
-            if (anyChanged)
-            {
-                _logger.LogInformation("Scores updated successfully.");
-            }
+            if (anyChanged) _logger.LogInformation("Scores and status updated successfully.");
         }
 
         [Function("GetExternalGames")]
