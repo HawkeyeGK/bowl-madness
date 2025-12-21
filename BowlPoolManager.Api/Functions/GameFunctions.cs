@@ -39,31 +39,30 @@ namespace BowlPoolManager.Api.Functions
             var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
             if (!authResult.IsValid) return authResult.ErrorResponse!;
 
-            var games = await _cfbdService.GetPostseasonGamesAsync(2024);
+            // FIXED: Updated from 2024 to 2025
+            var games = await _cfbdService.GetPostseasonGamesAsync(2025);
+            
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(games);
             return response;
         }
         
-        // --- NEW DIAGNOSTIC ENDPOINT ---
         [Function("GetRawCfbdGames")]
         public async Task<HttpResponseData> GetRawCfbdGames([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
             _logger.LogInformation("Debugging Raw CFBD JSON.");
             
-            // Light security check (Admin only recommended)
             var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
             if (!authResult.IsValid) return authResult.ErrorResponse!;
 
-            var json = await _cfbdService.GetRawPostseasonGamesJsonAsync(2024);
+            // FIXED: Updated from 2024 to 2025
+            var json = await _cfbdService.GetRawPostseasonGamesJsonAsync(2025);
             
             var response = req.CreateResponse(HttpStatusCode.OK);
-            // Return as JSON so browser formats it, but it is just a string pass-through
             response.Headers.Add("Content-Type", "application/json");
             await response.WriteStringAsync(json);
             return response;
         }
-        // -------------------------------
 
         [Function("SaveGame")]
         public async Task<HttpResponseData> SaveGame([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
