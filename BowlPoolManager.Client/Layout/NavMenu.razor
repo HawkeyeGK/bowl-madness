@@ -20,12 +20,14 @@
 <div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
     <nav class="flex-column">
         
-        @* --- PUBLIC LINKS --- *@
+        @* LEADERBOARD (Home) *@
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
                 <span class="bi bi-trophy-fill me-2" aria-hidden="true"></span> Leaderboard
             </NavLink>
         </div>
+        
+        @* PUBLIC TOOLS *@
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="results">
                 <span class="bi bi-display me-2" aria-hidden="true"></span> Scoreboard
@@ -37,9 +39,9 @@
             </NavLink>
         </div>
         
-        @* --- AUTHENTICATED LINKS --- *@
         <AuthorizeView>
             <Authorized>
+                @* MY PICKS *@
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="mypicks">
                         <span class="bi bi-clipboard-check-fill me-2" aria-hidden="true"></span> @MyPicksText
@@ -47,6 +49,7 @@
                 </div>
             </Authorized>
             <NotAuthorized>
+                @* LOGIN CALL TO ACTION *@
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="login">
                         <span class="bi bi-box-arrow-in-right me-2" aria-hidden="true"></span> Log In To Enter Picks
@@ -55,24 +58,15 @@
             </NotAuthorized>
         </AuthorizeView>
 
-        @* --- ADMIN SECTION --- *@
+        @* ADMIN SECTION (Cleaned) *@
         <AuthorizeView Roles="SuperAdmin,Admin">
             <Authorized>
                 <div class="nav-item px-3 mt-4">
                     <div class="text-white-50 small text-uppercase fw-bold px-3 mb-1">Admin</div>
                 </div>
-                
-                @* DASHBOARD (Hub) *@
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="admin/dashboard">
                         <span class="bi bi-speedometer2 me-2" aria-hidden="true"></span> Dashboard
-                    </NavLink>
-                </div>
-
-                @* GAMES (Primary Data Management) *@
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="admin/games">
-                        <span class="bi bi-calendar-event me-2" aria-hidden="true"></span> Games
                     </NavLink>
                 </div>
             </Authorized>

@@ -1,4 +1,4 @@
-@page "/admin/results"
+@page "/admin/gameresults"
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
 @using Microsoft.AspNetCore.Authorization
@@ -100,8 +100,6 @@
     private List<BowlGame>? games;
     private string? statusMessage;
 
-
-
     protected override async Task OnInitializedAsync()
     {
         await LoadGames();
@@ -114,7 +112,6 @@
             var allGames = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
             if (allGames != null)
             {
-                // Sort: Live games first, then Scheduled by date, then Final by date desc
                 games = allGames.OrderBy(g => g.StartTime).ToList();
             }
         }
@@ -135,14 +132,10 @@
     {
         try 
         {
-            // For MVP, we reuse the existing SaveGame endpoint.
-            // Future TODO: Create a dedicated 'UpdateScore' endpoint for regular Admins.
             var response = await Http.PostAsJsonAsync("api/SaveGame", game);
-            
             if (response.IsSuccessStatusCode)
             {
                 statusMessage = $"Updated {game.BowlName}!";
-                // Auto-hide toast after 3s
                 await Task.Delay(3000);
                 statusMessage = null;
                 StateHasChanged();
