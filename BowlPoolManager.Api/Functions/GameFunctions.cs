@@ -7,6 +7,7 @@ using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Core;
 using System.Text.Json;
 using BowlPoolManager.Api.Helpers;
+using System.Threading; // FIXED: Required for SemaphoreSlim
 
 namespace BowlPoolManager.Api.Functions
 {
@@ -17,7 +18,7 @@ namespace BowlPoolManager.Api.Functions
         private readonly ICfbdService _cfbdService;
 
         // STATIC STATE: Persists between function invocations
-        // This holds the timestamp of the last successful API sync
+        // This prevents spamming the API. We only check if it's been > 2 minutes.
         private static DateTime _lastRefresh = DateTime.MinValue;
         private static readonly SemaphoreSlim _refreshLock = new SemaphoreSlim(1, 1);
         private const int RefreshIntervalMinutes = 2; 
@@ -38,9 +39,11 @@ namespace BowlPoolManager.Api.Functions
             // 2. LAZY LOAD CHECK: Is it time to refresh scores?
             if (DateTime.UtcNow > _lastRefresh.AddMinutes(RefreshIntervalMinutes))
             {
+                // Ensure only one user triggers the update at a time
                 await _refreshLock.WaitAsync();
                 try
                 {
+                    // Double-check timestamp inside the lock
                     if (DateTime.UtcNow > _lastRefresh.AddMinutes(RefreshIntervalMinutes))
                     {
                         _logger.LogInformation("Lazy Loading: Refreshing scores from CFBD...");
@@ -51,6 +54,7 @@ namespace BowlPoolManager.Api.Functions
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error refreshing scores.");
+                    // Fail silently so the user still gets the cached data
                 }
                 finally
                 {
@@ -70,7 +74,7 @@ namespace BowlPoolManager.Api.Functions
         public async Task<HttpResponseData> GetLastScoreUpdate([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
             var response = req.CreateResponse(HttpStatusCode.OK);
-            // Return as JSON string (quoted) so Client can parse as DateTime
+            // Return as JSON string so Client can parse as DateTime
             await response.WriteAsJsonAsync(_lastRefresh);
             return response;
         }
