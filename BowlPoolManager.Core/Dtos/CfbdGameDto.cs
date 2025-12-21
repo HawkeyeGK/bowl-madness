@@ -53,6 +53,7 @@ namespace BowlPoolManager.Core.Dtos
             if (raw == null) return null;
             if (raw is string s) return s;
             
+            // Handle Scoreboard API objects
             if (raw is JObject jo)
             {
                 return jo["name"]?.ToString();
@@ -65,6 +66,7 @@ namespace BowlPoolManager.Core.Dtos
         {
             if (raw == null) return null;
             
+            // Handle Scoreboard API objects
             if (raw is JObject jo)
             {
                 return jo["points"]?.Value<int?>();
