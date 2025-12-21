@@ -20,7 +20,7 @@ else
                 <tr>
                     <th>Local Game</th>
                     <th>Date</th>
-                    <th>Link Status</th>
+                    <th style="min-width: 300px;">Link Map (Local &rarr; API)</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -36,10 +36,21 @@ else
                         <td>
                             @if(IsLinked(game))
                             {
-                                <span class="badge bg-success mb-1">Linked</span>
-                                <div style="font-size: 0.75em; line-height: 1.2;">
-                                    <div><strong>@game.TeamHome</strong> &rarr; <span class="text-success">@game.ApiHomeTeam</span></div>
-                                    <div><strong>@game.TeamAway</strong> &rarr; <span class="text-success">@game.ApiAwayTeam</span></div>
+                                <div class="bg-white rounded p-1 border shadow-sm" style="max-width: 350px;">
+                                    <table class="table table-sm table-borderless mb-0" style="font-size: 0.85rem;">
+                                        <tbody>
+                                            <tr>
+                                                <td class="text-end fw-bold py-0 pe-1">@game.TeamHome</td>
+                                                <td class="text-center text-muted py-0 px-1">&rarr;</td>
+                                                <td class="text-start text-success fw-bold py-0 ps-1">@game.ApiHomeTeam</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-end fw-bold py-0 pe-1">@game.TeamAway</td>
+                                                <td class="text-center text-muted py-0 px-1">&rarr;</td>
+                                                <td class="text-start text-success fw-bold py-0 ps-1">@game.ApiAwayTeam</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             }
                             else
@@ -156,10 +167,7 @@ else
     private BowlGame? SelectedLocalGame;
     private CfbdGameDto? SelectedApiGame;
 
-    // The two teams available from the selected API game
     private List<string> AvailableApiTeams = new();
-
-    // The user's specific choices
     private string ProposedApiHome = "";
     private string ProposedApiAway = "";
 
@@ -185,7 +193,6 @@ else
 
     private bool IsLinked(BowlGame game) => !string.IsNullOrEmpty(game.ExternalId);
 
-    // Validation: Both fields must be set, and they shouldn't map to the same team
     private bool CanSave => SelectedApiGame != null 
                             && !string.IsNullOrEmpty(ProposedApiHome) 
                             && !string.IsNullOrEmpty(ProposedApiAway)
@@ -204,14 +211,12 @@ else
         ProposedApiHome = "";
         ProposedApiAway = "";
         
-        // Try to load existing link
         if (!string.IsNullOrEmpty(game.ExternalId))
         {
             var match = ExternalGames.FirstOrDefault(x => x.Id.ToString() == game.ExternalId);
             if (match != null)
             {
                 SelectApiGameInternal(match);
-                // Pre-fill existing map
                 ProposedApiHome = game.ApiHomeTeam ?? "";
                 ProposedApiAway = game.ApiAwayTeam ?? "";
             }
@@ -251,11 +256,11 @@ else
             if (!string.IsNullOrEmpty(match.HomeTeam)) AvailableApiTeams.Add(match.HomeTeam);
             if (!string.IsNullOrEmpty(match.AwayTeam)) AvailableApiTeams.Add(match.AwayTeam);
             
-            // Intelligent Defaults (if names match exactly)
-            if (AvailableApiTeams.Contains(SelectedLocalGame?.TeamHome ?? "")) 
+            // Auto-match defaults only if no existing map
+            if (string.IsNullOrEmpty(ProposedApiHome) && AvailableApiTeams.Contains(SelectedLocalGame?.TeamHome ?? "")) 
                 ProposedApiHome = SelectedLocalGame!.TeamHome;
             
-            if (AvailableApiTeams.Contains(SelectedLocalGame?.TeamAway ?? "")) 
+            if (string.IsNullOrEmpty(ProposedApiAway) && AvailableApiTeams.Contains(SelectedLocalGame?.TeamAway ?? "")) 
                 ProposedApiAway = SelectedLocalGame!.TeamAway;
         }
     }
@@ -265,11 +270,7 @@ else
         if (SelectedLocalGame == null || SelectedApiGame == null) return;
 
         IsSaving = true;
-
-        // 1. Save ID Link
         SelectedLocalGame.ExternalId = SelectedApiGame.Id.ToString();
-
-        // 2. Save Explicit Bridge Map
         SelectedLocalGame.ApiHomeTeam = ProposedApiHome;
         SelectedLocalGame.ApiAwayTeam = ProposedApiAway;
 
