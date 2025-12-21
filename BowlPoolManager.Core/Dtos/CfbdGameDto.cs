@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 
 namespace BowlPoolManager.Core.Dtos
 {
+    // UPDATED: Attributes now match the API's camelCase format (e.g. homeTeam)
     public class CfbdGameDto
     {
         [JsonProperty("id")]
@@ -17,8 +18,7 @@ namespace BowlPoolManager.Core.Dtos
         [JsonPropertyName("week")]
         public int Week { get; set; }
 
-        // FIXED: Updated to camelCase to match API response
-        [JsonProperty("seasonType")] 
+        [JsonProperty("seasonType")]
         [JsonPropertyName("seasonType")]
         public string? SeasonType { get; set; }
 
@@ -30,7 +30,7 @@ namespace BowlPoolManager.Core.Dtos
         [JsonPropertyName("completed")]
         public bool Completed { get; set; }
 
-        // THE FIX: "homeTeam" (camelCase)
+        // --- THE FIX: camelCase Attributes ---
         [JsonProperty("homeTeam")]
         [JsonPropertyName("homeTeam")]
         public string? HomeTeam { get; set; }
@@ -46,6 +46,7 @@ namespace BowlPoolManager.Core.Dtos
         [JsonProperty("awayPoints")]
         [JsonPropertyName("awayPoints")]
         public int? AwayPoints { get; set; }
+        // -------------------------------------
 
         [JsonProperty("notes")]
         [JsonPropertyName("notes")]
