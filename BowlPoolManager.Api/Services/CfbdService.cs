@@ -19,7 +19,6 @@ namespace BowlPoolManager.Api.Services
 
         public async Task<List<CfbdGameDto>> GetPostseasonGamesAsync(int year)
         {
-            // Reuse the raw fetch logic for consistency
             var json = await GetRawPostseasonGamesJsonAsync(year);
             if (string.IsNullOrEmpty(json)) return new List<CfbdGameDto>();
 
@@ -49,22 +48,37 @@ namespace BowlPoolManager.Api.Services
             }
         }
 
-        // NEW: Fetch live scoreboard data
         public async Task<List<CfbdGameDto>> GetScoreboardGamesAsync()
         {
-            EnsureAuth();
+            // Re-use the raw fetch to ensure consistency
+            var json = await GetRawScoreboardJsonAsync();
+            if (string.IsNullOrEmpty(json)) return new List<CfbdGameDto>();
+
             try
             {
-                // /scoreboard returns the current active games. 
-                // We add classification=fbs to filter, but usually no params works for "Active Week"
-                var url = "/scoreboard?classification=fbs"; 
-                var json = await _httpClient.GetStringAsync(url);
                 return JsonConvert.DeserializeObject<List<CfbdGameDto>>(json) ?? new List<CfbdGameDto>();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Scoreboard fetch failed.");
+                _logger.LogError(ex, "Scoreboard deserialization failed.");
                 return new List<CfbdGameDto>();
+            }
+        }
+
+        // NEW: Raw Fetch Implementation
+        public async Task<string> GetRawScoreboardJsonAsync()
+        {
+            EnsureAuth();
+            try
+            {
+                // classification=fbs is usually safer to reduce noise
+                var url = "/scoreboard?classification=fbs"; 
+                return await _httpClient.GetStringAsync(url);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Scoreboard fetch failed.");
+                return $"Error fetching scoreboard: {ex.Message}";
             }
         }
 

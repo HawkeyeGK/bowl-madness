@@ -17,7 +17,6 @@ namespace BowlPoolManager.Api.Functions
         private readonly ICosmosDbService _cosmosService;
         private readonly ICfbdService _cfbdService;
 
-        // STATIC STATE
         private static DateTime _lastRefresh = DateTime.MinValue;
         private static readonly SemaphoreSlim _refreshLock = new SemaphoreSlim(1, 1);
         private const int RefreshIntervalMinutes = 2; 
@@ -34,7 +33,6 @@ namespace BowlPoolManager.Api.Functions
         {
             var games = await _cosmosService.GetGamesAsync();
 
-            // LAZY LOAD CHECK
             if (DateTime.UtcNow > _lastRefresh.AddMinutes(RefreshIntervalMinutes))
             {
                 await _refreshLock.WaitAsync();
@@ -71,7 +69,6 @@ namespace BowlPoolManager.Api.Functions
             return response;
         }
 
-        // --- UPDATED LOGIC USING /SCOREBOARD ---
         private async Task PerformScoreUpdate(List<BowlGame> games)
         {
             var linkedGames = games
@@ -81,11 +78,7 @@ namespace BowlPoolManager.Api.Functions
 
             if (!linkedGames.Any()) return;
 
-            // FIX: Use GetScoreboardGamesAsync (Live Data) instead of GetPostseasonGamesAsync
             var apiGames = await _cfbdService.GetScoreboardGamesAsync();
-            
-            // Fallback: If scoreboard is empty (sometimes happens mid-week), try the games endpoint?
-            // For now, let's trust scoreboard for LIVE data.
             
             bool anyChanged = false;
 
@@ -95,8 +88,6 @@ namespace BowlPoolManager.Api.Functions
                 if (apiGame == null) continue;
 
                 bool gameChanged = false;
-
-                // --- SAFE UPDATE: Only overwrite if API has a value ---
 
                 // Resolve Home Score
                 if (!string.IsNullOrEmpty(localGame.ApiHomeTeam))
@@ -130,7 +121,6 @@ namespace BowlPoolManager.Api.Functions
                     }
                 }
 
-                // Status Logic
                 var oldStatus = localGame.Status;
                 if (apiGame.Completed)
                 {
@@ -175,7 +165,19 @@ namespace BowlPoolManager.Api.Functions
             var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
             if (!authResult.IsValid) return authResult.ErrorResponse!;
 
-            var json = await _cfbdService.GetRawPostseasonGamesJsonAsync(2025);
+            // MODIFIED: Handle source parameter
+            var source = req.Query["source"];
+            string json;
+            
+            if (source == "scoreboard")
+            {
+                json = await _cfbdService.GetRawScoreboardJsonAsync();
+            }
+            else
+            {
+                json = await _cfbdService.GetRawPostseasonGamesJsonAsync(2025);
+            }
+            
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json");
             await response.WriteStringAsync(json);

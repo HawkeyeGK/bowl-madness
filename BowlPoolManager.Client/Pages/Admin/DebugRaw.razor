@@ -1,11 +1,13 @@
 @page "/admin/debug-raw"
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
 @inject HttpClient Http
 
-<h3>🕵️ Raw API Inspector</h3>
+<h3>Debug Raw CFBD JSON</h3>
 
-<p>This page displays the exact text returned by CollegeFootballData.com, bypassing all internal DTOs.</p>
-
-<button class="btn btn-primary mb-3" @onclick="LoadRaw">Refresh Raw Data</button>
+<div class="mb-3">
+    <button class="btn btn-outline-primary me-2" @onclick='() => LoadRaw("games")'>Fetch /games (2025)</button>
+    <button class="btn btn-outline-danger" @onclick='() => LoadRaw("scoreboard")'>Fetch /scoreboard (Live)</button>
+</div>
 
 @if (IsLoading)
 {
@@ -13,27 +15,26 @@
 }
 else
 {
-    @if (!string.IsNullOrEmpty(RawJson))
-    {
-        <div class="card">
-            <div class="card-body" style="background-color: #f8f9fa;">
-                <pre style="max-height: 600px; overflow: auto;">@RawJson</pre>
-            </div>
-        </div>
-    }
+    <div class="bg-light p-3 border rounded">
+        <pre style="max-height: 600px; overflow-y: auto; white-space: pre-wrap;">@RawJson</pre>
+    </div>
 }
 
 @code {
-    private string RawJson = "";
+    private string RawJson = "Click a button to fetch data.";
     private bool IsLoading = false;
 
-    private async Task LoadRaw()
+    private async Task LoadRaw(string source)
     {
         IsLoading = true;
+        RawJson = "Fetching...";
         try
         {
-            // Calls the new endpoint that returns pure string
-            RawJson = await Http.GetStringAsync("api/GetRawCfbdGames");
+            var url = source == "scoreboard" 
+                ? "api/GetRawCfbdGames?source=scoreboard" 
+                : "api/GetRawCfbdGames";
+                
+            RawJson = await Http.GetStringAsync(url);
         }
         catch (Exception ex)
         {

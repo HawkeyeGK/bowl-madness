@@ -6,8 +6,9 @@ namespace BowlPoolManager.Api.Services
     {
         Task<List<CfbdGameDto>> GetPostseasonGamesAsync(int year);
         Task<string> GetRawPostseasonGamesJsonAsync(int year);
-        
-        // NEW: Specific endpoint for live scoring
         Task<List<CfbdGameDto>> GetScoreboardGamesAsync();
+        
+        // NEW: Raw JSON for debugging
+        Task<string> GetRawScoreboardJsonAsync();
     }
 }
