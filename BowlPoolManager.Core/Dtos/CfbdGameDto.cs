@@ -34,38 +34,31 @@ namespace BowlPoolManager.Core.Dtos
         // --- SMART WRAPPERS for GameFunctions.cs ---
         [System.Text.Json.Serialization.JsonIgnore]
         [Newtonsoft.Json.JsonIgnore]
-        public string? HomeTeam => GetName(HomeRaw);
+        public string? HomeTeam => GetValue(HomeRaw, "name");
 
         [System.Text.Json.Serialization.JsonIgnore]
         [Newtonsoft.Json.JsonIgnore]
-        public int? HomePoints => GetPoints(HomeRaw) ?? HomePointsRoot;
+        public int? HomePoints => GetInt(HomeRaw, "points") ?? HomePointsRoot;
 
         [System.Text.Json.Serialization.JsonIgnore]
         [Newtonsoft.Json.JsonIgnore]
-        public string? AwayTeam => GetName(AwayRaw);
+        public string? AwayTeam => GetValue(AwayRaw, "name");
 
         [System.Text.Json.Serialization.JsonIgnore]
         [Newtonsoft.Json.JsonIgnore]
-        public int? AwayPoints => GetPoints(AwayRaw) ?? AwayPointsRoot;
+        public int? AwayPoints => GetInt(AwayRaw, "points") ?? AwayPointsRoot;
 
-        private string? GetName(object? raw)
+        private string? GetValue(object? raw, string key)
         {
             if (raw == null) return null;
             if (raw is string s) return s;
-            if (raw is JObject jo) return jo["name"]?.ToString();
+            if (raw is JObject jo) return jo[key]?.ToString();
             return null;
         }
 
-        private int? GetPoints(object? raw)
+        private int? GetInt(object? raw, string key)
         {
-            if (raw == null) return null;
-            
-            // Handle Scoreboard API objects
-            if (raw is JObject jo)
-            {
-                return jo["points"]?.Value<int?>();
-            }
-
+            if (raw is JObject jo) return jo[key]?.Value<int?>();
             return null;
         }
 

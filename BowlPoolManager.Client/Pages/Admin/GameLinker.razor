@@ -204,18 +204,17 @@ else
         SelectedLocalGame = game;
         SelectedApiGame = null;
         AvailableApiTeams.Clear();
-        ProposedApiHome = "";
-        ProposedApiAway = "";
         
+        // Preserve existing values for editing
+        ProposedApiHome = game.ApiHomeTeam ?? "";
+        ProposedApiAway = game.ApiAwayTeam ?? "";
+
         if (!string.IsNullOrEmpty(game.ExternalId))
         {
             var match = ExternalGames.FirstOrDefault(x => x.Id.ToString() == game.ExternalId);
             if (match != null)
             {
                 SelectApiGameInternal(match);
-                // Use existing stored values if they exist, otherwise default to match order
-                ProposedApiHome = !string.IsNullOrEmpty(game.ApiHomeTeam) ? game.ApiHomeTeam : (match.HomeTeam ?? "");
-                ProposedApiAway = !string.IsNullOrEmpty(game.ApiAwayTeam) ? game.ApiAwayTeam : (match.AwayTeam ?? "");
             }
         }
         
@@ -250,19 +249,14 @@ else
         AvailableApiTeams.Clear();
         if (match != null)
         {
-            var hName = match.HomeTeam;
-            var aName = match.AwayTeam;
-
-            if (!string.IsNullOrEmpty(hName)) AvailableApiTeams.Add(hName);
-            if (!string.IsNullOrEmpty(aName)) AvailableApiTeams.Add(aName);
+            var h = match.HomeTeam;
+            var a = match.AwayTeam;
+            if (!string.IsNullOrEmpty(h)) AvailableApiTeams.Add(h);
+            if (!string.IsNullOrEmpty(a)) AvailableApiTeams.Add(a);
             
-            // Only set defaults if we aren't already editing an existing link (checked by caller mostly, but safe here)
-            // Default mapping: First local team -> First API team (Home), Second -> Second (Away)
-            if (string.IsNullOrEmpty(ProposedApiHome) && !string.IsNullOrEmpty(hName)) 
-                ProposedApiHome = hName;
-            
-            if (string.IsNullOrEmpty(ProposedApiAway) && !string.IsNullOrEmpty(aName)) 
-                ProposedApiAway = aName;
+            // Only auto-default if they are currently empty
+            if (string.IsNullOrEmpty(ProposedApiHome) && !string.IsNullOrEmpty(h)) ProposedApiHome = h;
+            if (string.IsNullOrEmpty(ProposedApiAway) && !string.IsNullOrEmpty(a)) ProposedApiAway = a;
         }
     }
 
