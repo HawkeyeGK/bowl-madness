@@ -13,15 +13,11 @@ namespace BowlPoolManager.Core.Dtos
         [JsonPropertyName("completed")]
         public bool Completed { get; set; }
 
-        // Preserved to maintain compatibility with GameLinker.razor
-        [JsonProperty("notes")]
-        [JsonPropertyName("notes")]
-        public string? Notes { get; set; }
-
-        // --- FLAT DATA (Used by /games) ---
+        // --- ROOT RAW DATA ---
+        // We use 'object' to handle either a string (from /games) or an object (from /scoreboard)
         [JsonProperty("homeTeam")]
         [JsonPropertyName("homeTeam")]
-        public object? HomeRaw { get; set; } // Capture as object to detect string vs nested
+        public object? HomeRaw { get; set; }
 
         [JsonProperty("homePoints")]
         [JsonPropertyName("homePoints")]
@@ -35,8 +31,7 @@ namespace BowlPoolManager.Core.Dtos
         [JsonPropertyName("awayPoints")]
         public int? AwayPointsRoot { get; set; }
 
-        // --- SMART PROPERTIES (Used by GameFunctions.cs) ---
-        // These wrappers detect the format and return the correct value
+        // --- SMART WRAPPERS for GameFunctions.cs ---
         [System.Text.Json.Serialization.JsonIgnore]
         [Newtonsoft.Json.JsonIgnore]
         public string? HomeTeam => GetName(HomeRaw);
@@ -53,15 +48,14 @@ namespace BowlPoolManager.Core.Dtos
         [Newtonsoft.Json.JsonIgnore]
         public int? AwayPoints => GetPoints(AwayRaw) ?? AwayPointsRoot;
 
-        // --- HELPER LOGIC ---
+        // --- NESTED DESERIALIZATION LOGIC ---
         private string? GetName(object? raw)
         {
             if (raw == null) return null;
             if (raw is string s) return s;
             
-            // If it's a nested object (Scoreboard format)
             try {
-                var nested = JsonConvert.DeserializeObject<CfbdNestedTeam>(raw.ToString());
+                var nested = JsonConvert.DeserializeObject<CfbdNestedTeam>(raw.ToString()!);
                 return nested?.Name;
             } catch { return null; }
         }
@@ -71,10 +65,15 @@ namespace BowlPoolManager.Core.Dtos
             if (raw == null || raw is string) return null;
             
             try {
-                var nested = JsonConvert.DeserializeObject<CfbdNestedTeam>(raw.ToString());
+                var nested = JsonConvert.DeserializeObject<CfbdNestedTeam>(raw.ToString()!);
                 return nested?.Points;
             } catch { return null; }
         }
+
+        // Notes is required for the Linker UI
+        [JsonProperty("notes")]
+        [JsonPropertyName("notes")]
+        public string? Notes { get; set; }
     }
 
     public class CfbdNestedTeam
