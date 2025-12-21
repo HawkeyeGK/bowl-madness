@@ -9,7 +9,7 @@
     
     <div class="row g-4">
         
-        @* --- PLAYER MANAGEMENT --- *@
+        @* --- PLAYER & USER MANAGEMENT --- *@
         <div class="col-md-4">
             <div class="card h-100 shadow-sm border-0">
                 <div class="card-body text-center">
@@ -43,19 +43,19 @@
                 </div>
             </div>
         </div>
-
+        
+        @* --- SYSTEM & CONFIG --- *@
         <div class="col-md-4">
             <div class="card h-100 shadow-sm border-0">
                 <div class="card-body text-center">
-                    <i class="bi bi-pencil-square display-4 text-warning mb-3"></i>
-                    <h5 class="card-title">Enter Results</h5>
-                    <p class="card-text text-muted">Manually enter game scores and mark as final.</p>
-                    <a href="admin/gameresults" class="btn btn-outline-warning stretched-link">Update Scores</a>
+                    <i class="bi bi-collection-play display-4 text-secondary mb-3"></i>
+                    <h5 class="card-title">Pool Settings</h5>
+                    <p class="card-text text-muted">Create new pools, rollover seasons, and set status.</p>
+                    <a href="admin/pools" class="btn btn-outline-secondary stretched-link">Manage Pools</a>
                 </div>
             </div>
         </div>
-        
-        @* --- SYSTEM & CONFIG --- *@
+
         <div class="col-md-4">
             <div class="card h-100 shadow-sm border-0">
                 <div class="card-body text-center">
@@ -63,6 +63,18 @@
                     <h5 class="card-title">Link API Games</h5>
                     <p class="card-text text-muted">Connect local games to live CFBD API data feeds.</p>
                     <a href="admin/linker" class="btn btn-outline-dark stretched-link">Link Games</a>
+                </div>
+            </div>
+        </div>
+
+        @* --- DIAGNOSTICS & RESULTS --- *@
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body text-center">
+                    <i class="bi bi-pencil-square display-4 text-warning mb-3"></i>
+                    <h5 class="card-title">Enter Results</h5>
+                    <p class="card-text text-muted">Manually enter game scores and mark as final.</p>
+                    <a href="admin/gameresults" class="btn btn-outline-warning stretched-link">Update Scores</a>
                 </div>
             </div>
         </div>
