@@ -13,17 +13,28 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("bowlName")]
         public string BowlName { get; set; } = string.Empty;
 
-        // --- NEW: External Linkage ---
+        // --- EXTERNAL LINKAGE ---
         [JsonProperty("externalId")]
         [JsonPropertyName("externalId")]
         public string? ExternalId { get; set; }
-        // -----------------------------
+
+        // BRIDGE FIELDS
+        // These store the exact API Team Name that corresponds to the local team.
+        // ApiHomeTeam -> The API name for the team stored in 'TeamHome'
+        // ApiAwayTeam -> The API name for the team stored in 'TeamAway'
+        [JsonProperty("apiHomeTeam")]
+        [JsonPropertyName("apiHomeTeam")]
+        public string? ApiHomeTeam { get; set; }
+
+        [JsonProperty("apiAwayTeam")]
+        [JsonPropertyName("apiAwayTeam")]
+        public string? ApiAwayTeam { get; set; }
+        // ------------------------
 
         [JsonProperty("startTime")]
         [JsonPropertyName("startTime")]
         public DateTime StartTime { get; set; } = DateTime.UtcNow;
 
-        // NEW: Game Lifecycle
         [JsonProperty("gameStatus")]
         [JsonPropertyName("gameStatus")]
         public GameStatus Status { get; set; } = GameStatus.Scheduled;
@@ -46,7 +57,7 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("teamAwaySeed")]
         public int? TeamAwaySeed { get; set; }
 
-        // NEW: Scores
+        // SCORES
         [JsonProperty("teamHomeScore")]
         [JsonPropertyName("teamHomeScore")]
         public int? TeamHomeScore { get; set; }
@@ -60,7 +71,6 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("pointValue")]
         public int PointValue { get; set; } = 1;
 
-        // PLAYOFF LOGIC
         [JsonProperty("isPlayoff")]
         [JsonPropertyName("isPlayoff")]
         public bool IsPlayoff { get; set; } = false;
@@ -69,12 +79,10 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("round")]
         public PlayoffRound Round { get; set; } = PlayoffRound.Standard;
 
-        // BRACKET LINKAGE
         [JsonProperty("nextGameId")]
         [JsonPropertyName("nextGameId")]
         public string? NextGameId { get; set; }
 
-        // METADATA
         [JsonProperty("location")]
         [JsonPropertyName("location")]
         public string? Location { get; set; }
@@ -83,7 +91,6 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("television")]
         public string? Television { get; set; }
 
-        // COSMOS DISCRIMINATOR
         [JsonProperty("type")]
         [JsonPropertyName("type")]
         public string Type { get; set; } = "BowlGame";

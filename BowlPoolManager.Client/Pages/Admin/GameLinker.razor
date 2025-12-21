@@ -4,7 +4,7 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 
-<h3 class="mb-4">🔗 Game Linker (Smart Mode)</h3>
+<h3 class="mb-4">🔗 Game Linker</h3>
 
 @if (IsLoading)
 {
@@ -20,7 +20,7 @@ else
                 <tr>
                     <th>Local Game</th>
                     <th>Date</th>
-                    <th>Current Link</th>
+                    <th>Link Status</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -36,7 +36,11 @@ else
                         <td>
                             @if(IsLinked(game))
                             {
-                                <span class="badge bg-success">Linked: @game.ExternalId</span>
+                                <span class="badge bg-success mb-1">Linked</span>
+                                <div style="font-size: 0.75em; line-height: 1.2;">
+                                    <div><strong>@game.TeamHome</strong> &rarr; <span class="text-success">@game.ApiHomeTeam</span></div>
+                                    <div><strong>@game.TeamAway</strong> &rarr; <span class="text-success">@game.ApiAwayTeam</span></div>
+                                </div>
                             }
                             else
                             {
@@ -67,7 +71,7 @@ else
                 <div class="modal-body">
                     
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Select Matching API Game:</label>
+                        <label class="form-label fw-bold">1. Select Matching API Game:</label>
                         <select class="form-select" @onchange="OnApiGameSelected">
                             <option value="">-- Choose Game --</option>
                             @foreach (var ext in ExternalGames)
@@ -81,47 +85,51 @@ else
 
                     @if (SelectedApiGame != null && SelectedLocalGame != null)
                     {
-                        <div class="card bg-light mb-3">
+                        <div class="card bg-light">
+                            <div class="card-header fw-bold small text-uppercase">
+                                2. Map Teams
+                            </div>
                             <div class="card-body">
-                                <h6 class="card-title text-uppercase text-muted small fw-bold">Validation</h6>
-                                <div class="row align-items-center text-center">
-                                    <div class="col-5">
-                                        <div class="fw-bold">Local Data</div>
-                                        <div class="text-primary">@SelectedLocalGame.TeamHome</div>
-                                        <div class="text-primary">@SelectedLocalGame.TeamAway</div>
+                                <p class="small text-muted mb-3">
+                                    Match your local teams to the names provided by the API.
+                                </p>
+
+                                <div class="row align-items-center mb-3">
+                                    <div class="col-4 text-end fw-bold">
+                                        @SelectedLocalGame.TeamHome
                                     </div>
-                                    <div class="col-2">
-                                        <span class="oi oi-arrow-right"></span>
+                                    <div class="col-1 text-center">
+                                        <span class="oi oi-arrow-right text-muted"></span>
                                     </div>
-                                    <div class="col-5">
-                                        <div class="fw-bold">API Data</div>
-                                        <div class="text-success">@SelectedApiGame.HomeTeam</div>
-                                        <div class="text-success">@SelectedApiGame.AwayTeam</div>
+                                    <div class="col-7">
+                                        <select class="form-select" @bind="ProposedApiHome">
+                                            <option value="">-- Select API Team --</option>
+                                            @foreach(var team in AvailableApiTeams)
+                                            {
+                                                <option value="@team">@team</option>
+                                            }
+                                        </select>
                                     </div>
                                 </div>
-                                
-                                <hr/>
 
-                                @if (NamesMatch)
-                                {
-                                    <div class="alert alert-success py-2 mb-0">
-                                        <span class="oi oi-check"></span> <strong>Perfect Match!</strong> Team names are identical.
+                                <div class="row align-items-center">
+                                    <div class="col-4 text-end fw-bold">
+                                        @SelectedLocalGame.TeamAway
                                     </div>
-                                }
-                                else
-                                {
-                                    <div class="alert alert-warning py-2 mb-2">
-                                        <span class="oi oi-warning"></span> <strong>Name Mismatch</strong><br/>
-                                        Local names differ from API names.
+                                    <div class="col-1 text-center">
+                                        <span class="oi oi-arrow-right text-muted"></span>
                                     </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="syncNames" @bind="SyncTeamNames">
-                                        <label class="form-check-label fw-bold" for="syncNames">
-                                            Update local team names to match API?
-                                        </label>
-                                        <div class="form-text">Recommended for consistent scoring updates.</div>
+                                    <div class="col-7">
+                                        <select class="form-select" @bind="ProposedApiAway">
+                                            <option value="">-- Select API Team --</option>
+                                            @foreach(var team in AvailableApiTeams)
+                                            {
+                                                <option value="@team">@team</option>
+                                            }
+                                        </select>
                                     </div>
-                                }
+                                </div>
+
                             </div>
                         </div>
                     }
@@ -130,7 +138,7 @@ else
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
                     <button type="button" class="btn btn-primary" 
-                            disabled="@(SelectedApiGame == null || IsSaving)"
+                            disabled="@(!CanSave || IsSaving)"
                             @onclick="SaveLink">
                         @if (IsSaving) { <span>Saving...</span> } else { <span>Confirm Link</span> }
                     </button>
@@ -143,12 +151,17 @@ else
 @code {
     private bool IsLoading = true;
     private bool IsSaving = false;
-    
-    // Modal State
     private bool ShowModal = false;
+    
     private BowlGame? SelectedLocalGame;
     private CfbdGameDto? SelectedApiGame;
-    private bool SyncTeamNames = false;
+
+    // The two teams available from the selected API game
+    private List<string> AvailableApiTeams = new();
+
+    // The user's specific choices
+    private string ProposedApiHome = "";
+    private string ProposedApiAway = "";
 
     private List<BowlGame> LocalGames = new();
     private List<CfbdGameDto> ExternalGames = new();
@@ -166,42 +179,44 @@ else
             LocalGames = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames") ?? new();
             ExternalGames = await Http.GetFromJsonAsync<List<CfbdGameDto>>("api/GetExternalGames") ?? new();
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading data: {ex.Message}");
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        catch (Exception ex) { Console.WriteLine($"Error: {ex.Message}"); }
+        finally { IsLoading = false; }
     }
 
     private bool IsLinked(BowlGame game) => !string.IsNullOrEmpty(game.ExternalId);
 
+    // Validation: Both fields must be set, and they shouldn't map to the same team
+    private bool CanSave => SelectedApiGame != null 
+                            && !string.IsNullOrEmpty(ProposedApiHome) 
+                            && !string.IsNullOrEmpty(ProposedApiAway)
+                            && ProposedApiHome != ProposedApiAway;
+
     private string FormatApiGameLabel(CfbdGameDto game)
     {
-        // Format: "Rose Bowl: Michigan vs Washington"
-        var label = $"{game.Notes ?? "Bowl Game"}: {game.HomeTeam} vs {game.AwayTeam}";
-        return label;
+        return $"{game.Notes ?? "Bowl Game"}: {game.HomeTeam} vs {game.AwayTeam}";
     }
 
     private void OpenLinkModal(BowlGame game)
     {
         SelectedLocalGame = game;
         SelectedApiGame = null;
-        SyncTeamNames = false;
+        AvailableApiTeams.Clear();
+        ProposedApiHome = "";
+        ProposedApiAway = "";
         
-        // If already linked, try to pre-select the API game
+        // Try to load existing link
         if (!string.IsNullOrEmpty(game.ExternalId))
         {
             var match = ExternalGames.FirstOrDefault(x => x.Id.ToString() == game.ExternalId);
             if (match != null)
             {
-                SelectedApiGame = match;
-                CheckNameMatch();
+                SelectApiGameInternal(match);
+                // Pre-fill existing map
+                ProposedApiHome = game.ApiHomeTeam ?? "";
+                ProposedApiAway = game.ApiAwayTeam ?? "";
             }
         }
-
+        
         ShowModal = true;
     }
 
@@ -217,27 +232,32 @@ else
         var idStr = e.Value?.ToString();
         if (int.TryParse(idStr, out int id))
         {
-            SelectedApiGame = ExternalGames.FirstOrDefault(x => x.Id == id);
-            // Default to syncing names if there is a mismatch
-            CheckNameMatch();
-            if (!NamesMatch) SyncTeamNames = true;
+            var match = ExternalGames.FirstOrDefault(x => x.Id == id);
+            SelectApiGameInternal(match);
         }
         else
         {
             SelectedApiGame = null;
+            AvailableApiTeams.Clear();
         }
     }
 
-    private bool NamesMatch = true;
-
-    private void CheckNameMatch()
+    private void SelectApiGameInternal(CfbdGameDto? match)
     {
-        if (SelectedLocalGame == null || SelectedApiGame == null) return;
-        
-        bool homeMatch = string.Equals(SelectedLocalGame.TeamHome, SelectedApiGame.HomeTeam, StringComparison.OrdinalIgnoreCase);
-        bool awayMatch = string.Equals(SelectedLocalGame.TeamAway, SelectedApiGame.AwayTeam, StringComparison.OrdinalIgnoreCase);
-
-        NamesMatch = homeMatch && awayMatch;
+        SelectedApiGame = match;
+        AvailableApiTeams.Clear();
+        if (match != null)
+        {
+            if (!string.IsNullOrEmpty(match.HomeTeam)) AvailableApiTeams.Add(match.HomeTeam);
+            if (!string.IsNullOrEmpty(match.AwayTeam)) AvailableApiTeams.Add(match.AwayTeam);
+            
+            // Intelligent Defaults (if names match exactly)
+            if (AvailableApiTeams.Contains(SelectedLocalGame?.TeamHome ?? "")) 
+                ProposedApiHome = SelectedLocalGame!.TeamHome;
+            
+            if (AvailableApiTeams.Contains(SelectedLocalGame?.TeamAway ?? "")) 
+                ProposedApiAway = SelectedLocalGame!.TeamAway;
+        }
     }
 
     private async Task SaveLink()
@@ -246,36 +266,19 @@ else
 
         IsSaving = true;
 
-        // 1. Update Link
+        // 1. Save ID Link
         SelectedLocalGame.ExternalId = SelectedApiGame.Id.ToString();
 
-        // 2. Optional: Sync Names
-        if (SyncTeamNames)
-        {
-            SelectedLocalGame.TeamHome = SelectedApiGame.HomeTeam ?? SelectedLocalGame.TeamHome;
-            SelectedLocalGame.TeamAway = SelectedApiGame.AwayTeam ?? SelectedLocalGame.TeamAway;
-        }
+        // 2. Save Explicit Bridge Map
+        SelectedLocalGame.ApiHomeTeam = ProposedApiHome;
+        SelectedLocalGame.ApiAwayTeam = ProposedApiAway;
 
         try
         {
             var response = await Http.PostAsJsonAsync("api/SaveGame", SelectedLocalGame);
-            if (response.IsSuccessStatusCode)
-            {
-                // UI Refresh not strictly needed if we updated the object reference, but good for safety
-                CloseModal();
-            }
-            else
-            {
-                Console.WriteLine("Failed to save.");
-            }
+            if (response.IsSuccessStatusCode) CloseModal();
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error: {ex.Message}");
-        }
-        finally
-        {
-            IsSaving = false;
-        }
+        catch (Exception ex) { Console.WriteLine($"Error: {ex.Message}"); }
+        finally { IsSaving = false; }
     }
 }
