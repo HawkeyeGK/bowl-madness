@@ -88,37 +88,38 @@ namespace BowlPoolManager.Api.Functions
                 if (apiGame == null) continue;
 
                 bool gameChanged = false;
-
-                // Resolve Home Score
+                
+                // STRICT EQUALITY MATCHING
+                // Check local 'ApiHomeTeam' against both API slots in case of a swap
+                int? homeScore = null;
                 if (!string.IsNullOrEmpty(localGame.ApiHomeTeam))
                 {
-                    int? apiScore = null;
                     if (string.Equals(apiGame.HomeTeam, localGame.ApiHomeTeam, StringComparison.OrdinalIgnoreCase))
-                        apiScore = apiGame.HomePoints;
+                        homeScore = apiGame.HomePoints;
                     else if (string.Equals(apiGame.AwayTeam, localGame.ApiHomeTeam, StringComparison.OrdinalIgnoreCase))
-                        apiScore = apiGame.AwayPoints;
-
-                    if (apiScore.HasValue && apiScore != localGame.TeamHomeScore)
-                    {
-                        localGame.TeamHomeScore = apiScore;
-                        gameChanged = true;
-                    }
+                        homeScore = apiGame.AwayPoints;
                 }
 
-                // Resolve Away Score
+                if (homeScore.HasValue && homeScore != localGame.TeamHomeScore)
+                {
+                    localGame.TeamHomeScore = homeScore;
+                    gameChanged = true;
+                }
+                
+                // Check local 'ApiAwayTeam' against both API slots in case of a swap
+                int? awayScore = null;
                 if (!string.IsNullOrEmpty(localGame.ApiAwayTeam))
                 {
-                    int? apiScore = null;
                     if (string.Equals(apiGame.HomeTeam, localGame.ApiAwayTeam, StringComparison.OrdinalIgnoreCase))
-                        apiScore = apiGame.HomePoints;
+                        awayScore = apiGame.HomePoints;
                     else if (string.Equals(apiGame.AwayTeam, localGame.ApiAwayTeam, StringComparison.OrdinalIgnoreCase))
-                        apiScore = apiGame.AwayPoints;
+                        awayScore = apiGame.AwayPoints;
+                }
 
-                    if (apiScore.HasValue && apiScore != localGame.TeamAwayScore)
-                    {
-                        localGame.TeamAwayScore = apiScore;
-                        gameChanged = true;
-                    }
+                if (awayScore.HasValue && awayScore != localGame.TeamAwayScore)
+                {
+                    localGame.TeamAwayScore = awayScore;
+                    gameChanged = true;
                 }
 
                 var oldStatus = localGame.Status;

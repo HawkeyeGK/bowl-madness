@@ -85,10 +85,10 @@ else
                         <label class="form-label fw-bold">1. Select Matching API Game:</label>
                         <select class="form-select" @onchange="OnApiGameSelected">
                             <option value="">-- Choose Game --</option>
-                            @foreach (var ext in ExternalGames)
+                            @foreach (var ext in ExternalGames.OrderBy(x => x.HomeTeam))
                             {
                                 <option value="@ext.Id" selected="@(SelectedApiGame?.Id == ext.Id)">
-                                    @FormatApiGameLabel(ext)
+                                    @ext.HomeTeam vs @ext.AwayTeam (@ext.Notes)
                                 </option>
                             }
                         </select>
@@ -198,11 +198,6 @@ else
                             && !string.IsNullOrEmpty(ProposedApiAway)
                             && ProposedApiHome != ProposedApiAway;
 
-    private string FormatApiGameLabel(CfbdGameDto game)
-    {
-        return $"{game.Notes ?? "Bowl Game"}: {game.HomeTeam} vs {game.AwayTeam}";
-    }
-
     private void OpenLinkModal(BowlGame game)
     {
         SelectedLocalGame = game;
@@ -217,8 +212,9 @@ else
             if (match != null)
             {
                 SelectApiGameInternal(match);
-                ProposedApiHome = game.ApiHomeTeam ?? "";
-                ProposedApiAway = game.ApiAwayTeam ?? "";
+                // Use existing stored values if they exist, otherwise default to match order
+                ProposedApiHome = !string.IsNullOrEmpty(game.ApiHomeTeam) ? game.ApiHomeTeam : match.HomeTeam;
+                ProposedApiAway = !string.IsNullOrEmpty(game.ApiAwayTeam) ? game.ApiAwayTeam : match.AwayTeam;
             }
         }
         
@@ -256,12 +252,10 @@ else
             if (!string.IsNullOrEmpty(match.HomeTeam)) AvailableApiTeams.Add(match.HomeTeam);
             if (!string.IsNullOrEmpty(match.AwayTeam)) AvailableApiTeams.Add(match.AwayTeam);
             
-            // Auto-match defaults only if no existing map
-            if (string.IsNullOrEmpty(ProposedApiHome) && AvailableApiTeams.Contains(SelectedLocalGame?.TeamHome ?? "")) 
-                ProposedApiHome = SelectedLocalGame!.TeamHome;
-            
-            if (string.IsNullOrEmpty(ProposedApiAway) && AvailableApiTeams.Contains(SelectedLocalGame?.TeamAway ?? "")) 
-                ProposedApiAway = SelectedLocalGame!.TeamAway;
+            // Default mapping: First local team -> First API team (Home), Second -> Second (Away)
+            // This is a robust default for "Strict Matching" initial setup.
+            if (string.IsNullOrEmpty(ProposedApiHome)) ProposedApiHome = match.HomeTeam;
+            if (string.IsNullOrEmpty(ProposedApiAway)) ProposedApiAway = match.AwayTeam;
         }
     }
 
