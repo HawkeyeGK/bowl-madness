@@ -48,17 +48,50 @@ namespace BowlPoolManager.Core.Dtos
         [Newtonsoft.Json.JsonIgnore]
         public int? AwayPoints => GetInt(AwayRaw, "points") ?? AwayPointsRoot;
 
+        // --- BILINGUAL EXTRACTION LOGIC ---
         private string? GetValue(object? raw, string key)
         {
             if (raw == null) return null;
+            
+            // 1. Simple String (Common in /games endpoint)
             if (raw is string s) return s;
+            
+            // 2. Server-Side (Newtonsoft JObject)
             if (raw is JObject jo) return jo[key]?.ToString();
+
+            // 3. Client-Side (System.Text.Json JsonElement)
+            if (raw is JsonElement je)
+            {
+                // If the element itself is a string (e.g. /games endpoint processed by STJ)
+                if (je.ValueKind == JsonValueKind.String) 
+                    return je.GetString();
+
+                // If the element is an object (e.g. /scoreboard endpoint)
+                if (je.ValueKind == JsonValueKind.Object && je.TryGetProperty(key, out var prop))
+                {
+                     if (prop.ValueKind == JsonValueKind.String) return prop.GetString();
+                     return prop.ToString();
+                }
+            }
+
             return null;
         }
 
         private int? GetInt(object? raw, string key)
         {
+            // 1. Server-Side (Newtonsoft)
             if (raw is JObject jo) return jo[key]?.Value<int?>();
+
+            // 2. Client-Side (System.Text.Json)
+            if (raw is JsonElement je)
+            {
+                if (je.ValueKind == JsonValueKind.Object && 
+                    je.TryGetProperty(key, out var prop) && 
+                    prop.TryGetInt32(out int val))
+                {
+                    return val;
+                }
+            }
             return null;
         }
 
