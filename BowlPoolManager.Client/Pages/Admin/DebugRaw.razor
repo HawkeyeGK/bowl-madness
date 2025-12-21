@@ -11,7 +11,7 @@
         <button class="btn btn-primary" @onclick="RunDiagnostic" disabled="@IsLoading">
             @(IsLoading ? "Running..." : "Run Matching Diagnostic")
         </button>
-        <p class="mt-2 text-muted">This will compare local database games with the live Scoreboard API and report mismatches.</p>
+        <p class="mt-2 text-muted">This will compare local database games with the live Scoreboard API using the Server's "Swap-Aware" logic.</p>
     </div>
 </div>
 
@@ -53,7 +53,7 @@
                 return;
             }
 
-            // 3. Simulate PerformScoreUpdate logic
+            // 3. Simulate PerformScoreUpdate logic (Swap-Aware)
             foreach (var local in localGames.Where(g => !string.IsNullOrEmpty(g.ExternalId)))
             {
                 var apiMatch = apiGames.FirstOrDefault(x => x.Id.ToString() == local.ExternalId);
@@ -64,17 +64,25 @@
                     continue;
                 }
 
-                // Check Home Team
-                bool homeMatch = string.Equals(apiMatch.HomeTeam, local.ApiHomeTeam, StringComparison.OrdinalIgnoreCase);
-                string homeStatus = homeMatch ? "✅ MATCH" : $"❌ MISMATCH (API: '{apiMatch.HomeTeam}' vs DB: '{local.ApiHomeTeam}')";
+                // Helper to check both slots
+                string CheckTeam(string? dbTeam, string? apiHome, string? apiAway)
+                {
+                    if (string.IsNullOrEmpty(dbTeam)) return "⚠️ SKIPPED (No DB Team)";
+                    
+                    if (string.Equals(dbTeam, apiHome, StringComparison.OrdinalIgnoreCase)) return "✅ MATCH (Direct)";
+                    if (string.Equals(dbTeam, apiAway, StringComparison.OrdinalIgnoreCase)) return "✅ MATCH (Swapped)";
+                    
+                    return $"❌ MISMATCH (DB: '{dbTeam}' not found in API Game)";
+                }
 
-                // Check Away Team
-                bool awayMatch = string.Equals(apiMatch.AwayTeam, local.ApiAwayTeam, StringComparison.OrdinalIgnoreCase);
-                string awayStatus = awayMatch ? "✅ MATCH" : $"❌ MISMATCH (API: '{apiMatch.AwayTeam}' vs DB: '{local.ApiAwayTeam}')";
+                string homeStatus = CheckTeam(local.ApiHomeTeam, apiMatch.HomeTeam, apiMatch.AwayTeam);
+                string awayStatus = CheckTeam(local.ApiAwayTeam, apiMatch.HomeTeam, apiMatch.AwayTeam);
+
+                bool isMatch = homeStatus.Contains("MATCH") && awayStatus.Contains("MATCH");
 
                 Logs.Add(new LogEntry(local.BowlName, $"ID Found. Home: {homeStatus} | Away: {awayStatus}") 
                 { 
-                    IsMatch = homeMatch && awayMatch 
+                    IsMatch = isMatch 
                 });
             }
         }
