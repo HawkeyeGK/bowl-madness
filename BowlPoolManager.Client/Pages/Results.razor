@@ -9,7 +9,14 @@
 <div class="container mt-4">
     <div class="text-center mb-5">
         <h1 class="display-4 fw-bold text-primary"><i class="bi bi-display"></i> Scoreboard</h1>
-        <p class="lead text-muted">Scores & Schedules</p>
+        <p class="lead text-muted mb-1">Scores & Schedules</p>
+        
+        @if (LastUpdate != DateTime.MinValue)
+        {
+            <div class="small text-secondary fst-italic">
+                Updates automatically &bull; Last update: @DateTimeHelper.ToCentral(LastUpdate).ToString("MMM d, h:mm tt") CT
+            </div>
+        }
     </div>
 
     @if (isLoading)
@@ -86,18 +93,18 @@
                                                 <span>@(string.IsNullOrEmpty(game.TeamHome) ? "TBD" : game.TeamHome)</span>
                                                 @if(game.TeamHomeScore.HasValue)
                                                 {
-                                                    <span>@game.TeamHomeScore</span>
+                                                   <span>@game.TeamHomeScore</span>
                                                 }
-                                            </div>
+                                           </div>
 
                                             <div class="@awayClass d-flex justify-content-between mt-1">
-                                                <span>@(string.IsNullOrEmpty(game.TeamAway) ? "TBD" : game.TeamAway)</span>
+                                                 <span>@(string.IsNullOrEmpty(game.TeamAway) ? "TBD" : game.TeamAway)</span>
                                                 @if(game.TeamAwayScore.HasValue)
                                                 {
                                                     <span>@game.TeamAwayScore</span>
                                                 }
                                             </div>
-                                        </div>
+                                         </div>
                                     </td>
 
                                     <td class="text-center fw-bold fs-5">
@@ -116,12 +123,17 @@
 @code {
     private bool isLoading = true;
     private List<BowlGame> games = new();
+    private DateTime LastUpdate = DateTime.MinValue;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
+            // Load games (Triggers refresh)
             games = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames") ?? new();
+            
+            // Fetch timestamp (Post-refresh)
+            LastUpdate = await Http.GetFromJsonAsync<DateTime>("api/GetLastScoreUpdate");
         }
         catch (Exception ex)
         {
