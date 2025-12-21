@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace BowlPoolManager.Core.Dtos
 {
@@ -14,7 +15,6 @@ namespace BowlPoolManager.Core.Dtos
         public bool Completed { get; set; }
 
         // --- ROOT RAW DATA ---
-        // We use 'object' to handle either a string (from /games) or an object (from /scoreboard)
         [JsonProperty("homeTeam")]
         [JsonPropertyName("homeTeam")]
         public object? HomeRaw { get; set; }
@@ -48,42 +48,33 @@ namespace BowlPoolManager.Core.Dtos
         [Newtonsoft.Json.JsonIgnore]
         public int? AwayPoints => GetPoints(AwayRaw) ?? AwayPointsRoot;
 
-        // --- NESTED DESERIALIZATION LOGIC ---
         private string? GetName(object? raw)
         {
             if (raw == null) return null;
             if (raw is string s) return s;
             
-            try {
-                var nested = JsonConvert.DeserializeObject<CfbdNestedTeam>(raw.ToString()!);
-                return nested?.Name;
-            } catch { return null; }
+            if (raw is JObject jo)
+            {
+                return jo["name"]?.ToString();
+            }
+
+            return null;
         }
 
         private int? GetPoints(object? raw)
         {
-            if (raw == null || raw is string) return null;
+            if (raw == null) return null;
             
-            try {
-                var nested = JsonConvert.DeserializeObject<CfbdNestedTeam>(raw.ToString()!);
-                return nested?.Points;
-            } catch { return null; }
+            if (raw is JObject jo)
+            {
+                return jo["points"]?.Value<int?>();
+            }
+
+            return null;
         }
 
-        // Notes is required for the Linker UI
         [JsonProperty("notes")]
         [JsonPropertyName("notes")]
         public string? Notes { get; set; }
-    }
-
-    public class CfbdNestedTeam
-    {
-        [JsonProperty("name")]
-        [JsonPropertyName("name")]
-        public string? Name { get; set; }
-
-        [JsonProperty("points")]
-        [JsonPropertyName("points")]
-        public int? Points { get; set; }
     }
 }
