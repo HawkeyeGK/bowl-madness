@@ -13,7 +13,7 @@ namespace BowlPoolManager.Core.Dtos
         [JsonPropertyName("completed")]
         public bool Completed { get; set; }
 
-        // --- ROOT PROPERTIES (Used by /games) ---
+        // --- FLAT PROPERTIES (Used by standard /games endpoint) ---
         [JsonProperty("homeTeam")]
         [JsonPropertyName("homeTeam")]
         public string? HomeTeamRoot { get; set; }
@@ -30,17 +30,19 @@ namespace BowlPoolManager.Core.Dtos
         [JsonPropertyName("awayPoints")]
         public int? AwayPointsRoot { get; set; }
 
-        // --- NESTED PROPERTIES (Used by /scoreboard) ---
-        [JsonProperty("homeTeamObj")] // Map 'homeTeam' object from scoreboard
+        // --- NESTED PROPERTIES (Used by /scoreboard endpoint) ---
+        // We use different internal names to avoid conflicts during deserialization
+        [JsonProperty("homeTeamObj")] 
         [JsonPropertyName("homeTeam")] 
         public CfbdScoreboardTeamDto? HomeTeamObj { get; set; }
 
-        [JsonProperty("awayTeamObj")] // Map 'awayTeam' object from scoreboard
+        [JsonProperty("awayTeamObj")]
         [JsonPropertyName("awayTeam")]
         public CfbdScoreboardTeamDto? AwayTeamObj { get; set; }
 
         // --- SMART WRAPPERS ---
-        // These properties ensure GameFunctions logic works for BOTH API types
+        // These ensure GameFunctions.cs logic doesn't have to change.
+        // It will look for the nested object data first, then fall back to the root property.
         [JsonIgnore]
         [Newtonsoft.Json.JsonIgnore]
         public string? HomeTeam => HomeTeamObj?.Name ?? HomeTeamRoot;
