@@ -19,7 +19,7 @@ namespace BowlPoolManager.Api.Services
 
         public async Task<List<CfbdGameDto>> GetPostseasonGamesAsync(int year)
         {
-            // Reuse the raw fetch to ensure consistency
+            // Reuse the raw fetch logic for consistency
             var json = await GetRawPostseasonGamesJsonAsync(year);
             if (string.IsNullOrEmpty(json)) return new List<CfbdGameDto>();
 
@@ -36,19 +36,7 @@ namespace BowlPoolManager.Api.Services
 
         public async Task<string> GetRawPostseasonGamesJsonAsync(int year)
         {
-            var apiKey = Environment.GetEnvironmentVariable("CfbdApiKey");
-            
-            // Allow running without key for debug (API returns error usually, but handles crash)
-            if (string.IsNullOrEmpty(apiKey)) 
-            {
-                 _logger.LogWarning("CfbdApiKey is missing.");
-            }
-
-            if (!_httpClient.DefaultRequestHeaders.Contains("Authorization") && !string.IsNullOrEmpty(apiKey))
-            {
-                _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
-            }
-
+            EnsureAuth();
             try
             {
                 var url = $"/games?year={year}&seasonType=postseason";
@@ -58,6 +46,34 @@ namespace BowlPoolManager.Api.Services
             {
                 _logger.LogError(ex, "Raw fetch failed.");
                 return $"Error fetching data: {ex.Message}";
+            }
+        }
+
+        // NEW: Fetch live scoreboard data
+        public async Task<List<CfbdGameDto>> GetScoreboardGamesAsync()
+        {
+            EnsureAuth();
+            try
+            {
+                // /scoreboard returns the current active games. 
+                // We add classification=fbs to filter, but usually no params works for "Active Week"
+                var url = "/scoreboard?classification=fbs"; 
+                var json = await _httpClient.GetStringAsync(url);
+                return JsonConvert.DeserializeObject<List<CfbdGameDto>>(json) ?? new List<CfbdGameDto>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Scoreboard fetch failed.");
+                return new List<CfbdGameDto>();
+            }
+        }
+
+        private void EnsureAuth()
+        {
+            var apiKey = Environment.GetEnvironmentVariable("CfbdApiKey");
+            if (!string.IsNullOrEmpty(apiKey) && !_httpClient.DefaultRequestHeaders.Contains("Authorization"))
+            {
+                _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
             }
         }
     }

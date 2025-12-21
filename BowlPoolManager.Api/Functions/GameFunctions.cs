@@ -42,7 +42,7 @@ namespace BowlPoolManager.Api.Functions
                 {
                     if (DateTime.UtcNow > _lastRefresh.AddMinutes(RefreshIntervalMinutes))
                     {
-                        _logger.LogInformation("Lazy Loading: Refreshing scores from CFBD...");
+                        _logger.LogInformation("Lazy Loading: Refreshing scores from CFBD Scoreboard...");
                         await PerformScoreUpdate(games);
                         _lastRefresh = DateTime.UtcNow;
                     }
@@ -71,7 +71,7 @@ namespace BowlPoolManager.Api.Functions
             return response;
         }
 
-        // --- FIXED BRIDGE UPDATE LOGIC ---
+        // --- UPDATED LOGIC USING /SCOREBOARD ---
         private async Task PerformScoreUpdate(List<BowlGame> games)
         {
             var linkedGames = games
@@ -81,7 +81,11 @@ namespace BowlPoolManager.Api.Functions
 
             if (!linkedGames.Any()) return;
 
-            var apiGames = await _cfbdService.GetPostseasonGamesAsync(2025);
+            // FIX: Use GetScoreboardGamesAsync (Live Data) instead of GetPostseasonGamesAsync
+            var apiGames = await _cfbdService.GetScoreboardGamesAsync();
+            
+            // Fallback: If scoreboard is empty (sometimes happens mid-week), try the games endpoint?
+            // For now, let's trust scoreboard for LIVE data.
             
             bool anyChanged = false;
 
@@ -103,7 +107,6 @@ namespace BowlPoolManager.Api.Functions
                     else if (string.Equals(apiGame.AwayTeam, localGame.ApiHomeTeam, StringComparison.OrdinalIgnoreCase))
                         apiScore = apiGame.AwayPoints;
 
-                    // FIX: Only update if apiScore HAS A VALUE (Prevents null overwrite)
                     if (apiScore.HasValue && apiScore != localGame.TeamHomeScore)
                     {
                         localGame.TeamHomeScore = apiScore;
@@ -120,7 +123,6 @@ namespace BowlPoolManager.Api.Functions
                     else if (string.Equals(apiGame.AwayTeam, localGame.ApiAwayTeam, StringComparison.OrdinalIgnoreCase))
                         apiScore = apiGame.AwayPoints;
 
-                    // FIX: Only update if apiScore HAS A VALUE
                     if (apiScore.HasValue && apiScore != localGame.TeamAwayScore)
                     {
                         localGame.TeamAwayScore = apiScore;
@@ -136,7 +138,6 @@ namespace BowlPoolManager.Api.Functions
                 }
                 else 
                 {
-                    // If not final, but time has passed, mark InProgress
                     if (DateTime.UtcNow >= localGame.StartTime.AddMinutes(-15)) 
                         localGame.Status = GameStatus.InProgress;
                 }
