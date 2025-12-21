@@ -3,53 +3,69 @@ using Newtonsoft.Json;
 
 namespace BowlPoolManager.Core.Dtos
 {
-    // UPDATED: Attributes now match the API's camelCase format (e.g. homeTeam)
     public class CfbdGameDto
     {
         [JsonProperty("id")]
         [JsonPropertyName("id")]
         public int Id { get; set; }
 
-        [JsonProperty("season")]
-        [JsonPropertyName("season")]
-        public int Season { get; set; }
-
-        [JsonProperty("week")]
-        [JsonPropertyName("week")]
-        public int Week { get; set; }
-
-        [JsonProperty("seasonType")]
-        [JsonPropertyName("seasonType")]
-        public string? SeasonType { get; set; }
-
-        [JsonProperty("startDate")]
-        [JsonPropertyName("startDate")]
-        public DateTime? StartDate { get; set; }
-
         [JsonProperty("completed")]
         [JsonPropertyName("completed")]
         public bool Completed { get; set; }
 
-        // --- THE FIX: camelCase Attributes ---
+        // --- ROOT PROPERTIES (Used by /games) ---
         [JsonProperty("homeTeam")]
         [JsonPropertyName("homeTeam")]
-        public string? HomeTeam { get; set; }
+        public string? HomeTeamRoot { get; set; }
 
         [JsonProperty("homePoints")]
         [JsonPropertyName("homePoints")]
-        public int? HomePoints { get; set; }
+        public int? HomePointsRoot { get; set; }
 
         [JsonProperty("awayTeam")]
         [JsonPropertyName("awayTeam")]
-        public string? AwayTeam { get; set; }
+        public string? AwayTeamRoot { get; set; }
 
         [JsonProperty("awayPoints")]
         [JsonPropertyName("awayPoints")]
-        public int? AwayPoints { get; set; }
-        // -------------------------------------
+        public int? AwayPointsRoot { get; set; }
 
-        [JsonProperty("notes")]
-        [JsonPropertyName("notes")]
-        public string? Notes { get; set; } 
+        // --- NESTED PROPERTIES (Used by /scoreboard) ---
+        [JsonProperty("homeTeamObj")] // Map 'homeTeam' object from scoreboard
+        [JsonPropertyName("homeTeam")] 
+        public CfbdScoreboardTeamDto? HomeTeamObj { get; set; }
+
+        [JsonProperty("awayTeamObj")] // Map 'awayTeam' object from scoreboard
+        [JsonPropertyName("awayTeam")]
+        public CfbdScoreboardTeamDto? AwayTeamObj { get; set; }
+
+        // --- SMART WRAPPERS ---
+        // These properties ensure GameFunctions logic works for BOTH API types
+        [JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
+        public string? HomeTeam => HomeTeamObj?.Name ?? HomeTeamRoot;
+
+        [JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
+        public int? HomePoints => HomeTeamObj?.Points ?? HomePointsRoot;
+
+        [JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
+        public string? AwayTeam => AwayTeamObj?.Name ?? AwayTeamRoot;
+
+        [JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
+        public int? AwayPoints => AwayTeamObj?.Points ?? AwayPointsRoot;
+    }
+
+    public class CfbdScoreboardTeamDto
+    {
+        [JsonProperty("name")]
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
+
+        [JsonProperty("points")]
+        [JsonPropertyName("points")]
+        public int? Points { get; set; }
     }
 }
