@@ -215,6 +215,9 @@ else
             if (match != null)
             {
                 SelectApiGameInternal(match);
+                // Ensure edit values aren't overwritten by auto-match if they exist
+                if (!string.IsNullOrEmpty(game.ApiHomeTeam)) ProposedApiHome = game.ApiHomeTeam;
+                if (!string.IsNullOrEmpty(game.ApiAwayTeam)) ProposedApiAway = game.ApiAwayTeam;
             }
         }
         
