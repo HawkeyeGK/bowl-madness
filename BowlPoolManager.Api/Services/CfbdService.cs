@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using BowlPoolManager.Core.Dtos;
 using Newtonsoft.Json; 
+using System.Net.Http.Headers;
 
 namespace BowlPoolManager.Api.Services
 {
@@ -35,22 +36,11 @@ namespace BowlPoolManager.Api.Services
 
         public async Task<string> GetRawPostseasonGamesJsonAsync(int year)
         {
-            EnsureAuth();
-            try
-            {
-                var url = $"/games?year={year}&seasonType=postseason";
-                return await _httpClient.GetStringAsync(url);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Raw fetch failed.");
-                return $"Error fetching data: {ex.Message}";
-            }
+            return await ExecuteRequestAsync($"/games?year={year}&seasonType=postseason");
         }
 
         public async Task<List<CfbdGameDto>> GetScoreboardGamesAsync()
         {
-            // Re-use the raw fetch to ensure consistency
             var json = await GetRawScoreboardJsonAsync();
             if (string.IsNullOrEmpty(json)) return new List<CfbdGameDto>();
 
@@ -65,29 +55,45 @@ namespace BowlPoolManager.Api.Services
             }
         }
 
-        // NEW: Raw Fetch Implementation
         public async Task<string> GetRawScoreboardJsonAsync()
         {
-            EnsureAuth();
+            return await ExecuteRequestAsync("/scoreboard?classification=fbs");
+        }
+
+        // --- HELPER: Stateless Request Execution ---
+        // This ensures the API Key is attached to the specific MESSAGE, not the shared Client.
+        private async Task<string> ExecuteRequestAsync(string relativeUrl)
+        {
             try
             {
-                // classification=fbs is usually safer to reduce noise
-                var url = "/scoreboard?classification=fbs"; 
-                return await _httpClient.GetStringAsync(url);
+                var request = new HttpRequestMessage(HttpMethod.Get, relativeUrl);
+                
+                var apiKey = Environment.GetEnvironmentVariable("CfbdApiKey");
+                
+                if (string.IsNullOrEmpty(apiKey))
+                {
+                    _logger.LogError("CRITICAL: 'CfbdApiKey' is missing from Environment Variables!");
+                    return "Error: API Key Missing on Server";
+                }
+
+                // Explicitly attach header to THIS specific request message
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+                var response = await _httpClient.SendAsync(request);
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    _logger.LogError($"CFBD API Error ({response.StatusCode}) for {relativeUrl}: {error}");
+                    return $"Error: {response.StatusCode} - {error}";
+                }
+
+                return await response.Content.ReadAsStringAsync();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Scoreboard fetch failed.");
-                return $"Error fetching scoreboard: {ex.Message}";
-            }
-        }
-
-        private void EnsureAuth()
-        {
-            var apiKey = Environment.GetEnvironmentVariable("CfbdApiKey");
-            if (!string.IsNullOrEmpty(apiKey) && !_httpClient.DefaultRequestHeaders.Contains("Authorization"))
-            {
-                _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+                _logger.LogError(ex, $"Request execution failed for {relativeUrl}");
+                return $"Exception: {ex.Message}";
             }
         }
     }
