@@ -19,88 +19,60 @@
 
 <div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
     <nav class="flex-column">
-       
-        @* LEADERBOARD (Home) *@
+        
+        @* --- PUBLIC LINKS --- *@
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
                 <span class="bi bi-trophy-fill me-2" aria-hidden="true"></span> Leaderboard
             </NavLink>
         </div>
-
-        @* SCOREBOARD *@
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="results">
                 <span class="bi bi-display me-2" aria-hidden="true"></span> Scoreboard
             </NavLink>
         </div>
-
-        @* PRINT BRACKET *@
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="print-bracket">
                 <span class="bi bi-printer-fill me-2" aria-hidden="true"></span> Print Bracket
             </NavLink>
         </div>
         
+        @* --- AUTHENTICATED LINKS --- *@
         <AuthorizeView>
             <Authorized>
-                @* MY PICKS *@
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="mypicks">
                         <span class="bi bi-clipboard-check-fill me-2" aria-hidden="true"></span> @MyPicksText
                     </NavLink>
                 </div>
-                
-
             </Authorized>
             <NotAuthorized>
-                @* LOGIN CALL TO ACTION *@
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="login">
                         <span class="bi bi-box-arrow-in-right me-2" aria-hidden="true"></span> Log In To Enter Picks
-                   </NavLink>
+                    </NavLink>
                 </div>
             </NotAuthorized>
         </AuthorizeView>
 
-        @* ADMIN SECTION *@
+        @* --- ADMIN SECTION --- *@
         <AuthorizeView Roles="SuperAdmin,Admin">
             <Authorized>
-                 <div class="nav-item px-3 mt-4">
+                <div class="nav-item px-3 mt-4">
                     <div class="text-white-50 small text-uppercase fw-bold px-3 mb-1">Admin</div>
                 </div>
+                
+                @* DASHBOARD (Hub) *@
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="admin/dashboard">
                         <span class="bi bi-speedometer2 me-2" aria-hidden="true"></span> Dashboard
                     </NavLink>
                 </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="admin/entries">
-                        <span class="bi bi-people me-2" aria-hidden="true"></span> Entries
-                    </NavLink>
-                </div>
+
+                @* GAMES (Primary Data Management) *@
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="admin/games">
                         <span class="bi bi-calendar-event me-2" aria-hidden="true"></span> Games
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="admin/linker">
-                        <span class="bi bi-link-45deg me-2" aria-hidden="true"></span> Link Games
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="admin/debug-raw">
-                        <span class="bi bi-bug me-2" aria-hidden="true"></span> Debug API
-                    </NavLink>
-                </div>
-                 <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="admin/gameresults">
-                        <span class="bi bi-pencil-square me-2" aria-hidden="true"></span> Enter Results
-                    </NavLink>
-                </div>
-                 <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="admin/users">
-                        <span class="bi bi-person me-2" aria-hidden="true"></span> Users
                     </NavLink>
                 </div>
             </Authorized>
@@ -133,16 +105,8 @@
             var authState = await AuthStateProvider.GetAuthenticationStateAsync();
             if (authState.User.Identity?.IsAuthenticated ?? false)
             {
-                // Fetch ALL entries (global) - No poolId param
                 var myEntries = await Http.GetFromJsonAsync<List<BracketEntry>>("api/GetMyEntries");
-                if (myEntries == null || !myEntries.Any())
-                {
-                    MyPicksText = "Enter Your Picks";
-                }
-                else
-                {
-                    MyPicksText = "My Picks";
-                }
+                MyPicksText = (myEntries == null || !myEntries.Any()) ? "Enter Your Picks" : "My Picks";
             }
         }
         catch 
