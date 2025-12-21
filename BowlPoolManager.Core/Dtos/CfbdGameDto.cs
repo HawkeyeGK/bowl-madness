@@ -13,10 +13,14 @@ namespace BowlPoolManager.Core.Dtos
         [JsonPropertyName("completed")]
         public bool Completed { get; set; }
 
-        // --- FLAT PROPERTIES (Used by standard /games endpoint) ---
+        [JsonProperty("notes")]
+        [JsonPropertyName("notes")]
+        public string? Notes { get; set; }
+
+        // --- ROOT PROPERTIES (Used by standard /games) ---
         [JsonProperty("homeTeam")]
         [JsonPropertyName("homeTeam")]
-        public string? HomeTeamRoot { get; set; }
+        public object? HomeTeamRaw { get; set; }
 
         [JsonProperty("homePoints")]
         [JsonPropertyName("homePoints")]
@@ -24,40 +28,58 @@ namespace BowlPoolManager.Core.Dtos
 
         [JsonProperty("awayTeam")]
         [JsonPropertyName("awayTeam")]
-        public string? AwayTeamRoot { get; set; }
+        public object? AwayTeamRaw { get; set; }
 
         [JsonProperty("awayPoints")]
         [JsonPropertyName("awayPoints")]
         public int? AwayPointsRoot { get; set; }
 
-        // --- NESTED PROPERTIES (Used by /scoreboard endpoint) ---
-        // We use different internal names to avoid conflicts during deserialization
-        [JsonProperty("homeTeamObj")] 
-        [JsonPropertyName("homeTeam")] 
-        public CfbdScoreboardTeamDto? HomeTeamObj { get; set; }
-
-        [JsonProperty("awayTeamObj")]
-        [JsonPropertyName("awayTeam")]
-        public CfbdScoreboardTeamDto? AwayTeamObj { get; set; }
-
         // --- SMART WRAPPERS ---
-        // These ensure GameFunctions.cs logic doesn't have to change.
-        // It will look for the nested object data first, then fall back to the root property.
-        [JsonIgnore]
+        // These properties detect if the API returned a string or a nested object
+        [System.Text.Json.Serialization.JsonIgnore]
         [Newtonsoft.Json.JsonIgnore]
-        public string? HomeTeam => HomeTeamObj?.Name ?? HomeTeamRoot;
+        public string? HomeTeam => GetTeamName(HomeTeamRaw);
 
-        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         [Newtonsoft.Json.JsonIgnore]
-        public int? HomePoints => HomeTeamObj?.Points ?? HomePointsRoot;
+        public int? HomePoints => GetPoints(HomeTeamRaw) ?? HomePointsRoot;
 
-        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         [Newtonsoft.Json.JsonIgnore]
-        public string? AwayTeam => AwayTeamObj?.Name ?? AwayTeamRoot;
+        public string? AwayTeam => GetTeamName(AwayTeamRaw);
 
-        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         [Newtonsoft.Json.JsonIgnore]
-        public int? AwayPoints => AwayTeamObj?.Points ?? AwayPointsRoot;
+        public int? AwayPoints => GetPoints(AwayTeamRaw) ?? AwayPointsRoot;
+
+        // --- HELPER LOGIC FOR NESTED JSON ---
+        private string? GetTeamName(object? raw)
+        {
+            if (raw == null) return null;
+            if (raw is string s) return s;
+            
+            // Handle nested object from /scoreboard
+            var json = raw.ToString();
+            if (string.IsNullOrEmpty(json)) return null;
+            
+            try {
+                var nested = JsonConvert.DeserializeObject<CfbdScoreboardTeamDto>(json);
+                return nested?.Name;
+            } catch { return null; }
+        }
+
+        private int? GetPoints(object? raw)
+        {
+            if (raw == null || raw is string) return null;
+            
+            var json = raw.ToString();
+            if (string.IsNullOrEmpty(json)) return null;
+
+            try {
+                var nested = JsonConvert.DeserializeObject<CfbdScoreboardTeamDto>(json);
+                return nested?.Points;
+            } catch { return null; }
+        }
     }
 
     public class CfbdScoreboardTeamDto
