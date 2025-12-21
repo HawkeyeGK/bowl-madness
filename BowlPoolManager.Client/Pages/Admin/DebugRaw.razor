@@ -1,48 +1,99 @@
 @page "/admin/debug-raw"
-@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core.Dtos
+@using Newtonsoft.Json
 @inject HttpClient Http
 
-<h3>Debug Raw CFBD JSON</h3>
+<h3>Score Update Diagnostic Tool</h3>
 
-<div class="mb-3">
-    <button class="btn btn-outline-primary me-2" @onclick='() => LoadRaw("games")'>Fetch /games (2025)</button>
-    <button class="btn btn-outline-danger" @onclick='() => LoadRaw("scoreboard")'>Fetch /scoreboard (Live)</button>
+<div class="card mb-4">
+    <div class="card-body">
+        <button class="btn btn-primary" @onclick="RunDiagnostic" disabled="@IsLoading">
+            @(IsLoading ? "Running..." : "Run Matching Diagnostic")
+        </button>
+        <p class="mt-2 text-muted">This will compare local database games with the live Scoreboard API and report mismatches.</p>
+    </div>
 </div>
 
-@if (IsLoading)
+@if (Logs.Any())
 {
-    <p>Loading...</p>
-}
-else
-{
-    <div class="bg-light p-3 border rounded">
-        <pre style="max-height: 600px; overflow-y: auto; white-space: pre-wrap;">@RawJson</pre>
+    <div class="list-group">
+        @foreach (var log in Logs)
+        {
+            <div class="list-group-item @(log.IsError ? "list-group-item-danger" : (log.IsMatch ? "list-group-item-success" : ""))">
+                <strong>@log.Title</strong><br/>
+                <small>@log.Message</small>
+            </div>
+        }
     </div>
 }
 
 @code {
-    private string RawJson = "Click a button to fetch data.";
     private bool IsLoading = false;
+    private List<LogEntry> Logs = new();
 
-    private async Task LoadRaw(string source)
+    private async Task RunDiagnostic()
     {
         IsLoading = true;
-        RawJson = "Fetching...";
+        Logs.Clear();
         try
         {
-            var url = source == "scoreboard" 
-                ? "api/GetRawCfbdGames?source=scoreboard" 
-                : "api/GetRawCfbdGames";
+            // 1. Fetch Local Games
+            Logs.Add(new LogEntry("System", "Fetching local games from Cosmos DB..."));
+            var localGames = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
+            
+            // 2. Fetch API Games
+            Logs.Add(new LogEntry("System", "Fetching live scoreboard data..."));
+            var apiJson = await Http.GetStringAsync("api/GetRawCfbdGames?source=scoreboard");
+            var apiGames = JsonConvert.DeserializeObject<List<CfbdGameDto>>(apiJson);
+
+            if (localGames == null || apiGames == null)
+            {
+                Logs.Add(new LogEntry("Error", "Failed to retrieve one or both datasets.", true));
+                return;
+            }
+
+            // 3. Simulate PerformScoreUpdate logic
+            foreach (var local in localGames.Where(g => !string.IsNullOrEmpty(g.ExternalId)))
+            {
+                var apiMatch = apiGames.FirstOrDefault(x => x.Id.ToString() == local.ExternalId);
                 
-            RawJson = await Http.GetStringAsync(url);
+                if (apiMatch == null)
+                {
+                    Logs.Add(new LogEntry(local.BowlName, $"❌ FAIL: ExternalId '{local.ExternalId}' not found in API results.", true));
+                    continue;
+                }
+
+                // Check Home Team
+                bool homeMatch = string.Equals(apiMatch.HomeTeam, local.ApiHomeTeam, StringComparison.OrdinalIgnoreCase);
+                string homeStatus = homeMatch ? "✅ MATCH" : $"❌ MISMATCH (API: '{apiMatch.HomeTeam}' vs DB: '{local.ApiHomeTeam}')";
+
+                // Check Away Team
+                bool awayMatch = string.Equals(apiMatch.AwayTeam, local.ApiAwayTeam, StringComparison.OrdinalIgnoreCase);
+                string awayStatus = awayMatch ? "✅ MATCH" : $"❌ MISMATCH (API: '{apiMatch.AwayTeam}' vs DB: '{local.ApiAwayTeam}')";
+
+                Logs.Add(new LogEntry(local.BowlName, $"ID Found. Home: {homeStatus} | Away: {awayStatus}") 
+                { 
+                    IsMatch = homeMatch && awayMatch 
+                });
+            }
         }
         catch (Exception ex)
         {
-            RawJson = $"Error: {ex.Message}";
+            Logs.Add(new LogEntry("Exception", ex.Message, true));
         }
         finally
         {
             IsLoading = false;
         }
+    }
+
+    public class LogEntry
+    {
+        public string Title { get; set; }
+        public string Message { get; set; }
+        public bool IsError { get; set; }
+        public bool IsMatch { get; set; }
+        public LogEntry(string t, string m, bool e = false) { Title = t; Message = m; IsError = e; }
     }
 }
