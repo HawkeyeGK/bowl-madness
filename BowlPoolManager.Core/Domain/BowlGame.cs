@@ -39,6 +39,11 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("gameStatus")]
         public GameStatus Status { get; set; } = GameStatus.Scheduled;
 
+        // NEW FIELD: Stores "3rd • 10:30", "Final", etc.
+        [JsonProperty("gameDetail")]
+        [JsonPropertyName("gameDetail")]
+        public string? GameDetail { get; set; }
+
         // TEAMS
         [JsonProperty("teamHome")]
         [JsonPropertyName("teamHome")]

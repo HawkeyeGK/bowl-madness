@@ -15,6 +15,20 @@ namespace BowlPoolManager.Core.Dtos
         [JsonPropertyName("completed")]
         public bool Completed { get; set; }
 
+        // --- NEW FIELDS FOR LIVE STATUS ---
+        [JsonProperty("status")]
+        [System.Text.Json.Serialization.JsonPropertyName("status")]
+        public string? StatusRaw { get; set; } // "scheduled", "in_progress", "final"
+
+        [JsonProperty("period")]
+        [System.Text.Json.Serialization.JsonPropertyName("period")]
+        public int? Period { get; set; }
+
+        [JsonProperty("clock")]
+        [System.Text.Json.Serialization.JsonPropertyName("clock")]
+        public string? Clock { get; set; } 
+        // ----------------------------------
+
         // --- ROOT RAW DATA ---
         [JsonProperty("homeTeam")]
         [JsonPropertyName("homeTeam")]
