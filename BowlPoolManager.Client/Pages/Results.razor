@@ -38,6 +38,7 @@
                                 <th>Date</th>
                                 <th>Bowl / Info</th>
                                 <th class="text-center">Result</th>
+                                <th class="text-center">Status</th> @* NEW COLUMN *@
                                 <th class="text-center">Pts</th>
                             </tr>
                         </thead>
@@ -67,32 +68,21 @@
                                 }
 
                                 <tr>
+                                    @* --- DATE --- *@
                                     <td style="width: 15%">
                                         @DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d")
                                         <div class="small text-muted">@DateTimeHelper.ToCentral(game.StartTime).ToString("h:mm tt") CT</div>
                                     </td>
 
+                                    @* --- BOWL INFO (Removed Status Tags) --- *@
                                     <td style="width: 30%">
                                         <strong>@game.BowlName</strong>
                                         
-                                        @* --- STATUS TAGS --- *@
                                         @if (game.IsPlayoff)
                                         {
                                             <span class="badge bg-warning text-dark ms-1">Playoff</span>
                                         }
 
-                                        @if (game.Status == GameStatus.Final)
-                                        {
-                                            <span class="badge bg-danger ms-1">Final</span>
-                                        }
-                                        else if (game.Status == GameStatus.InProgress)
-                                        {
-                                            <span class="badge bg-success ms-1">
-                                                <span class="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style="width: 6px; height: 6px;"></span>
-                                                @(string.IsNullOrEmpty(game.GameDetail) ? "In Progress" : game.GameDetail)
-                                            </span>
-                                        }
-                                        
                                         <div class="small text-muted mt-1">
                                             <i class="bi bi-geo-alt"></i> @game.Location
                                             <span class="mx-1">&bull;</span>
@@ -100,6 +90,7 @@
                                         </div>
                                     </td>
 
+                                    @* --- RESULT (SCORES) --- *@
                                     <td class="text-center">
                                         <div class="mx-auto" style="max-width: 260px;">
                                             <div class="@homeClass d-flex justify-content-between">
@@ -120,6 +111,22 @@
                                         </div>
                                     </td>
 
+                                    @* --- STATUS (NEW LOCATION) --- *@
+                                    <td class="text-center text-nowrap">
+                                        @if (game.Status == GameStatus.Final)
+                                        {
+                                            <span class="badge bg-danger">Final</span>
+                                        }
+                                        else if (game.Status == GameStatus.InProgress)
+                                        {
+                                            <span class="badge bg-success">
+                                                <span class="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style="width: 6px; height: 6px;"></span>
+                                                @(string.IsNullOrEmpty(game.GameDetail) ? "In Progress" : game.GameDetail)
+                                            </span>
+                                        }
+                                    </td>
+
+                                    @* --- PTS --- *@
                                     <td class="text-center fw-bold fs-5">
                                         @game.PointValue
                                     </td>
