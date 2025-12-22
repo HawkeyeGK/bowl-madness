@@ -1,0 +1,330 @@
+@page "/what-if"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@using BowlPoolManager.Core.Helpers
+@using BowlPoolManager.Client.Helpers
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
+@inject HttpClient Http
+
+<PageTitle>Scenario Matrix</PageTitle>
+
+<style>
+    /* Matrix Styles for Sticky Headers and Columns */
+    .matrix-container {
+        max-height: 85vh;
+        overflow: auto;
+        position: relative;
+        border: 1px solid #dee2e6;
+    }
+    .matrix-table {
+        border-collapse: separate; 
+        border-spacing: 0;
+        min-width: 100%;
+    }
+    .matrix-table th {
+        background-color: #f8f9fa;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-bottom: 2px solid #dee2e6;
+        vertical-align: top;
+        text-align: center;
+        padding: 0.5rem;
+        min-width: 160px; 
+    }
+    .matrix-table th.corner-header {
+        left: 0;
+        z-index: 20;
+        min-width: 220px;
+        background-color: #e9ecef;
+        vertical-align: middle;
+    }
+    .matrix-table td.sticky-col {
+        position: sticky;
+        left: 0;
+        background-color: #fff;
+        z-index: 5;
+        border-right: 2px solid #dee2e6;
+        font-weight: 500;
+        min-width: 220px;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+    }
+    .matrix-table tr:hover td { background-color: #f1f3f5; }
+    .matrix-table tr:hover td.sticky-col { background-color: #e9ecef; }
+
+    /* Sim Controls */
+    .sim-control {
+        cursor: pointer;
+        font-size: 0.75rem;
+        padding: 4px 8px;
+        border-radius: 4px;
+        border: 1px solid #ced4da;
+        margin: 2px;
+        display: block;
+        width: 100%;
+        transition: all 0.2s;
+        text-align: center;
+    }
+    .sim-control:hover { filter: brightness(0.95); }
+    .sim-control.active-win {
+        background-color: #198754; 
+        color: white;
+        border-color: #198754;
+    }
+    .sim-control.active-loss {
+        opacity: 0.4;
+        text-decoration: line-through;
+    }
+    
+    /* Colors */
+    .cell-win { background-color: #d1e7dd !important; color: #0f5132; }
+    .cell-loss { background-color: #f8d7da !important; color: #842029; }
+</style>
+
+<div class="container-fluid mt-3 px-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex align-items-center gap-3">
+            <h1 class="h3 fw-bold mb-0"><i class="bi bi-grid-3x3-gap-fill text-primary"></i> Scenario Matrix</h1>
+            <span class="badge bg-danger">Admin Preview</span>
+        </div>
+        <div>
+             @if (simulatedWinners.Any())
+             {
+                <button class="btn btn-outline-danger btn-sm" @onclick="ResetSimulation">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset Scenarios
+                </button>
+             }
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
+    }
+    else
+    {
+        <div class="matrix-container shadow-sm">
+            <table class="table mb-0 matrix-table table-bordered">
+                <thead>
+                    <tr>
+                        <th class="corner-header">
+                            <div class="d-flex justify-content-between text-muted small">
+                                <span>Player</span>
+                                <span>Proj. Score</span>
+                            </div>
+                        </th>
+                        @foreach (var game in games)
+                        {
+                            <th>
+                                <div class="small fw-bold mb-1" style="font-size: 0.7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="@game.BowlName">
+                                    @game.BowlName
+                                </div>
+                                <div class="badge bg-light text-secondary border mb-2">@game.PointValue pts</div>
+                                
+                                @if (game.Status == GameStatus.Final)
+                                {
+                                    @* FINAL: Static Badge *@
+                                    <div class="d-flex flex-column gap-1">
+                                        <span class="badge @(GetRealWinner(game) == game.TeamHome ? "bg-success" : "bg-secondary bg-opacity-25 text-dark")">
+                                            @game.TeamHome
+                                        </span>
+                                        <span class="badge @(GetRealWinner(game) == game.TeamAway ? "bg-success" : "bg-secondary bg-opacity-25 text-dark")">
+                                            @game.TeamAway
+                                        </span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    @* FUTURE: Controls *@
+                                    var options = GetSelectableTeams(game);
+                                    
+                                    @if(options.Count <= 2) 
+                                    {
+                                        @* Simple Toggle for Head-to-Head *@
+                                        <div class="d-flex flex-column gap-1">
+                                            @foreach(var team in options)
+                                            {
+                                                <div class="sim-control @GetSimClass(game.Id, team)" 
+                                                     @onclick="() => ToggleSimWinner(game.Id, team)">
+                                                    @team
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        @* Dropdown for Playoffs/Many Options *@
+                                        <select class="form-select form-select-sm" style="font-size: 0.75rem;" 
+                                                value="@(simulatedWinners.ContainsKey(game.Id) ? simulatedWinners[game.Id] : "")"
+                                                @onchange="@(e => SetSimWinner(game.Id, e.Value?.ToString()))">
+                                            <option value="">-- Select Winner --</option>
+                                            @foreach(var team in options)
+                                            {
+                                                <option value="@team">@team</option>
+                                            }
+                                        </select>
+                                    }
+                                }
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in projectedStandings)
+                    {
+                        <tr>
+                            <td class="sticky-col">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-truncate" style="max-width: 160px;" title="@row.Entry.PlayerName">
+                                        <span class="text-muted small me-1">@row.Rank.</span>
+                                        @row.Entry.PlayerName
+                                    </span>
+                                    <span class="badge bg-primary rounded-pill">@row.Score</span>
+                                </div>
+                            </td>
+
+                            @foreach (var game in games)
+                            {
+                                var pick = row.Entry.Picks != null && row.Entry.Picks.ContainsKey(game.Id) ? row.Entry.Picks[game.Id] : "";
+                                <td class="text-center @GetCellClass(game, pick)">
+                                    @if (!string.IsNullOrEmpty(pick))
+                                    {
+                                        <span style="font-size: 0.85rem;">@pick</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private List<BowlGame> games = new();
+    private List<BracketEntry> entries = new();
+    
+    // State
+    private Dictionary<string, string> simulatedWinners = new();
+    private List<LeaderboardRow> projectedStandings = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
+            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries");
+
+            await Task.WhenAll(gamesTask, entriesTask);
+
+            games = (await gamesTask ?? new()).OrderBy(g => g.StartTime).ToList();
+            entries = await entriesTask ?? new();
+            
+            Recalculate();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+        finally { isLoading = false; }
+    }
+
+    // --- LOGIC ---
+
+    private IEnumerable<string> GetSelectableTeams(BowlGame game)
+    {
+        // 1. If standard game with known teams, just return them
+        if (!string.Equals(game.TeamHome, "TBD", StringComparison.OrdinalIgnoreCase) && 
+            !string.IsNullOrEmpty(game.TeamHome) && !string.IsNullOrEmpty(game.TeamAway))
+        {
+            return new[] { game.TeamHome, game.TeamAway };
+        }
+
+        // 2. "All Picked Teams" Logic for Playoffs
+        // Find every unique pick made for this game ID
+        var pickedTeams = entries
+            .Where(e => e.Picks != null && e.Picks.ContainsKey(game.Id))
+            .Select(e => e.Picks[game.Id])
+            .Where(t => !string.IsNullOrEmpty(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(t => t)
+            .ToList();
+            
+        return pickedTeams;
+    }
+
+    private void ToggleSimWinner(string gameId, string team)
+    {
+        if (simulatedWinners.ContainsKey(gameId) && simulatedWinners[gameId] == team)
+            simulatedWinners.Remove(gameId);
+        else
+            simulatedWinners[gameId] = team;
+            
+        Recalculate();
+    }
+
+    private void SetSimWinner(string gameId, string? team)
+    {
+        if (string.IsNullOrEmpty(team))
+            simulatedWinners.Remove(gameId);
+        else
+            simulatedWinners[gameId] = team;
+            
+        Recalculate();
+    }
+
+    private void ResetSimulation()
+    {
+        simulatedWinners.Clear();
+        Recalculate();
+    }
+
+    private void Recalculate()
+    {
+        projectedStandings = WhatIfScoringEngine.Calculate(games, entries, simulatedWinners);
+    }
+
+    // --- STYLING HELPERS ---
+
+    private string GetSimClass(string gameId, string team)
+    {
+        if (!simulatedWinners.ContainsKey(gameId)) return "bg-white"; 
+        
+        if (simulatedWinners[gameId] == team) return "active-win"; 
+        return "active-loss"; 
+    }
+
+    private string GetRealWinner(BowlGame game)
+    {
+        if (game.Status != GameStatus.Final) return "";
+        int h = game.TeamHomeScore ?? 0;
+        int a = game.TeamAwayScore ?? 0;
+        if (h > a) return game.TeamHome;
+        if (a > h) return game.TeamAway;
+        return "";
+    }
+
+    private string GetCellClass(BowlGame game, string pick)
+    {
+        if (string.IsNullOrEmpty(pick)) return "";
+        string winner = "";
+        
+        if (game.Status == GameStatus.Final) winner = GetRealWinner(game);
+        else if (simulatedWinners.ContainsKey(game.Id)) winner = simulatedWinners[game.Id];
+
+        if (!string.IsNullOrEmpty(winner))
+        {
+            return string.Equals(pick, winner, StringComparison.OrdinalIgnoreCase) ? "cell-win" : "cell-loss";
+        }
+        return "";
+    }
+}
