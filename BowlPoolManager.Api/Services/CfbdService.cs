@@ -58,10 +58,13 @@ namespace BowlPoolManager.Api.Services
                         StatusRaw = (string?)g["status"],
                         Period = (int?)g["period"],
                         Clock = (string?)g["clock"],
-                        // Pass raw objects for the Smart Wrappers to handle
-                        HomeRaw = g["homeTeam"],
+                        // FIX: Convert JToken to Dictionary. 
+                        // System.Text.Json (used in GameFunctions) cannot serialize JTokens,
+                        // but it CAN serialize standard Dictionaries.
+                        HomeRaw = g["homeTeam"]?.ToObject<Dictionary<string, object>>(),
                         HomePointsRoot = (int?)g["homePoints"],
-                        AwayRaw = g["awayTeam"],
+                        
+                        AwayRaw = g["awayTeam"]?.ToObject<Dictionary<string, object>>(),
                         AwayPointsRoot = (int?)g["awayPoints"],
                         // Explicitly map Notes
                         Notes = (string?)g["notes"]
