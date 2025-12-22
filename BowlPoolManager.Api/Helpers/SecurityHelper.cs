@@ -1,7 +1,6 @@
 using Microsoft.Azure.Functions.Worker.Http;
 using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Core;
-using BowlPoolManager.Api.Services; // Required for ICosmosDbService
 using BowlPoolManager.Api.Repositories; // NEW
 using System.Text.Json;
 using System.Text;
@@ -34,48 +33,10 @@ namespace BowlPoolManager.Api.Helpers
             return JsonSerializer.Deserialize<ClientPrincipal>(decoded, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
 
-        /// <summary>
-        /// Determines if the current request is from a SuperAdmin by verifying against the Database.
-        /// </summary>
-        public static async Task<bool> IsSuperAdminAsync(HttpRequestData req, ICosmosDbService cosmosService)
-        {
-            var principal = ParseSwaHeader(req);
-            if (string.IsNullOrEmpty(principal?.UserId)) return false;
-
-            var userProfile = await cosmosService.GetUserAsync(principal.UserId);
-            return userProfile != null && userProfile.AppRole == Constants.Roles.SuperAdmin;
-        }
-
         public class AuthResult
         {
             public bool IsValid { get; set; }
             public HttpResponseData? ErrorResponse { get; set; }
-        }
-
-        public static async Task<AuthResult> ValidateSuperAdminAsync(HttpRequestData req, ICosmosDbService cosmosService)
-        {
-            var principal = ParseSwaHeader(req);
-            if (principal == null || string.IsNullOrEmpty(principal.UserId))
-            {
-                return new AuthResult 
-                { 
-                    IsValid = false, 
-                    ErrorResponse = req.CreateResponse(System.Net.HttpStatusCode.Unauthorized) 
-                };
-            }
-
-            // DB LOOKUP (The Source of Truth)
-            var userProfile = await cosmosService.GetUserAsync(principal.UserId);
-            if (userProfile == null || userProfile.AppRole != Constants.Roles.SuperAdmin)
-            {
-                return new AuthResult 
-                { 
-                    IsValid = false, 
-                    ErrorResponse = req.CreateResponse(System.Net.HttpStatusCode.Forbidden) 
-                };
-            }
-
-            return new AuthResult { IsValid = true };
         }
 
         public static async Task<AuthResult> ValidateSuperAdminAsync(HttpRequestData req, IUserRepository userRepo)
