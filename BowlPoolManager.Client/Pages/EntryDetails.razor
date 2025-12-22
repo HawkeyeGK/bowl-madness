@@ -88,16 +88,13 @@
                         string rowClass = "";
                         string pickStatusIcon = "";
 
-                        if (game.Status == GameStatus.Final)
+                        // Logic Consolidation: Use Domain Model properties
+                        if (game.IsFinal)
                         {
                             if (hasPick)
                             {
-                                 // SAFE ACCESS: Nullable Scores
-                                 var homeScore = game.TeamHomeScore ?? 0;
-                                 var awayScore = game.TeamAwayScore ?? 0;
-                                 var winner = homeScore > awayScore ? game.TeamHome : game.TeamAway;
-                                 
-                                 bool isCorrect = string.Equals(pick, winner, StringComparison.OrdinalIgnoreCase);
+                                // Clean Domain Check
+                                bool isCorrect = string.Equals(pick, game.WinningTeamName, StringComparison.OrdinalIgnoreCase);
 
                                 if (isCorrect) 
                                 {
@@ -116,8 +113,8 @@
                             // SAFE ACCESS: eliminatedTeams is initialized in code block
                             if (hasPick && !string.IsNullOrEmpty(pick) && eliminatedTeams.Contains(pick))
                             {
-                                 rowClass = "table-danger";
-                                 pickStatusIcon = "<i class='bi bi-x-circle-fill text-danger' title='Team Eliminated'></i> <span class='badge bg-danger'>Eliminated</span>";
+                               rowClass = "table-danger";
+                               pickStatusIcon = "<i class='bi bi-x-circle-fill text-danger' title='Team Eliminated'></i> <span class='badge bg-danger'>Eliminated</span>";
                             }
                         }
 
@@ -184,13 +181,13 @@
             games = await gamesTask ?? new();
             var allEntries = await entriesTask ?? new();
 
-            // Safe Score Logic
-            foreach (var g in games.Where(x => x.Status == GameStatus.Final))
+            // Logic Consolidation: Use Domain Model properties
+            foreach (var g in games.Where(x => x.IsFinal))
             {
-                var h = g.TeamHomeScore ?? 0;
-                var a = g.TeamAwayScore ?? 0;
-                if (h < a) eliminatedTeams.Add(g.TeamHome);
-                else if (a < h) eliminatedTeams.Add(g.TeamAway);
+                if (!string.IsNullOrEmpty(g.LosingTeamName))
+                {
+                    eliminatedTeams.Add(g.LosingTeamName);
+                }
             }
 
             entry = allEntries.FirstOrDefault(e => e.Id == EntryId);

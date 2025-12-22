@@ -96,6 +96,41 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("television")]
         public string? Television { get; set; }
 
+        // --- COMPUTED HELPERS (Logic Consolidation) ---
+        [JsonIgnore]
+        public bool IsFinal => Status == GameStatus.Final;
+
+        [JsonIgnore]
+        public string? WinningTeamName 
+        {
+            get 
+            {
+                if (Status != GameStatus.Final) return null;
+                // Treat null score as 0 for comparison
+                int home = TeamHomeScore ?? 0;
+                int away = TeamAwayScore ?? 0;
+                
+                if (home > away) return TeamHome;
+                if (away > home) return TeamAway;
+                return null; // Tie or error
+            }
+        }
+
+        [JsonIgnore]
+        public string? LosingTeamName 
+        {
+            get 
+            {
+                if (Status != GameStatus.Final) return null;
+                int home = TeamHomeScore ?? 0;
+                int away = TeamAwayScore ?? 0;
+
+                if (home < away) return TeamHome;
+                if (away < home) return TeamAway;
+                return null;
+            }
+        }
+
         [JsonProperty("type")]
         [JsonPropertyName("type")]
         public string Type { get; set; } = "BowlGame";
