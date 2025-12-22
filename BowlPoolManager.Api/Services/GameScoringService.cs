@@ -1,13 +1,14 @@
 using Microsoft.Extensions.Logging;
 using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Core.Dtos;
+using BowlPoolManager.Api.Repositories; // NEW
 
 namespace BowlPoolManager.Api.Services
 {
     public class GameScoringService : IGameScoringService
     {
         private readonly ILogger<GameScoringService> _logger;
-        private readonly ICosmosDbService _cosmosService;
+        private readonly IGameRepository _gameRepo; // Changed from ICosmosDbService
         private readonly ICfbdService _cfbdService;
 
         // Throttling State
@@ -15,25 +16,21 @@ namespace BowlPoolManager.Api.Services
         private static readonly SemaphoreSlim _refreshLock = new SemaphoreSlim(1, 1);
         private const int RefreshIntervalMinutes = 2;
 
-        public GameScoringService(ILogger<GameScoringService> logger, ICosmosDbService cosmosService, ICfbdService cfbdService)
+        // Update Constructor Injection
+        public GameScoringService(ILogger<GameScoringService> logger, IGameRepository gameRepo, ICfbdService cfbdService)
         {
             _logger = logger;
-            _cosmosService = cosmosService;
+            _gameRepo = gameRepo;
             _cfbdService = cfbdService;
         }
 
         public async Task CheckAndRefreshScoresAsync(List<BowlGame> games)
         {
-            // Quick check before waiting on lock
-            if (DateTime.UtcNow <= _lastRefresh.AddMinutes(RefreshIntervalMinutes))
-            {
-                return;
-            }
+            if (DateTime.UtcNow <= _lastRefresh.AddMinutes(RefreshIntervalMinutes)) return;
 
             await _refreshLock.WaitAsync();
             try
             {
-                // Double-check inside lock
                 if (DateTime.UtcNow > _lastRefresh.AddMinutes(RefreshIntervalMinutes))
                 {
                     _logger.LogInformation("Lazy Loading: Refreshing scores from CFBD Scoreboard...");
@@ -70,7 +67,7 @@ namespace BowlPoolManager.Api.Services
 
                 bool gameChanged = false;
 
-                // 1. MATCH HOME SCORE (Swap-Aware)
+                // 1. MATCH HOME SCORE
                 int? homeScore = null;
                 if (!string.IsNullOrEmpty(localGame.ApiHomeTeam))
                 {
@@ -86,7 +83,7 @@ namespace BowlPoolManager.Api.Services
                     gameChanged = true;
                 }
 
-                // 2. MATCH AWAY SCORE (Swap-Aware)
+                // 2. MATCH AWAY SCORE
                 int? awayScore = null;
                 if (!string.IsNullOrEmpty(localGame.ApiAwayTeam))
                 {
@@ -106,7 +103,6 @@ namespace BowlPoolManager.Api.Services
                 var oldStatus = localGame.Status;
                 var oldDetail = localGame.GameDetail;
 
-                // CFBD Status: "scheduled", "in_progress", "final"
                 if (apiGame.Completed || apiGame.StatusRaw == "final")
                 {
                     localGame.Status = GameStatus.Final;
@@ -116,7 +112,6 @@ namespace BowlPoolManager.Api.Services
                 {
                     localGame.Status = GameStatus.InProgress;
 
-                    // Format Time: "3rd • 10:45"
                     if (apiGame.Period.HasValue)
                     {
                         string p = apiGame.Period switch { 1 => "1st", 2 => "2nd", 3 => "3rd", 4 => "4th", _ => "OT" };
@@ -133,7 +128,8 @@ namespace BowlPoolManager.Api.Services
 
                 if (gameChanged)
                 {
-                    await _cosmosService.UpdateGameAsync(localGame);
+                    // Call the Repository instead of the generic service
+                    await _gameRepo.UpdateGameAsync(localGame);
                     anyChanged = true;
                 }
             }

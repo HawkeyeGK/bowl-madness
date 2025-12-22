@@ -2,6 +2,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Core;
 using BowlPoolManager.Api.Services; // Required for ICosmosDbService
+using BowlPoolManager.Api.Repositories; // NEW
 using System.Text.Json;
 using System.Text;
 
@@ -65,6 +66,32 @@ namespace BowlPoolManager.Api.Helpers
 
             // DB LOOKUP (The Source of Truth)
             var userProfile = await cosmosService.GetUserAsync(principal.UserId);
+            if (userProfile == null || userProfile.AppRole != Constants.Roles.SuperAdmin)
+            {
+                return new AuthResult 
+                { 
+                    IsValid = false, 
+                    ErrorResponse = req.CreateResponse(System.Net.HttpStatusCode.Forbidden) 
+                };
+            }
+
+            return new AuthResult { IsValid = true };
+        }
+
+        public static async Task<AuthResult> ValidateSuperAdminAsync(HttpRequestData req, IUserRepository userRepo)
+        {
+            var principal = ParseSwaHeader(req);
+            if (principal == null || string.IsNullOrEmpty(principal.UserId))
+            {
+                return new AuthResult 
+                { 
+                    IsValid = false, 
+                    ErrorResponse = req.CreateResponse(System.Net.HttpStatusCode.Unauthorized) 
+                };
+            }
+
+            // DB LOOKUP using IUserRepository
+            var userProfile = await userRepo.GetUserAsync(principal.UserId);
             if (userProfile == null || userProfile.AppRole != Constants.Roles.SuperAdmin)
             {
                 return new AuthResult 

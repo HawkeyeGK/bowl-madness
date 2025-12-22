@@ -6,23 +6,30 @@ using BowlPoolManager.Api.Services;
 using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Api.Helpers;
 using System.Text.Json;
+using BowlPoolManager.Api.Repositories; // NEW
 
 namespace BowlPoolManager.Api.Functions
 {
     public class GameFunctions
     {
         private readonly ILogger _logger;
-        private readonly ICosmosDbService _cosmosService;
+        // REMOVED: private readonly ICosmosDbService _cosmosService;
+        // ADDED Repositories:
+        private readonly IGameRepository _gameRepo;
+        private readonly IUserRepository _userRepo;
+        
         private readonly ICfbdService _cfbdService;
         private readonly IGameScoringService _scoringService;
 
         public GameFunctions(ILoggerFactory loggerFactory, 
-                             ICosmosDbService cosmosService, 
+                             IGameRepository gameRepo, // Injected
+                             IUserRepository userRepo, // Injected
                              ICfbdService cfbdService,
                              IGameScoringService scoringService)
         {
             _logger = loggerFactory.CreateLogger<GameFunctions>();
-            _cosmosService = cosmosService;
+            _gameRepo = gameRepo;
+            _userRepo = userRepo;
             _cfbdService = cfbdService;
             _scoringService = scoringService;
         }
@@ -30,7 +37,8 @@ namespace BowlPoolManager.Api.Functions
         [Function("GetGames")]
         public async Task<HttpResponseData> GetGames([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
-            var games = await _cosmosService.GetGamesAsync();
+            // Use Repo
+            var games = await _gameRepo.GetGamesAsync();
 
             // Delegate logic to the service
             await _scoringService.CheckAndRefreshScoresAsync(games);
@@ -44,7 +52,8 @@ namespace BowlPoolManager.Api.Functions
         [Function("GetExternalGames")]
         public async Task<HttpResponseData> GetExternalGames([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
-            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
+            // Use UserRepo overload
+            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
             if (!authResult.IsValid) return authResult.ErrorResponse!;
 
             var games = await _cfbdService.GetPostseasonGamesAsync(2025);
@@ -56,7 +65,8 @@ namespace BowlPoolManager.Api.Functions
         [Function("GetRawCfbdGames")]
         public async Task<HttpResponseData> GetRawCfbdGames([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
-            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
+            // Use UserRepo overload
+            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
             if (!authResult.IsValid) return authResult.ErrorResponse!;
 
             var source = req.Query["source"];
@@ -80,11 +90,12 @@ namespace BowlPoolManager.Api.Functions
         [Function("SaveGame")]
         public async Task<HttpResponseData> SaveGame([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
         {
-             var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
+             // Use UserRepo overload
+             var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
              if (!authResult.IsValid) return authResult.ErrorResponse!;
 
              var game = await JsonSerializer.DeserializeAsync<BowlGame>(req.Body);
-             if (game != null) await _cosmosService.UpdateGameAsync(game);
+             if (game != null) await _gameRepo.UpdateGameAsync(game); // Use Repo
              
              return req.CreateResponse(HttpStatusCode.OK);
         }
