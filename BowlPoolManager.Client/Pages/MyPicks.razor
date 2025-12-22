@@ -33,7 +33,7 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2 class="h4 text-secondary mb-0">My Brackets</h2>
                 <button class="btn btn-primary" @onclick="CreateAdditionalEntry">
-                    <i class="bi bi-plus-lg"></i> New Entry
+                     <i class="bi bi-plus-lg"></i> New Entry
                 </button>
             </div>
 
@@ -41,7 +41,8 @@
             {
                 <div class="alert alert-info text-center py-4">
                     <i class="bi bi-info-circle display-4 d-block mb-3"></i>
-                    You haven't entered any pools yet. Click <strong>New Entry</strong> to get started!
+                    You haven't entered any pools yet.
+                    Click <strong>New Entry</strong> to get started!
                 </div>
             }
             else
@@ -52,47 +53,46 @@
                     {
                         var stats = GetEntryStats(entry);
                         var poolName = pools.FirstOrDefault(p => p.Id == entry.PoolId)?.Name ?? "Unknown Pool";
-                        
                         <div class="col-md-6 col-lg-4">
                             <div class="card h-100 shadow-sm border-0">
                                 <div class="card-header bg-white border-bottom-0 pb-0">
-                                    <span class="badge bg-light text-secondary border">@poolName</span>
+                                     <span class="badge bg-light text-secondary border">@poolName</span>
                                 </div>
                                 <div class="card-body pt-2">
-                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                     <div class="d-flex justify-content-between align-items-start mb-3">
                                         <h4 class="card-title fw-bold text-primary mb-0 text-truncate" title="@entry.PlayerName">
                                             @entry.PlayerName
                                         </h4>
                                     </div>
 
-                                    <div class="row text-center mb-3 g-0 border rounded bg-light py-2">
+                                     <div class="row text-center mb-3 g-0 border rounded bg-light py-2">
                                         <div class="col border-end">
-                                            <small class="text-muted d-block">Points</small>
+                                             <small class="text-muted d-block">Points</small>
                                             <span class="fw-bold fs-5">@stats.Score</span>
                                         </div>
                                         <div class="col border-end">
                                             <small class="text-muted d-block">Max</small>
-                                            <span class="fw-bold fs-5">@stats.MaxPossible</span>
+                                             <span class="fw-bold fs-5">@stats.MaxPossible</span>
                                         </div>
-                                        <div class="col">
+                                         <div class="col">
                                             <small class="text-muted d-block">Correct</small>
-                                            <span class="fw-bold fs-5">@stats.CorrectPicks</span>
+                                             <span class="fw-bold fs-5">@stats.CorrectPicks</span>
                                         </div>
                                     </div>
 
-                                    <div class="d-flex gap-2">
+                                     <div class="d-flex gap-2">
                                         <button class="btn btn-outline-primary flex-grow-1" @onclick="() => EditEntry(entry)">
-                                            <i class="bi bi-pencil-square"></i> View/Edit
+                                             <i class="bi bi-pencil-square"></i> View/Edit
                                         </button>
                                         
                                         @* PRINT BUTTON *@
                                         <a href="print-bracket/@entry.Id" target="_blank" class="btn btn-outline-secondary" title="Print Bracket">
-                                            <i class="bi bi-printer"></i>
+                                             <i class="bi bi-printer"></i>
                                         </a>
 
-                                        <button class="btn btn-outline-danger" @onclick="() => DeleteEntry(entry)" title="Delete Bracket">
+                                         <button class="btn btn-outline-danger" @onclick="() => DeleteEntry(entry)" title="Delete Bracket">
                                             <i class="bi bi-trash-fill"></i>
-                                        </button>
+                                         </button>
                                     </div>
                                   </div>
                             </div>
@@ -107,11 +107,11 @@
              <div class="card shadow-sm mw-100 mx-auto mt-5" style="max-width: 500px;">
                 <div class="card-body p-5 text-center">
                     <button class="btn btn-sm btn-close position-absolute top-0 end-0 m-3" @onclick="BackToDashboard"></button>
-                    
+                     
                     <i class="bi bi-ticket-perforated display-1 text-secondary mb-3"></i>
                     <h3 class="mb-3">Enter Pool</h3>
                     <p class="text-muted mb-4">Enter your invite code to join a pool.</p>
-                    
+                   
                     <EditForm Model="@joinModel" OnValidSubmit="StartNewEntry">
                         <div class="mb-3">
                             <InputText @bind-Value="joinModel.InviteCode" class="form-control form-control-lg text-center" placeholder="e.g. BOWL2025" />
@@ -127,11 +127,11 @@
             var entryPool = pools.FirstOrDefault(p => p.Id == activeEntry.PoolId);
             bool isLocked = entryPool != null && DateTime.UtcNow > entryPool.LockDate;
             
-            <div class="d-flex justify-content-between align-items-center mb-4">
+             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div class="d-flex align-items-center">
                     <button class="btn btn-outline-secondary me-3" @onclick="BackToDashboard">
                          <i class="bi bi-arrow-left"></i> Back
-                    </button>
+                     </button>
                     <div>
                         <h2 class="fw-bold mb-0">
                             @(string.IsNullOrEmpty(activeEntry.Id) ? "New Entry" : "Edit Entry")
@@ -144,20 +144,19 @@
                         @if (isLocked)
                         {
                              <span class="badge bg-warning text-dark"><i class="bi bi-lock-fill"></i> Locked</span>
-                         }
+                          }
                         else if (entryPool != null)
                         {
-                             <span class="text-muted small">Deadline: @entryPool.LockDate.ToLocalTime().ToString("g")</span>
+                            <span class="text-muted small">Deadline: @entryPool.LockDate.ToLocalTime().ToString("g")</span>
                          }
                     </div>
                 </div>
                 
-                @* PRINT BUTTON (New) *@
                 @if(!string.IsNullOrEmpty(activeEntry.Id)) 
                 {
                     <a href="print-bracket/@activeEntry.Id" target="_blank" class="btn btn-outline-secondary">
                         <i class="bi bi-printer me-2"></i> Print Picks
-                    </a>
+                     </a>
                 }
             </div>
 
@@ -169,13 +168,13 @@
                     <div class="alert alert-danger">
                         <i class="bi bi-exclamation-triangle-fill"></i> @errorMessage
                     </div>
-                }
+                 }
 
                 @* PLAYER NAME *@
                 <div class="card mb-4 shadow-sm">
                     <div class="card-body">
                         <label class="form-label fw-bold">Bracket Name</label>
-                        <InputText @bind-Value="activeEntry.PlayerName" class="form-control" disabled="@isLocked" placeholder="Give this bracket a unique name" />
+                         <InputText @bind-Value="activeEntry.PlayerName" class="form-control" disabled="@isLocked" placeholder="Give this bracket a unique name" />
                         <ValidationMessage For="@(() => activeEntry.PlayerName)" />
                     </div>
                 </div>
@@ -185,89 +184,92 @@
                     <div class="card-header bg-dark text-white fw-bold">
                         Make Your Picks (@activeEntry.Picks.Count / @games.Count Selected)
                     </div>
-                    <ul class="list-group list-group-flush">
+                     <ul class="list-group list-group-flush">
                         @foreach (var game in games.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
                         {
-                            string pick = activeEntry.Picks.ContainsKey(game.Id) ? activeEntry.Picks[game.Id] : "";
+                             // SAFE ACCESS: Check ContainsKey before accessing indexer, OR use TryGetValue in helper
+                             string pick = "";
+                             if (activeEntry.Picks.ContainsKey(game.Id)) pick = activeEntry.Picks[game.Id];
+                             
                             bool isSelected = !string.IsNullOrEmpty(pick);
                             var slots = GetMatchupSlots(game);
                             bool isGameReady = slots.Home != "TBD" && slots.Away != "TBD";
                             bool isDisabled = isLocked || !isGameReady;
-                            <li class="list-group-item p-3 @(isSelected ? "bg-light-success" : "")">
+                            
+                             <li class="list-group-item p-3 @(isSelected ? "bg-light-success" : "")">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
                                      <div>
-                                        <span class="badge bg-secondary">@game.BowlName</span>
+                                         <span class="badge bg-secondary">@game.BowlName</span>
                                         @if (game.IsPlayoff)
                                          {
                                             <span class="badge bg-warning text-dark ms-1">Playoff</span>
                                         }
-                                    </div>
+                                     </div>
                                     <div class="text-end">
-                                        <div class="small fw-bold text-dark">
+                                         <div class="small fw-bold text-dark">
                                             @DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d, h:mm tt") CT
                                          </div>
-                                        <div class="small text-muted" style="font-size: 0.85em;">
+                                          <div class="small text-muted" style="font-size: 0.85em;">
                                             @game.Location 
-                                        </div>
+                                         </div>
                                     </div>
                                </div>
-                                
+                                 
                                 <div class="row g-2">
                                     <div class="col">
-                                        <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_home")" 
+                                         <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_home")" 
                                                checked="@(pick == slots.Home && slots.Home != "TBD")" 
                                                disabled="@isDisabled"
                                                @onchange="@(() => UpdatePick(game.Id, slots.Home))" autocomplete="off">
-                                        
+                                         
                                          <label class="btn @(isDisabled ? "btn-outline-secondary" : "btn-outline-primary") w-100 d-flex align-items-center justify-content-center h-100 @(pick == slots.Home && slots.Home != "TBD" ? "active fw-bold" : "")" 
                                                for="@($"{game.Id}_home")">
-                                             @slots.Home
+                                              @slots.Home
                                         </label>
                                     </div>
 
-                                     <div class="col">
+                                      <div class="col">
                                         <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_away")" 
-                                                checked="@(pick == slots.Away && slots.Away != "TBD")" 
+                                                 checked="@(pick == slots.Away && slots.Away != "TBD")" 
                                                disabled="@isDisabled"
-                                                @onchange="@(() => UpdatePick(game.Id, slots.Away))" autocomplete="off">
+                                                 @onchange="@(() => UpdatePick(game.Id, slots.Away))" autocomplete="off">
                                         
-                                         <label class="btn @(isDisabled ? "btn-outline-secondary" : "btn-outline-primary") w-100 d-flex align-items-center justify-content-center h-100 @(pick == slots.Away && slots.Away != "TBD" ? "active fw-bold" : "")" 
+                                          <label class="btn @(isDisabled ? "btn-outline-secondary" : "btn-outline-primary") w-100 d-flex align-items-center justify-content-center h-100 @(pick == slots.Away && slots.Away != "TBD" ? "active fw-bold" : "")" 
                                                for="@($"{game.Id}_away")">
                                             @slots.Away
-                                        </label>
+                                         </label>
                                     </div>
-                                </div>
+                                 </div>
                             </li>
                          }
                     </ul>
                 </div>
 
-                @* TIEBREAKER *@
+                 @* TIEBREAKER *@
                 <div class="card mb-4 shadow-sm border-warning">
                      <div class="card-body bg-warning bg-opacity-10">
                         <label class="form-label fw-bold text-dark">Tiebreaker: Total Points in ReliaQuest Bowl - Iowa vs. Vanderbilt</label>
-                        <InputNumber @bind-Value="activeEntry.TieBreakerPoints" class="form-control" disabled="@isLocked" />
+                         <InputNumber @bind-Value="activeEntry.TieBreakerPoints" class="form-control" disabled="@isLocked" />
                     </div>
                 </div>
 
                 @* ACTIONS *@
                 @if (!isLocked)
-                {
+                 {
                     <div class="d-grid gap-2 mb-5">
-                        @* NOTE: Button is now always enabled (unless saving) to allow validation feedback *@
                         <button type="submit" class="btn btn-success btn-lg" disabled="@isSaving">
-                            @if (isSaving)
+                             @if (isSaving)
                             {
                                 <span class="spinner-border spinner-border-sm me-2"></span> <span>Saving...</span>
                              }
                             else
                             {
-                                 <i class="bi bi-save-fill"></i> <span>Save Bracket</span>
+                                  <i class="bi bi-save-fill"></i> <span>Save Bracket</span>
                             }
                         </button>
                     </div>
                 }
-            </EditForm>
+             </EditForm>
         }
     }
     
@@ -278,7 +280,7 @@
                 <div class="toast-body fs-6">
                     <i class="@(isSuccessToast ? "bi bi-check-circle-fill" : "bi bi-exclamation-triangle-fill") me-2"></i> @toastMessage
                 </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" @onclick="() => showToast = false"></button>
+                 <button type="button" class="btn-close btn-close-white me-2 m-auto" @onclick="() => showToast = false"></button>
             </div>
         </div>
     </div>
@@ -292,10 +294,10 @@
     private JoinModel joinModel = new();
     
     private bool isLoading = true;
+    
     private bool isSaving = false;
     private string errorMessage = "";
     
-    // Toast State
     private bool showToast = false;
     private bool isSuccessToast = true;
     private string toastMessage = "";
@@ -305,8 +307,6 @@
     
     private List<BracketEntry> myEntries = new();
     private BracketEntry activeEntry = new();
-
-    private bool IsComplete => activeEntry.Picks.Count == games.Count;
 
     protected override async Task OnInitializedAsync()
     {
@@ -318,12 +318,14 @@
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
             // 2. Fetch My Entries (ALL)
             var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetMyEntries");
-            
             await Task.WhenAll(poolsTask, gamesTask, entriesTask);
             
             pools = await poolsTask ?? new();
             games = await gamesTask ?? new();
             myEntries = await entriesTask ?? new();
+            
+            // Ensure Active Entry has instantiated Picks
+            if (activeEntry.Picks == null) activeEntry.Picks = new Dictionary<string, string>();
         }
         catch (Exception ex)
         {
@@ -334,8 +336,6 @@
             isLoading = false;
         }
     }
-
-    // --- DASHBOARD ACTIONS ---
 
     private void CreateAdditionalEntry()
     {
@@ -352,18 +352,20 @@
             return;
         }
 
-        // We don't know the pool yet - the backend will derive it from the code on save.
-        // We just start an empty entry.
         activeEntry = new BracketEntry(); 
-        activeEntry.Id = ""; // FIX: Clear default ID so backend knows it's a CREATE operation
+        activeEntry.Picks = new Dictionary<string, string>(); // Safe Init
+        activeEntry.Id = "";
         viewMode = ViewMode.Editor;
     }
 
     private void EditEntry(BracketEntry entry)
     {
+        // Safe deep copy serialization
         activeEntry = System.Text.Json.JsonSerializer.Deserialize<BracketEntry>(
             System.Text.Json.JsonSerializer.Serialize(entry)
         ) ?? new BracketEntry();
+
+        if (activeEntry.Picks == null) activeEntry.Picks = new Dictionary<string, string>();
 
         errorMessage = "";
         viewMode = ViewMode.Editor;
@@ -375,10 +377,9 @@
         errorMessage = "";
     }
 
-    // --- EDITOR ACTIONS ---
-
     private void UpdatePick(string gameId, string winner)
     {
+        if (activeEntry.Picks == null) activeEntry.Picks = new Dictionary<string, string>();
         activeEntry.Picks[gameId] = winner;
         StateHasChanged();
     }
@@ -427,7 +428,6 @@
         var missingGames = games.Where(g => !activeEntry.Picks.ContainsKey(g.Id) || string.IsNullOrEmpty(activeEntry.Picks[g.Id]))
                                 .OrderBy(g => g.StartTime)
                                 .ToList();
-
         if (missingGames.Any())
         {
             string gameList = string.Join(", ", missingGames.Select(g => g.BowlName));
@@ -435,7 +435,6 @@
             return;
         }
 
-        // --- PROCEED TO SAVE ---
         isSaving = true;
         errorMessage = "";
 
@@ -444,7 +443,6 @@
             string url = "api/SaveMyEntry";
             if (!string.IsNullOrEmpty(joinModel.InviteCode) && string.IsNullOrEmpty(activeEntry.PoolId))
             {
-                // SAFETY: Double check ID is empty
                 activeEntry.Id = "";
                 url += $"?inviteCode={joinModel.InviteCode}";
             }
@@ -455,7 +453,6 @@
                 var savedEntry = await response.Content.ReadFromJsonAsync<BracketEntry>();
                 if (savedEntry != null)
                 {
-                    // Update Local List
                     var existingIndex = myEntries.FindIndex(e => e.Id == savedEntry.Id);
                     if (existingIndex >= 0)
                     {
@@ -467,9 +464,8 @@
                     }
                     
                     TriggerToast("Bracket saved successfully!", true);
-                    viewMode = ViewMode.Dashboard; // Return to dashboard on success
+                    viewMode = ViewMode.Dashboard;
                     
-                    // Update App State
                     AppState.NotifyDataChanged();
                 }
             }
@@ -494,8 +490,6 @@
             isSaving = false;
         }
     }
-
-    // --- HELPERS ---
 
     private LeaderboardRow GetEntryStats(BracketEntry entry)
     {

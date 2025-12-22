@@ -6,16 +6,14 @@ using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Core;
 using System.Text.Json;
 using BowlPoolManager.Api.Helpers;
-using BowlPoolManager.Api.Repositories; // NEW
-using BowlPoolManager.Core.Helpers; // For ScoringEngine if used
+using BowlPoolManager.Api.Repositories;
+using BowlPoolManager.Core.Helpers;
 
 namespace BowlPoolManager.Api.Functions
 {
     public class EntryFunctions
     {
         private readonly ILogger _logger;
-        
-        // REPLACED: private readonly ICosmosDbService _cosmosService;
         private readonly IEntryRepository _entryRepo;
         private readonly IPoolRepository _poolRepo;
         private readonly IGameRepository _gameRepo;
@@ -40,7 +38,6 @@ namespace BowlPoolManager.Api.Functions
             _logger.LogInformation("Getting entries.");
             var poolId = req.Query["poolId"];
 
-            // Use Entry Repo
             var entries = await _entryRepo.GetEntriesAsync(poolId);
             
             var response = req.CreateResponse(HttpStatusCode.OK);
@@ -54,10 +51,9 @@ namespace BowlPoolManager.Api.Functions
             var principal = SecurityHelper.ParseSwaHeader(req);
             if (principal == null) return req.CreateResponse(HttpStatusCode.Unauthorized);
 
-            var poolId = req.Query["poolId"]; // Optional filter
+            var poolId = req.Query["poolId"] ?? ""; // SAFE COALESCE
 
-            // Use Entry Repo
-            var entries = await _entryRepo.GetEntriesForUserAsync(principal.UserId, poolId ?? "");
+            var entries = await _entryRepo.GetEntriesForUserAsync(principal.UserId, poolId);
             
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(entries);
@@ -70,7 +66,6 @@ namespace BowlPoolManager.Api.Functions
             var id = req.Query["id"];
             if (string.IsNullOrEmpty(id)) return req.CreateResponse(HttpStatusCode.BadRequest);
 
-            // Use Entry Repo
             var entry = await _entryRepo.GetEntryAsync(id);
             
             if (entry == null) return req.CreateResponse(HttpStatusCode.NotFound);
@@ -91,8 +86,6 @@ namespace BowlPoolManager.Api.Functions
             var entry = await JsonSerializer.DeserializeAsync<BracketEntry>(req.Body);
             if (entry == null) return req.CreateResponse(HttpStatusCode.BadRequest);
 
-            // 1. Validate Pool & Lock Date
-            // Use Pool Repo
             var pool = await _poolRepo.GetPoolAsync(entry.PoolId);
             if (pool == null)
             {
@@ -108,16 +101,11 @@ namespace BowlPoolManager.Api.Functions
                 return badReq;
             }
 
-            // 2. Validate Ownership (if updating existing)
             if (!string.IsNullOrEmpty(entry.Id))
             {
-                // Use Entry Repo
                 var existing = await _entryRepo.GetEntryAsync(entry.Id);
-                // If it exists, check ownership
                 if (existing != null && existing.UserId != principal.UserId)
                 {
-                    // Allow SuperAdmin override, otherwise block
-                    // Use User Repo for permission check
                     var user = await _userRepo.GetUserAsync(principal.UserId);
                     if (user == null || user.AppRole != Constants.Roles.SuperAdmin)
                     {
@@ -126,11 +114,8 @@ namespace BowlPoolManager.Api.Functions
                 }
             }
 
-            // 3. Set Owner & Metadata
             if (string.IsNullOrEmpty(entry.UserId)) entry.UserId = principal.UserId;
             
-            // 4. Check Name Uniqueness (in this pool)
-            // Use Entry Repo
             bool isTaken = await _entryRepo.IsBracketNameTakenAsync(entry.PoolId, entry.PlayerName, entry.Id);
             if (isTaken)
             {
@@ -139,8 +124,6 @@ namespace BowlPoolManager.Api.Functions
                 return conflict;
             }
 
-            // 5. Save
-            // Use Entry Repo
             await _entryRepo.AddEntryAsync(entry);
 
             var response = req.CreateResponse(HttpStatusCode.OK);
@@ -158,14 +141,11 @@ namespace BowlPoolManager.Api.Functions
             var id = query["id"];
             if (string.IsNullOrEmpty(id)) return req.CreateResponse(HttpStatusCode.BadRequest);
 
-            // Use Entry Repo
             var entry = await _entryRepo.GetEntryAsync(id);
             if (entry == null) return req.CreateResponse(HttpStatusCode.NotFound);
 
-            // Auth Check: Owner or SuperAdmin
             if (entry.UserId != principal.UserId)
             {
-                // Use User Repo
                 var user = await _userRepo.GetUserAsync(principal.UserId);
                 if (user == null || user.AppRole != Constants.Roles.SuperAdmin)
                 {
@@ -173,12 +153,9 @@ namespace BowlPoolManager.Api.Functions
                 }
             }
 
-            // Use Pool Repo to check Lock Date (Prevent deleting after lock?)
-            // Policy: Usually allow delete, or block? Assuming block if locked for fairness.
             var pool = await _poolRepo.GetPoolAsync(entry.PoolId);
             if (pool != null && DateTime.UtcNow > pool.LockDate)
             {
-                // Allow SuperAdmin to delete even after lock
                 var user = await _userRepo.GetUserAsync(principal.UserId);
                 if (user == null || user.AppRole != Constants.Roles.SuperAdmin)
                 {
@@ -188,7 +165,6 @@ namespace BowlPoolManager.Api.Functions
                 }
             }
 
-            // Use Entry Repo
             await _entryRepo.DeleteEntryAsync(id);
             return req.CreateResponse(HttpStatusCode.OK);
         }

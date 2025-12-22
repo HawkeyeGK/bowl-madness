@@ -26,24 +26,21 @@
     }
     else if (entry.Picks == null) 
     {
-        @* REDACTED STATE *@
         <div class="alert alert-info text-center py-5">
             <i class="bi bi-shield-lock display-1"></i>
             <h2 class="mt-3">Picks Hidden</h2>
-            @* FIXED TEXT *@
             <p>This bracket is hidden until the pool unlocks.</p>
         </div>
     }
     else
     {
-        @* NORMAL VIEW *@
         <div class="card shadow-sm mb-4">
             <div class="card-body bg-light">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h2 class="fw-bold mb-0">@entry.PlayerName</h2>
                     
                     <div class="d-flex gap-2">
-                        <AuthorizeView Roles="@Constants.Roles.SuperAdmin">
+                         <AuthorizeView Roles="@Constants.Roles.SuperAdmin">
                             <Authorized>
                                 <a href="/admin/entry/@entry.Id" class="btn btn-warning btn-sm shadow-sm">
                                     <i class="bi bi-pencil-square"></i> Edit Picks
@@ -55,11 +52,11 @@
 
                 <div class="row text-center border-top pt-3">
                     <div class="col-md-4">
-                        <span class="text-muted small d-block">Tiebreaker</span>
+                         <span class="text-muted small d-block">Tiebreaker</span>
                         <h4 class="fw-bold text-dark">@entry.TieBreakerPoints</h4>
                     </div>
                     <div class="col-md-4 border-start border-end">
-                        <span class="text-muted small d-block">Current Points</span>
+                         <span class="text-muted small d-block">Current Points</span>
                         <h2 class="text-primary fw-bold mb-0">@currentScore</h2>
                     </div>
                     <div class="col-md-4">
@@ -84,8 +81,8 @@
                 <tbody>
                     @foreach (var game in games.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
                     {
-                        // Safe Dictionary Access
                         string pick = "";
+                        // SAFE ACCESS: Check if Picks is null before TryGetValue
                         bool hasPick = entry.Picks != null && entry.Picks.TryGetValue(game.Id, out pick);
 
                         string rowClass = "";
@@ -95,8 +92,12 @@
                         {
                             if (hasPick)
                             {
-                                var winner = game.TeamHomeScore > game.TeamAwayScore ? game.TeamHome : game.TeamAway;
-                                bool isCorrect = string.Equals(pick, winner, StringComparison.OrdinalIgnoreCase);
+                                 // SAFE ACCESS: Nullable Scores
+                                 var homeScore = game.TeamHomeScore ?? 0;
+                                 var awayScore = game.TeamAwayScore ?? 0;
+                                 var winner = homeScore > awayScore ? game.TeamHome : game.TeamAway;
+                                 
+                                 bool isCorrect = string.Equals(pick, winner, StringComparison.OrdinalIgnoreCase);
 
                                 if (isCorrect) 
                                 {
@@ -112,6 +113,7 @@
                         }
                         else
                         {
+                            // SAFE ACCESS: eliminatedTeams is initialized in code block
                             if (hasPick && eliminatedTeams.Contains(pick))
                             {
                                  rowClass = "table-danger";
@@ -120,7 +122,6 @@
                         }
 
                         var (homeTeamName, awayTeamName) = GetDisplayTeams(game, entry);
-
                         <tr class="@rowClass">
                             <td>
                                 @DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d")
@@ -134,10 +135,10 @@
                                 }
                             </td>
                             <td>
-                                <div class="@(game.TeamHomeScore > game.TeamAwayScore ? "fw-bold" : "")">
+                                <div class="@((game.TeamHomeScore ?? 0) > (game.TeamAwayScore ?? 0) ? "fw-bold" : "")">
                                     @homeTeamName <span class="small text-muted">@(game.TeamHomeScore?.ToString() ?? "")</span>
                                 </div>
-                                <div class="@(game.TeamAwayScore > game.TeamHomeScore ? "fw-bold" : "")">
+                                <div class="@((game.TeamAwayScore ?? 0) > (game.TeamHomeScore ?? 0) ? "fw-bold" : "")">
                                     @awayTeamName <span class="small text-muted">@(game.TeamAwayScore?.ToString() ?? "")</span>
                                 </div>
                             </td>
@@ -183,14 +184,16 @@
             games = await gamesTask ?? new();
             var allEntries = await entriesTask ?? new();
 
+            // Safe Score Logic
             foreach (var g in games.Where(x => x.Status == GameStatus.Final))
             {
-                if (g.TeamHomeScore < g.TeamAwayScore) eliminatedTeams.Add(g.TeamHome);
-                else if (g.TeamAwayScore < g.TeamHomeScore) eliminatedTeams.Add(g.TeamAway);
+                var h = g.TeamHomeScore ?? 0;
+                var a = g.TeamAwayScore ?? 0;
+                if (h < a) eliminatedTeams.Add(g.TeamHome);
+                else if (a < h) eliminatedTeams.Add(g.TeamAway);
             }
 
             entry = allEntries.FirstOrDefault(e => e.Id == EntryId);
-
             if (entry != null && entry.Picks != null)
             {
                 var stats = ScoringEngine.Calculate(games, new List<BracketEntry> { entry }).First();
