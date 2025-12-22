@@ -2,23 +2,26 @@ using System.Net;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using BowlPoolManager.Api.Services;
 using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Core;
 using System.Text.Json;
 using BowlPoolManager.Api.Helpers;
+using BowlPoolManager.Api.Repositories; // NEW
 
 namespace BowlPoolManager.Api.Functions
 {
     public class PoolFunctions
     {
         private readonly ILogger _logger;
-        private readonly ICosmosDbService _cosmosService;
+        // Replaced ICosmosDbService with specific repos
+        private readonly IPoolRepository _poolRepo;
+        private readonly IUserRepository _userRepo;
 
-        public PoolFunctions(ILoggerFactory loggerFactory, ICosmosDbService cosmosService)
+        public PoolFunctions(ILoggerFactory loggerFactory, IPoolRepository poolRepo, IUserRepository userRepo)
         {
             _logger = loggerFactory.CreateLogger<PoolFunctions>();
-            _cosmosService = cosmosService;
+            _poolRepo = poolRepo;
+            _userRepo = userRepo;
         }
 
         [Function("CreatePool")]
@@ -28,8 +31,8 @@ namespace BowlPoolManager.Api.Functions
 
             try
             {
-                // Security Check (SuperAdmin Only)
-                var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _cosmosService);
+                // Use SecurityHelper overload with IUserRepository
+                var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
                 if (!authResult.IsValid) return authResult.ErrorResponse!;
 
                 var pool = await JsonSerializer.DeserializeAsync<BowlPool>(req.Body);
@@ -50,7 +53,6 @@ namespace BowlPoolManager.Api.Functions
                     return badReq;
                 }
 
-                // If creating new, ensure lock date is future
                 if (string.IsNullOrEmpty(pool.Id) && pool.LockDate < DateTime.UtcNow)
                 {
                     var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
@@ -58,7 +60,8 @@ namespace BowlPoolManager.Api.Functions
                     return badReq;
                 }
 
-                await _cosmosService.AddPoolAsync(pool);
+                // Use Pool Repo
+                await _poolRepo.AddPoolAsync(pool);
 
                 var response = req.CreateResponse(HttpStatusCode.OK);
                 await response.WriteAsJsonAsync(pool);
@@ -75,11 +78,9 @@ namespace BowlPoolManager.Api.Functions
         public async Task<HttpResponseData> GetPools([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
             _logger.LogInformation("Getting all pools.");
-            var pools = await _cosmosService.GetPoolsAsync();
             
-            // NOTE: In a high-security environment, we might hide InviteCode here 
-            // and only show it to Admins. For now, we assume the InviteCode 
-            // is semi-public (shared via email).
+            // Use Pool Repo
+            var pools = await _poolRepo.GetPoolsAsync();
             
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(pools);
