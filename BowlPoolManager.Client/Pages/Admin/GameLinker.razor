@@ -88,7 +88,7 @@ else
                             @foreach (var ext in ExternalGames.OrderBy(x => x.HomeTeam))
                             {
                                 <option value="@ext.Id" selected="@(SelectedApiGame?.Id == ext.Id)">
-                                    @ext.HomeTeam vs @ext.AwayTeam (@ext.Notes)
+                                    @ext.HomeTeam vs @ext.AwayTeam @(!string.IsNullOrEmpty(ext.Notes) ? $"({ext.Notes})" : "")
                                 </option>
                             }
                         </select>

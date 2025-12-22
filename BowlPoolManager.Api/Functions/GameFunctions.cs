@@ -74,7 +74,10 @@ namespace BowlPoolManager.Api.Functions
             
             if (source == "scoreboard")
             {
-                json = await _cfbdService.GetRawScoreboardJsonAsync();
+                // Fix: Use the Typed service method to ensure our manual mapping (Notes, etc.) is applied,
+                // then re-serialize to send to client.
+                var games = await _cfbdService.GetScoreboardGamesAsync();
+                json = JsonSerializer.Serialize(games);
             }
             else
             {

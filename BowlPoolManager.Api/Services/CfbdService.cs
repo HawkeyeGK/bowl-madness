@@ -46,7 +46,30 @@ namespace BowlPoolManager.Api.Services
 
             try
             {
-                return JsonConvert.DeserializeObject<List<CfbdGameDto>>(json) ?? new List<CfbdGameDto>();
+                // Manual mapping to ensure Notes and other fields are correct
+                // because sometimes automatic deserialization misses fields or casing differs.
+                var token = Newtonsoft.Json.Linq.JToken.Parse(json);
+                if (token is Newtonsoft.Json.Linq.JArray arr)
+                {
+                    return arr.Select(g => new CfbdGameDto
+                    {
+                        Id = (int?)g["id"] ?? 0,
+                        Completed = (bool?)g["completed"] ?? false,
+                        StatusRaw = (string?)g["status"],
+                        Period = (int?)g["period"],
+                        Clock = (string?)g["clock"],
+                        // Pass raw objects for the Smart Wrappers to handle
+                        HomeRaw = g["homeTeam"],
+                        HomePointsRoot = (int?)g["homePoints"],
+                        AwayRaw = g["awayTeam"],
+                        AwayPointsRoot = (int?)g["awayPoints"],
+                        // Explicitly map Notes
+                        Notes = (string?)g["notes"]
+                    }).ToList();
+                }
+
+                // If not an array (e.g. error object or single object), try single or fail
+                return new List<CfbdGameDto>();
             }
             catch (Exception ex)
             {
