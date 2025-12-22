@@ -18,6 +18,8 @@ builder.Services
 // --- NEW: Register HTTP Client and External Service ---
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ICfbdService, CfbdService>();
+// NEW: Register GameScoringService as Singleton (holds the refresh timer state)
+builder.Services.AddSingleton<IGameScoringService, GameScoringService>();
 // -----------------------------------------------------
 
 // 1. Register Cosmos Service
