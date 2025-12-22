@@ -182,14 +182,17 @@
                 @* GAMES LIST *@
                 <div class="card shadow-sm mb-5">
                     <div class="card-header bg-dark text-white fw-bold">
-                        Make Your Picks (@activeEntry.Picks.Count / @games.Count Selected)
+                        Make Your Picks (@(activeEntry.Picks?.Count ?? 0) / @games.Count Selected)
                     </div>
                      <ul class="list-group list-group-flush">
                         @foreach (var game in games.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
                         {
-                             // SAFE ACCESS: Check ContainsKey before accessing indexer, OR use TryGetValue in helper
+                             // FIX: Safe dictionary access
                              string pick = "";
-                             if (activeEntry.Picks.ContainsKey(game.Id)) pick = activeEntry.Picks[game.Id];
+                             if (activeEntry.Picks?.TryGetValue(game.Id, out var p) == true)
+                             {
+                                 pick = p;
+                             }
                              
                             bool isSelected = !string.IsNullOrEmpty(pick);
                             var slots = GetMatchupSlots(game);
@@ -306,7 +309,7 @@
     private List<BowlGame> games = new();
     
     private List<BracketEntry> myEntries = new();
-    private BracketEntry activeEntry = new();
+    private BracketEntry activeEntry = new() { Picks = new Dictionary<string, string>() };
 
     protected override async Task OnInitializedAsync()
     {
@@ -424,6 +427,9 @@
 
     private async Task SavePicks()
     {
+        // FIX: Ensure Picks is not null before LINQ query
+        activeEntry.Picks ??= new Dictionary<string, string>();
+
         // --- VALIDATION: CHECK MISSING PICKS ---
         var missingGames = games.Where(g => !activeEntry.Picks.ContainsKey(g.Id) || string.IsNullOrEmpty(activeEntry.Picks[g.Id]))
                                 .OrderBy(g => g.StartTime)
@@ -524,7 +530,7 @@
              {
                  if (feederQueue.TryDequeue(out var f1))
                  {
-                     if (activeEntry.Picks.TryGetValue(f1.Id, out var w1)) home = w1;
+                     if (activeEntry.Picks != null && activeEntry.Picks.TryGetValue(f1.Id, out var w1)) home = w1;
                      else home = "TBD";
                  }
                  else home = "TBD";
@@ -534,7 +540,7 @@
              {
                  if (feederQueue.TryDequeue(out var f2))
                  {
-                     if (activeEntry.Picks.TryGetValue(f2.Id, out var w2)) away = w2;
+                     if (activeEntry.Picks != null && activeEntry.Picks.TryGetValue(f2.Id, out var w2)) away = w2;
                      else away = "TBD";
                  }
                  else away = "TBD";

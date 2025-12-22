@@ -81,7 +81,7 @@
                 <tbody>
                     @foreach (var game in games.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
                     {
-                        string pick = "";
+                        string? pick = null;
                         // SAFE ACCESS: Check if Picks is null before TryGetValue
                         bool hasPick = entry.Picks != null && entry.Picks.TryGetValue(game.Id, out pick);
 
@@ -114,7 +114,7 @@
                         else
                         {
                             // SAFE ACCESS: eliminatedTeams is initialized in code block
-                            if (hasPick && eliminatedTeams.Contains(pick))
+                            if (hasPick && !string.IsNullOrEmpty(pick) && eliminatedTeams.Contains(pick))
                             {
                                  rowClass = "table-danger";
                                  pickStatusIcon = "<i class='bi bi-x-circle-fill text-danger' title='Team Eliminated'></i> <span class='badge bg-danger'>Eliminated</span>";
