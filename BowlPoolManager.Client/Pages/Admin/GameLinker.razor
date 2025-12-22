@@ -187,9 +187,42 @@ else
             LocalGames = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames") ?? new();
             // Use the scoreboard source to get full names (e.g. "Oklahoma Sooners")
             ExternalGames = await Http.GetFromJsonAsync<List<CfbdGameDto>>("api/GetRawCfbdGames?source=scoreboard") ?? new();
+
+            // Populate empty bracket slots with winners from previous rounds
+            ResolveAdvancingTeams();
         }
         catch (Exception ex) { Console.WriteLine($"Error: {ex.Message}"); }
         finally { IsLoading = false; }
+    }
+
+    private void ResolveAdvancingTeams()
+    {
+        // Iterate through all games to find those that are Final and have a "NextGame"
+        foreach (var feederGame in LocalGames.Where(g => g.Status == GameStatus.Final && !string.IsNullOrEmpty(g.NextGameId)))
+        {
+            var winner = feederGame.WinningTeamName;
+            if (string.IsNullOrEmpty(winner)) continue;
+
+            // Find the target game
+            var targetGame = LocalGames.FirstOrDefault(g => g.Id == feederGame.NextGameId);
+            if (targetGame == null) continue;
+
+            // Determine if the winner is already in the target game
+            bool alreadySeated = (targetGame.TeamHome == winner || targetGame.TeamAway == winner);
+
+            if (!alreadySeated)
+            {
+                // Place the winner in the first available empty slot
+                if (string.IsNullOrEmpty(targetGame.TeamHome))
+                {
+                    targetGame.TeamHome = winner;
+                }
+                else if (string.IsNullOrEmpty(targetGame.TeamAway))
+                {
+                    targetGame.TeamAway = winner;
+                }
+            }
+        }
     }
 
     private bool IsLinked(BowlGame game) => !string.IsNullOrEmpty(game.ExternalId);
