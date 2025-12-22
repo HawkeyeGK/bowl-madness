@@ -97,10 +97,13 @@ namespace BowlPoolManager.Core.Domain
         public string? Television { get; set; }
 
         // --- COMPUTED HELPERS (Logic Consolidation) ---
-        [JsonIgnore]
+        
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public bool IsFinal => Status == GameStatus.Final;
 
-        [JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public string? WinningTeamName 
         {
             get 
@@ -116,7 +119,8 @@ namespace BowlPoolManager.Core.Domain
             }
         }
 
-        [JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public string? LosingTeamName 
         {
             get 
