@@ -2,6 +2,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Azure.Cosmos;
 using BowlPoolManager.Api.Services;
 using BowlPoolManager.Api.Repositories;
@@ -20,22 +21,30 @@ builder.Services.AddSingleton<ICfbdService, CfbdService>();
 builder.Services.AddSingleton<IGameScoringService, GameScoringService>();
 
 // --- REPOSITORIES & DATABASE ---
-builder.Services.AddSingleton<Container>(sp =>
+// --- 1. OPTIMIZED REGISTRATION (Fast, No Network Calls) ---
+builder.Services.AddSingleton<CosmosClient>(sp =>
 {
     var config = sp.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
     var connStr = config["CosmosDbConnectionString"];
     
-    // Fail gracefully if missing during build
-    if (string.IsNullOrEmpty(connStr)) return null!; 
+    if (string.IsNullOrEmpty(connStr)) throw new InvalidOperationException("CosmosDbConnectionString is missing.");
 
-    var clientOptions = new CosmosClientOptions { SerializerOptions = new CosmosSerializationOptions { PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase } };
-    var client = new CosmosClient(connStr, clientOptions);
+    var clientOptions = new CosmosClientOptions 
+    { 
+        SerializerOptions = new CosmosSerializationOptions 
+        { 
+            PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase 
+        } 
+    };
     
-    // Bootstrap: Ensure Database & Container exist
-    var db = client.CreateDatabaseIfNotExistsAsync(Constants.Database.DbName).GetAwaiter().GetResult();
-    var containerResponse = db.Database.CreateContainerIfNotExistsAsync(Constants.Database.ContainerName, Constants.Database.PartitionKeyPath).GetAwaiter().GetResult();
-    
-    return containerResponse.Container;
+    return new CosmosClient(connStr, clientOptions);
+});
+
+builder.Services.AddSingleton<Container>(sp =>
+{
+    var client = sp.GetRequiredService<CosmosClient>();
+    // Lightweight proxy only. Does not check existence.
+    return client.GetContainer(Constants.Database.DbName, Constants.Database.ContainerName);
 });
 
 builder.Services.AddSingleton<IGameRepository, GameRepository>();
@@ -44,4 +53,34 @@ builder.Services.AddSingleton<IEntryRepository, EntryRepository>();
 builder.Services.AddSingleton<IUserRepository, UserRepository>();
 // --------------------------------
 
-builder.Build().Run();
+var host = builder.Build();
+
+// --- 2. ASYNC INITIALIZATION (The "Self-Healing" Step) ---
+// This runs once on startup, asynchronously, ensuring the DB exists before accepting traffic.
+using (var scope = host.Services.CreateScope())
+{
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    var config = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+    
+    // Only attempt if connection string is present (skips during build pipeline if env vars missing)
+    if (!string.IsNullOrEmpty(config["CosmosDbConnectionString"]))
+    {
+        try 
+        {
+            var client = scope.ServiceProvider.GetRequiredService<CosmosClient>();
+            
+            // Async creation - perfectly safe here!
+            var db = await client.CreateDatabaseIfNotExistsAsync(Constants.Database.DbName);
+            await db.Database.CreateContainerIfNotExistsAsync(Constants.Database.ContainerName, Constants.Database.PartitionKeyPath);
+        }
+        catch (Exception ex)
+        {
+            // Log but don't crash - allows the function to start even if DB has issues (e.g. firewall)
+            // though requests will likely fail later.
+            logger.LogError(ex, "Error during database bootstrapping.");
+        }
+    }
+}
+// --------------------------------
+
+await host.RunAsync();
