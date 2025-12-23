@@ -331,10 +331,21 @@
 
     private IEnumerable<string> GetPotentialWinnersForGame(BowlGame game)
     {
+        // 0. Calculate Valid Entrants first (Recursive Check)
+        // We must know who is actually playing to validate any simulation or reality.
+        var validEntrants = GetEntrantsForGame(game).ToList();
+
         // PRIORITY 1: Simulation (Allows overriding reality)
         if (simulatedWinners.TryGetValue(game.Id, out var simPick))
         {
-            return new[] { simPick };
+            // CRITICAL FIX: Only return the simPick if they are actually a valid entrant.
+            // If I picked "Team A" in the Final, but then went back and changed the Semi-Final 
+            // so "Team A" lost, "Team A" is no longer a valid entrant here.
+            // We ignore the stale pick and fall through to "Undecided".
+            if (validEntrants.Contains(simPick, StringComparer.OrdinalIgnoreCase))
+            {
+                return new[] { simPick };
+            }
         }
 
         // PRIORITY 2: Reality
@@ -344,8 +355,8 @@
             return string.IsNullOrEmpty(realWinner) ? Enumerable.Empty<string>() : new[] { realWinner };
         }
 
-        // PRIORITY 3: Undecided -> Recursion
-        return GetEntrantsForGame(game);
+        // PRIORITY 3: Undecided -> Return all valid entrants
+        return validEntrants;
     }
 
     private IEnumerable<string> GetEntrantsForGame(BowlGame game)
