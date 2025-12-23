@@ -10,68 +10,78 @@
 <PageTitle>Scenario Matrix</PageTitle>
 
 <style>
-    /* SPREADSHEET LAYOUT: Fixed viewport height */
+    /* 1. SCROLL CONTAINER (Based on fm26-helper .grid-scroll-container) */
     .matrix-container {
-        /* Forces the container to fill the remaining screen space */
-        height: calc(100vh - 190px); 
-        overflow: auto; /* Auto-enables scrollbars when content exceeds space */
-        position: relative;
+        display: block;
+        width: 100%;
+        height: calc(100vh - 190px); /* Fixed Viewport Height */
+        overflow: auto; /* Handles BOTH x and y scrolling */
         border: 1px solid #dee2e6;
         background-color: white;
+        
+        /* Smooth scrolling on mobile */
+        -webkit-overflow-scrolling: touch;
     }
 
-    /* PREVENT TABLE BORDER CONFLICTS */
+    /* 2. TABLE BASE */
     .matrix-table {
         border-collapse: separate; 
         border-spacing: 0;
-        /* CRITICAL FIX: Forces table to take its natural width, triggering horizontal scroll */
-        width: max-content; 
         min-width: 100%;
+        margin-bottom: 0;
     }
 
-    /* 1. TOP HEADER (STICKY TOP) */
+    /* 3. PREVENT WRAPPING (Critical for Horizontal Scroll) */
+    .matrix-table th, 
+    .matrix-table td {
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+
+    /* 4. STICKY HEADERS (Top Row) */
     .matrix-table th {
         position: sticky;
         top: 0;
-        z-index: 20; 
-        background-color: #f8f9fa;
+        z-index: 20; /* Higher than data */
+        background-color: #f8f9fa; /* Light Gray */
         border-bottom: 2px solid #dee2e6;
-        vertical-align: top;
-        text-align: center;
         padding: 0.5rem;
-        min-width: 160px; 
-        box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1); 
-        white-space: nowrap; /* Prevent header wrapping */
+        text-align: center;
+        box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
     }
 
-    /* 2. TOP-LEFT CORNER (STICKY TOP & LEFT) */
-    .matrix-table th.corner-header {
-        position: sticky;
-        left: 0;
-        top: 0;
-        z-index: 30; 
-        min-width: 220px;
-        background-color: #e9ecef;
-        vertical-align: middle;
-        border-right: 2px solid #dee2e6;
-    }
-
-    /* 3. FIRST COLUMN (STICKY LEFT) */
+    /* 5. STICKY FIRST COLUMN (Left Column) */
     .matrix-table td.sticky-col {
         position: sticky;
         left: 0;
-        z-index: 10; 
-        background-color: #fff;
+        z-index: 10; /* Above normal data, below headers */
+        
+        /* SOLID BACKGROUND IS CRITICAL FOR SCROLLING OVER DATA */
+        background-color: #fff !important; 
         border-right: 2px solid #dee2e6;
         font-weight: 500;
         min-width: 220px;
         box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.1);
-        white-space: nowrap; /* Keep names on one line */
     }
 
-    /* ROW HOVER EFFECTS */
-    .matrix-table tr:hover td { background-color: #f1f3f5; }
-    .matrix-table tr:hover td.sticky-col { background-color: #e9ecef; }
+    /* 6. CORNER CELL (Top-Left Intersection) */
+    .matrix-table th.corner-header {
+        position: sticky;
+        left: 0;
+        top: 0;
+        z-index: 30; /* Highest: Above Top Header AND Left Col */
+        background-color: #e9ecef !important;
+        border-right: 2px solid #dee2e6;
+        min-width: 220px;
+    }
+
+    /* 7. ROW HOVER (Must handle sticky col color) */
+    .matrix-table tr:hover td { 
+        background-color: #f1f3f5; 
+    }
+    .matrix-table tr:hover td.sticky-col { 
+        background-color: #e9ecef !important; 
+    }
 
     /* Sim Controls */
     .sim-control {
@@ -83,9 +93,7 @@
         margin: 2px;
         display: block;
         width: 100%;
-        transition: all 0.2s;
         text-align: center;
-        white-space: nowrap;
     }
     .sim-control:hover { filter: brightness(0.95); }
     .sim-control.active-win {
