@@ -240,20 +240,20 @@
 
     // --- LOGIC ---
 
-    private IEnumerable<string> GetSelectableTeams(BowlGame game)
+    private List<string> GetSelectableTeams(BowlGame game)
     {
         // 1. If standard game with known teams, just return them
         if (!string.Equals(game.TeamHome, "TBD", StringComparison.OrdinalIgnoreCase) && 
             !string.IsNullOrEmpty(game.TeamHome) && !string.IsNullOrEmpty(game.TeamAway))
         {
-            return new[] { game.TeamHome, game.TeamAway };
+            return new List<string> { game.TeamHome, game.TeamAway };
         }
 
         // 2. "All Picked Teams" Logic for Playoffs
         // Find every unique pick made for this game ID
         var pickedTeams = entries
             .Where(e => e.Picks != null && e.Picks.ContainsKey(game.Id))
-            .Select(e => e.Picks[game.Id])
+            .Select(e => e.Picks![game.Id]) // Added ! to suppress CS8602 (we checked null in Where)
             .Where(t => !string.IsNullOrEmpty(t))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(t => t)
