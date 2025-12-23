@@ -10,46 +10,63 @@
 <PageTitle>Scenario Matrix</PageTitle>
 
 <style>
-    /* Matrix Styles */
+    /* SPREADSHEET LAYOUT: Fixed viewport height */
     .matrix-container {
-        max-height: 85vh;
+        /* Forces the container to fill the remaining screen space */
+        /* This keeps the horizontal scrollbar docked to the bottom of the viewport */
+        height: calc(100vh - 190px); 
         overflow: auto;
         position: relative;
         border: 1px solid #dee2e6;
+        background-color: white;
     }
+
+    /* PREVENT TABLE BORDER CONFLICTS */
     .matrix-table {
         border-collapse: separate; 
         border-spacing: 0;
         min-width: 100%;
     }
+
+    /* 1. TOP HEADER (STICKY TOP) - Freezes the Game Names */
     .matrix-table th {
-        background-color: #f8f9fa;
         position: sticky;
         top: 0;
-        z-index: 10;
+        z-index: 20; /* Higher than data & side col */
+        background-color: #f8f9fa;
         border-bottom: 2px solid #dee2e6;
         vertical-align: top;
         text-align: center;
         padding: 0.5rem;
-        min-width: 160px; 
+        min-width: 160px;
+        box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1); 
     }
+
+    /* 2. TOP-LEFT CORNER (STICKY TOP & LEFT) - Freezes the "Player/Score" cell */
     .matrix-table th.corner-header {
+        position: sticky;
         left: 0;
-        z-index: 20;
+        top: 0;
+        z-index: 30; /* Highest priority: Must cover Top Header AND Side Col */
         min-width: 220px;
         background-color: #e9ecef;
         vertical-align: middle;
+        border-right: 2px solid #dee2e6;
     }
+
+    /* 3. FIRST COLUMN (STICKY LEFT) - Freezes the Player Names */
     .matrix-table td.sticky-col {
         position: sticky;
         left: 0;
+        z-index: 10; /* Higher than data, Lower than Top Header */
         background-color: #fff;
-        z-index: 5;
         border-right: 2px solid #dee2e6;
         font-weight: 500;
         min-width: 220px;
-        box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+        box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.1);
     }
+
+    /* ROW HOVER EFFECTS (Must handle sticky col bg) */
     .matrix-table tr:hover td { background-color: #f1f3f5; }
     .matrix-table tr:hover td.sticky-col { background-color: #e9ecef; }
 
