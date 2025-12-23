@@ -13,9 +13,8 @@
     /* SPREADSHEET LAYOUT: Fixed viewport height */
     .matrix-container {
         /* Forces the container to fill the remaining screen space */
-        /* This keeps the horizontal scrollbar docked to the bottom of the viewport */
         height: calc(100vh - 190px); 
-        overflow: auto;
+        overflow: auto; /* Auto-enables scrollbars when content exceeds space */
         position: relative;
         border: 1px solid #dee2e6;
         background-color: white;
@@ -25,48 +24,52 @@
     .matrix-table {
         border-collapse: separate; 
         border-spacing: 0;
+        /* CRITICAL FIX: Forces table to take its natural width, triggering horizontal scroll */
+        width: max-content; 
         min-width: 100%;
     }
 
-    /* 1. TOP HEADER (STICKY TOP) - Freezes the Game Names */
+    /* 1. TOP HEADER (STICKY TOP) */
     .matrix-table th {
         position: sticky;
         top: 0;
-        z-index: 20; /* Higher than data & side col */
+        z-index: 20; 
         background-color: #f8f9fa;
         border-bottom: 2px solid #dee2e6;
         vertical-align: top;
         text-align: center;
         padding: 0.5rem;
-        min-width: 160px;
+        min-width: 160px; 
         box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1); 
+        white-space: nowrap; /* Prevent header wrapping */
     }
 
-    /* 2. TOP-LEFT CORNER (STICKY TOP & LEFT) - Freezes the "Player/Score" cell */
+    /* 2. TOP-LEFT CORNER (STICKY TOP & LEFT) */
     .matrix-table th.corner-header {
         position: sticky;
         left: 0;
         top: 0;
-        z-index: 30; /* Highest priority: Must cover Top Header AND Side Col */
+        z-index: 30; 
         min-width: 220px;
         background-color: #e9ecef;
         vertical-align: middle;
         border-right: 2px solid #dee2e6;
     }
 
-    /* 3. FIRST COLUMN (STICKY LEFT) - Freezes the Player Names */
+    /* 3. FIRST COLUMN (STICKY LEFT) */
     .matrix-table td.sticky-col {
         position: sticky;
         left: 0;
-        z-index: 10; /* Higher than data, Lower than Top Header */
+        z-index: 10; 
         background-color: #fff;
         border-right: 2px solid #dee2e6;
         font-weight: 500;
         min-width: 220px;
         box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.1);
+        white-space: nowrap; /* Keep names on one line */
     }
 
-    /* ROW HOVER EFFECTS (Must handle sticky col bg) */
+    /* ROW HOVER EFFECTS */
     .matrix-table tr:hover td { background-color: #f1f3f5; }
     .matrix-table tr:hover td.sticky-col { background-color: #e9ecef; }
 
@@ -82,6 +85,7 @@
         width: 100%;
         transition: all 0.2s;
         text-align: center;
+        white-space: nowrap;
     }
     .sim-control:hover { filter: brightness(0.95); }
     .sim-control.active-win {
