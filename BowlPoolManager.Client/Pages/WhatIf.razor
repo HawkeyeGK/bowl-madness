@@ -175,7 +175,7 @@
                                     <div class="d-flex flex-column gap-1">
                                         @foreach(var team in options)
                                         {
-                                            <div class="sim-control @GetSimClass(game.Id, team)" 
+                                            <div class="sim-control @GetSimClass(game.Id, team, options)" 
                                                  @onclick="() => ToggleSimWinner(game.Id, team)">
                                                 @team
                                             </div>
@@ -456,12 +456,24 @@
         }
     }
 
-    private string GetSimClass(string gameId, string team)
+    private string GetSimClass(string gameId, string team, List<string> validOptions)
     {
-        if (!simulatedWinners.ContainsKey(gameId)) return "bg-white"; 
+        // 1. Check if we have a simulated winner
+        if (simulatedWinners.TryGetValue(gameId, out var simPick))
+        {
+            // 2. Validate: Is the stored winner actually a valid option right now?
+            // If I picked "Team A", but "Team A" was eliminated upstream, 
+            // validOptions will NOT contain "Team A". 
+            // In that case, we treat the game as Undecided (no styles).
+            if (validOptions.Contains(simPick, StringComparer.OrdinalIgnoreCase))
+            {
+                // The pick is valid. Apply Win/Loss styles.
+                return simPick == team ? "active-win" : "active-loss";
+            }
+        }
         
-        if (simulatedWinners[gameId] == team) return "active-win"; 
-        return "active-loss"; 
+        // No valid winner selected -> Default style (Selectable)
+        return "bg-white"; 
     }
 
     private string GetRealWinner(BowlGame game)
