@@ -340,11 +340,16 @@
     /// <summary>
     /// Returns the valid teams for a specific game slot based on the current simulation state.
     /// </summary>
+    /// <summary>
+    /// Returns the valid teams for a specific game slot based on the current simulation state.
+    /// </summary>
     private List<string> GetSelectableTeams(BowlGame game)
     {
-        // Recursively find all teams that can reach this game
-        var potentials = GetPotentialWinnersForGame(game);
-        return potentials.OrderBy(t => t).ToList();
+        // FIX: Use GetEntrantsForGame (Inputs) instead of GetPotentialWinnersForGame (Outputs).
+        // This ensures that even if I pick a winner, the UI still shows me all the options 
+        // so I can toggle my decision easily.
+        var entrants = GetEntrantsForGame(game);
+        return entrants.OrderBy(t => t).ToList();
     }
 
     /// <summary>
