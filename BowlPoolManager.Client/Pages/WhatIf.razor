@@ -10,7 +10,7 @@
 <PageTitle>Scenario Matrix</PageTitle>
 
 <style>
-    /* Matrix Styles for Sticky Headers and Columns */
+    /* Matrix Styles */
     .matrix-container {
         max-height: 85vh;
         overflow: auto;
@@ -88,11 +88,23 @@
             <h1 class="h3 fw-bold mb-0"><i class="bi bi-grid-3x3-gap-fill text-primary"></i> Scenario Matrix</h1>
             <span class="badge bg-danger">Admin Preview</span>
         </div>
-        <div>
+        
+        <div class="d-flex gap-2 align-items-center">
+            @* POOL SELECTOR *@
+            @if(poolList.Count > 1)
+            {
+                <select class="form-select form-select-sm" style="width: auto; min-width: 150px;" @onchange="OnPoolChanged">
+                    @foreach(var pool in poolList)
+                    {
+                        <option value="@pool.Id" selected="@(pool.Id == selectedPoolId)">@pool.Name</option>
+                    }
+                </select>
+            }
+
              @if (simulatedWinners.Any())
              {
                 <button class="btn btn-outline-danger btn-sm" @onclick="ResetSimulation">
-                    <i class="bi bi-arrow-counterclockwise"></i> Reset Scenarios
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset
                 </button>
              }
         </div>
@@ -211,9 +223,16 @@
 @code {
     private bool isLoading = true;
     private List<BowlGame> games = new();
-    private List<BracketEntry> entries = new();
     
-    // State
+    // Raw Data
+    private List<BracketEntry> allEntries = new();
+    private List<BowlPool> poolList = new();
+    
+    // Filtered State
+    private string selectedPoolId = "";
+    private List<BracketEntry> filteredEntries = new();
+    
+    // Simulation State
     private Dictionary<string, string> simulatedWinners = new();
     private List<LeaderboardRow> projectedStandings = new();
 
@@ -223,13 +242,21 @@
         {
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
             var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries");
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
 
-            await Task.WhenAll(gamesTask, entriesTask);
+            await Task.WhenAll(gamesTask, entriesTask, poolsTask);
 
             games = (await gamesTask ?? new()).OrderBy(g => g.StartTime).ToList();
-            entries = await entriesTask ?? new();
+            allEntries = await entriesTask ?? new();
+            poolList = await poolsTask ?? new();
+
+            // Default to the first pool if available
+            if (poolList.Any())
+            {
+                selectedPoolId = poolList.First().Id;
+            }
             
-            Recalculate();
+            UpdateFilteredEntries();
         }
         catch (Exception ex)
         {
@@ -238,7 +265,29 @@
         finally { isLoading = false; }
     }
 
-    // --- LOGIC ---
+    // --- FILTERING LOGIC ---
+    
+    private void OnPoolChanged(ChangeEventArgs e)
+    {
+        selectedPoolId = e.Value?.ToString() ?? "";
+        UpdateFilteredEntries();
+    }
+
+    private void UpdateFilteredEntries()
+    {
+        if (string.IsNullOrEmpty(selectedPoolId))
+        {
+            filteredEntries = new();
+        }
+        else
+        {
+            filteredEntries = allEntries.Where(e => e.PoolId == selectedPoolId).ToList();
+        }
+        // When pool changes, we recalculate using the new subset of entries
+        Recalculate();
+    }
+
+    // --- GAME LOGIC ---
 
     private List<string> GetSelectableTeams(BowlGame game)
     {
@@ -250,10 +299,10 @@
         }
 
         // 2. "All Picked Teams" Logic for Playoffs
-        // Find every unique pick made for this game ID
-        var pickedTeams = entries
+        // Find every unique pick made for this game ID **WITHIN THE CURRENT POOL**
+        var pickedTeams = filteredEntries
             .Where(e => e.Picks != null && e.Picks.ContainsKey(game.Id))
-            .Select(e => e.Picks![game.Id]) // Added ! to suppress CS8602 (we checked null in Where)
+            .Select(e => e.Picks![game.Id]) 
             .Where(t => !string.IsNullOrEmpty(t))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(t => t)
@@ -290,7 +339,8 @@
 
     private void Recalculate()
     {
-        projectedStandings = WhatIfScoringEngine.Calculate(games, entries, simulatedWinners);
+        // Use the FILTERED list for calculations
+        projectedStandings = WhatIfScoringEngine.Calculate(games, filteredEntries, simulatedWinners);
     }
 
     // --- STYLING HELPERS ---
