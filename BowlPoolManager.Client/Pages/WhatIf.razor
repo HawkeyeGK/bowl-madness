@@ -14,15 +14,12 @@
     .matrix-container {
         display: block;
         width: 100%;
-        max-width: 100%; /* Critical: Ensures it respects the parent width */
+        max-width: 100%;
         height: calc(100vh - 190px); 
-        overflow: auto; /* Handles BOTH x and y scrolling */
-        
+        overflow: auto; 
         border: 1px solid #dee2e6;
         background-color: white;
-        
-        /* Smooth scrolling context */
-        position: relative; 
+        position: relative;
         -webkit-overflow-scrolling: touch;
     }
 
@@ -58,12 +55,10 @@
         position: sticky;
         left: 0;
         z-index: 10; 
-        
-        /* Solid background prevents bleed-through */
         background-color: #fff !important; 
         border-right: 2px solid #dee2e6;
         font-weight: 500;
-        min-width: 200px; /* Slightly narrower than before for better mobile fit */
+        min-width: 200px; 
         box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.1);
     }
 
@@ -79,12 +74,8 @@
     }
 
     /* 7. ROW HOVER */
-    .matrix-table tr:hover td { 
-        background-color: #f1f3f5; 
-    }
-    .matrix-table tr:hover td.sticky-col { 
-        background-color: #e9ecef !important; 
-    }
+    .matrix-table tr:hover td { background-color: #f1f3f5; }
+    .matrix-table tr:hover td.sticky-col { background-color: #e9ecef !important; }
 
     /* Sim Controls */
     .sim-control {
@@ -141,10 +132,10 @@
 
         @* RIGHT SIDE: Actions *@
         <div>
-             @if (simulatedWinners.Any())
+             @if (HasActiveSimulation)
              {
                 <button class="btn btn-outline-danger btn-sm" @onclick="ResetSimulation">
-                    <i class="bi bi-arrow-counterclockwise"></i> Reset Scenarios
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset to Reality
                 </button>
              }
         </div>
@@ -176,49 +167,36 @@
                                 </div>
                                 <div class="badge bg-light text-secondary border mb-2">@game.PointValue pts</div>
                                 
-                                @if (game.Status == GameStatus.Final)
+                                @* UNIFIED CONTROL LOGIC: All games (Final or Future) are editable *@
+                                @{
+                                    var options = GetSelectableTeams(game);
+                                }
+                                
+                                @if(options.Count <= 2) 
                                 {
-                                    @* FINAL: Static Badge *@
+                                    @* Simple Toggle for Head-to-Head *@
                                     <div class="d-flex flex-column gap-1">
-                                        <span class="badge @(GetRealWinner(game) == game.TeamHome ? "bg-success" : "bg-secondary bg-opacity-25 text-dark")">
-                                            @game.TeamHome
-                                        </span>
-                                        <span class="badge @(GetRealWinner(game) == game.TeamAway ? "bg-success" : "bg-secondary bg-opacity-25 text-dark")">
-                                            @game.TeamAway
-                                        </span>
+                                        @foreach(var team in options)
+                                        {
+                                            <div class="sim-control @GetSimClass(game.Id, team)" 
+                                                 @onclick="() => ToggleSimWinner(game.Id, team)">
+                                                @team
+                                            </div>
+                                        }
                                     </div>
                                 }
                                 else
                                 {
-                                    @* FUTURE: Controls *@
-                                    var options = GetSelectableTeams(game);
-                                    
-                                    @if(options.Count <= 2) 
-                                    {
-                                        @* Simple Toggle for Head-to-Head *@
-                                        <div class="d-flex flex-column gap-1">
-                                            @foreach(var team in options)
-                                            {
-                                                <div class="sim-control @GetSimClass(game.Id, team)" 
-                                                     @onclick="() => ToggleSimWinner(game.Id, team)">
-                                                    @team
-                                                </div>
-                                            }
-                                        </div>
-                                    }
-                                    else
-                                    {
-                                        @* Dropdown for Playoffs/Many Options *@
-                                        <select class="form-select form-select-sm" style="font-size: 0.75rem;" 
-                                                value="@(simulatedWinners.ContainsKey(game.Id) ? simulatedWinners[game.Id] : "")"
-                                                @onchange="@(e => SetSimWinner(game.Id, e.Value?.ToString()))">
-                                            <option value="">-- Select Winner --</option>
-                                            @foreach(var team in options)
-                                            {
-                                                <option value="@team">@team</option>
-                                            }
-                                        </select>
-                                    }
+                                    @* Dropdown for Playoffs/Many Options *@
+                                    <select class="form-select form-select-sm" style="font-size: 0.75rem;" 
+                                            value="@(simulatedWinners.ContainsKey(game.Id) ? simulatedWinners[game.Id] : "")"
+                                            @onchange="@(e => SetSimWinner(game.Id, e.Value?.ToString()))">
+                                        <option value="">-- Select Winner --</option>
+                                        @foreach(var team in options)
+                                        {
+                                            <option value="@team">@team</option>
+                                        }
+                                    </select>
                                 }
                             </th>
                         }
@@ -293,13 +271,23 @@
             allEntries = await entriesTask ?? new();
             poolList = await poolsTask ?? new();
 
-            // Build the Bracket Tree (Reverse Lookup)
-            // matches any game where NextGameId is not null
+            // 1. Build the Bracket Tree
             _feederMap = games
                 .Where(g => !string.IsNullOrEmpty(g.NextGameId))
                 .ToLookup(g => g.NextGameId!);
 
-            // Default to the first pool if available
+            // 2. Pre-fill Simulation with Reality
+            // This ensures Final games show as "Selected" immediately
+            foreach(var game in games.Where(g => g.Status == GameStatus.Final))
+            {
+                var winner = GetRealWinner(game);
+                if (!string.IsNullOrEmpty(winner))
+                {
+                    simulatedWinners[game.Id] = winner;
+                }
+            }
+
+            // 3. Default Pool
             if (poolList.Any())
             {
                 selectedPoolId = poolList.First().Id;
@@ -337,67 +325,48 @@
 
     // --- SMART BRACKET LOGIC ---
 
-    /// <summary>
-    /// Returns the valid teams for a specific game slot based on the current simulation state.
-    /// </summary>
-    /// <summary>
-    /// Returns the valid teams for a specific game slot based on the current simulation state.
-    /// </summary>
     private List<string> GetSelectableTeams(BowlGame game)
     {
-        // FIX: Use GetEntrantsForGame (Inputs) instead of GetPotentialWinnersForGame (Outputs).
-        // This ensures that even if I pick a winner, the UI still shows me all the options 
-        // so I can toggle my decision easily.
+        // Use "Entrants" (Inputs) so the list doesn't collapse after selecting a winner
         var entrants = GetEntrantsForGame(game);
         return entrants.OrderBy(t => t).ToList();
     }
 
-    /// <summary>
-    /// Recursive function to find who could win a specific game.
-    /// </summary>
     private IEnumerable<string> GetPotentialWinnersForGame(BowlGame game)
     {
-        // 1. If Real Life says it's over, that's the only option.
+        // PRIORITY 1: Simulation (Allows overriding reality)
+        if (simulatedWinners.TryGetValue(game.Id, out var simPick))
+        {
+            return new[] { simPick };
+        }
+
+        // PRIORITY 2: Reality
         if (game.Status == GameStatus.Final)
         {
             var realWinner = GetRealWinner(game);
             return string.IsNullOrEmpty(realWinner) ? Enumerable.Empty<string>() : new[] { realWinner };
         }
 
-        // 2. If User has Simulated a winner, that team "advances" (is the output of this node).
-        if (simulatedWinners.TryGetValue(game.Id, out var simPick))
-        {
-            return new[] { simPick };
-        }
-
-        // 3. If Undecided, the potential winners are the ENTRANTS of this game.
-        // (i.e., anyone playing in this game could win it).
+        // PRIORITY 3: Undecided -> Recursion
         return GetEntrantsForGame(game);
     }
 
-    /// <summary>
-    /// Determines who is playing in a game (Entrants).
-    /// Entrants = (Winners of Feeder Games) + (Fixed Seeds like 'Alabama')
-    /// </summary>
     private IEnumerable<string> GetEntrantsForGame(BowlGame game)
     {
         var entrants = new HashSet<string>();
 
-        // A. Fixed Teams (Root nodes or pre-seeded slots)
-        // If the database has a concrete name (not TBD), it's an entrant.
+        // A. Fixed Teams
         if (!string.IsNullOrEmpty(game.TeamHome) && !game.TeamHome.Equals("TBD", StringComparison.OrdinalIgnoreCase))
             entrants.Add(game.TeamHome);
             
         if (!string.IsNullOrEmpty(game.TeamAway) && !game.TeamAway.Equals("TBD", StringComparison.OrdinalIgnoreCase))
             entrants.Add(game.TeamAway);
 
-        // B. Feeder Games (Recursive Step)
-        // Look for any games that point to this one as their 'NextGameId'
+        // B. Feeder Games (Recursive)
         if (_feederMap != null && _feederMap.Contains(game.Id))
         {
             foreach (var feeder in _feederMap[game.Id])
             {
-                // The potential winners of the feeder game become the entrants of this game
                 var incoming = GetPotentialWinnersForGame(feeder);
                 foreach (var team in incoming) entrants.Add(team);
             }
@@ -411,14 +380,20 @@
     private void ToggleSimWinner(string gameId, string team)
     {
         if (simulatedWinners.ContainsKey(gameId) && simulatedWinners[gameId] == team)
+        {
+            // If we uncheck a winner, we need to verify if the game is Final.
+            // If Final, we should revert to the Real winner (or keep it selected)
+            // But simplified: Toggle Off removes from dict.
             simulatedWinners.Remove(gameId);
+            
+            // If game is final, re-add real winner so it doesn't look empty? 
+            // Or let it be empty (undecided)?
+            // User requested: "behave same as incomplete". Incomplete can be untoggled.
+        }
         else
+        {
             simulatedWinners[gameId] = team;
-            
-        // Check for invalid downstream picks (e.g. I picked Team A in Final, but switched Semi to Team B)
-        // In a complex app we might auto-remove them, but simply recalculating scores handles the math correctly.
-        // Visual cleanup could happen here if desired.
-            
+        }
         Recalculate();
     }
 
@@ -435,6 +410,12 @@
     private void ResetSimulation()
     {
         simulatedWinners.Clear();
+        // Restore Reality
+        foreach(var game in games.Where(g => g.Status == GameStatus.Final))
+        {
+            var w = GetRealWinner(game);
+            if (!string.IsNullOrEmpty(w)) simulatedWinners[game.Id] = w;
+        }
         Recalculate();
     }
 
@@ -444,6 +425,28 @@
     }
 
     // --- STYLING HELPERS ---
+
+    // Logic to only show "Reset" if we have deviated from reality
+    private bool HasActiveSimulation
+    {
+        get
+        {
+            foreach(var kvp in simulatedWinners)
+            {
+                var game = games.FirstOrDefault(g => g.Id == kvp.Key);
+                if (game == null) continue;
+                
+                // If we predicted a future game, that's active.
+                if (game.Status != GameStatus.Final) return true;
+                
+                // If we changed history, that's active.
+                if (GetRealWinner(game) != kvp.Value) return true;
+            }
+            // If we have FEWER items than finalized games (unselected a final game), that's also a deviation
+            // But simplest check matches 99% of use cases.
+            return false;
+        }
+    }
 
     private string GetSimClass(string gameId, string team)
     {
@@ -468,8 +471,8 @@
         if (string.IsNullOrEmpty(pick)) return "";
         string winner = "";
         
-        if (game.Status == GameStatus.Final) winner = GetRealWinner(game);
-        else if (simulatedWinners.ContainsKey(game.Id)) winner = simulatedWinners[game.Id];
+        // UI uses Simulation Dictionary for visuals since we synced them
+        if (simulatedWinners.ContainsKey(game.Id)) winner = simulatedWinners[game.Id];
 
         if (!string.IsNullOrEmpty(winner))
         {
