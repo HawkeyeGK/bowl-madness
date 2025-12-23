@@ -10,6 +10,14 @@
 
 .navbar-brand {
     font-size: 1.1rem;
+    /* Force white color to override Bootswatch Flatly active/focus green state */
+    color: white !important;
+}
+
+.navbar-brand:hover,
+.navbar-brand:focus,
+.navbar-brand:active {
+    color: white !important;
 }
 
 /* RESTORED: Open Iconic Styles to match your HTML */
