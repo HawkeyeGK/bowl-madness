@@ -2,6 +2,15 @@ html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
+/* Main Layout Fix: Critical for scrolling tables within Flexbox */
+main {
+    /* 1. Allows flex shrinking so it doesn't expand to fit the table */
+    min-width: 0;
+
+    /* 2. STRICTLY prevents this container from becoming wider than the viewport */
+    overflow-x: hidden;
+}
+
 h1:focus {
     outline: none;
 }
