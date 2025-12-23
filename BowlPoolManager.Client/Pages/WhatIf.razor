@@ -276,6 +276,9 @@
     private Dictionary<string, string> simulatedWinners = new();
     private List<LeaderboardRow> projectedStandings = new();
 
+    // Smart Bracket Map: Key = TargetGameId, Value = List of Games that feed into it
+    private ILookup<string, BowlGame>? _feederMap;
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -289,6 +292,12 @@
             games = (await gamesTask ?? new()).OrderBy(g => g.StartTime).ToList();
             allEntries = await entriesTask ?? new();
             poolList = await poolsTask ?? new();
+
+            // Build the Bracket Tree (Reverse Lookup)
+            // matches any game where NextGameId is not null
+            _feederMap = games
+                .Where(g => !string.IsNullOrEmpty(g.NextGameId))
+                .ToLookup(g => g.NextGameId!);
 
             // Default to the first pool if available
             if (poolList.Any())
@@ -323,33 +332,76 @@
         {
             filteredEntries = allEntries.Where(e => e.PoolId == selectedPoolId).ToList();
         }
-        // When pool changes, we recalculate using the new subset of entries
         Recalculate();
     }
 
-    // --- GAME LOGIC ---
+    // --- SMART BRACKET LOGIC ---
 
+    /// <summary>
+    /// Returns the valid teams for a specific game slot based on the current simulation state.
+    /// </summary>
     private List<string> GetSelectableTeams(BowlGame game)
     {
-        // 1. If standard game with known teams, just return them
-        if (!string.Equals(game.TeamHome, "TBD", StringComparison.OrdinalIgnoreCase) && 
-            !string.IsNullOrEmpty(game.TeamHome) && !string.IsNullOrEmpty(game.TeamAway))
+        // Recursively find all teams that can reach this game
+        var potentials = GetPotentialWinnersForGame(game);
+        return potentials.OrderBy(t => t).ToList();
+    }
+
+    /// <summary>
+    /// Recursive function to find who could win a specific game.
+    /// </summary>
+    private IEnumerable<string> GetPotentialWinnersForGame(BowlGame game)
+    {
+        // 1. If Real Life says it's over, that's the only option.
+        if (game.Status == GameStatus.Final)
         {
-            return new List<string> { game.TeamHome, game.TeamAway };
+            var realWinner = GetRealWinner(game);
+            return string.IsNullOrEmpty(realWinner) ? Enumerable.Empty<string>() : new[] { realWinner };
         }
 
-        // 2. "All Picked Teams" Logic for Playoffs
-        // Find every unique pick made for this game ID **WITHIN THE CURRENT POOL**
-        var pickedTeams = filteredEntries
-            .Where(e => e.Picks != null && e.Picks.ContainsKey(game.Id))
-            .Select(e => e.Picks![game.Id]) 
-            .Where(t => !string.IsNullOrEmpty(t))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(t => t)
-            .ToList();
-            
-        return pickedTeams;
+        // 2. If User has Simulated a winner, that team "advances" (is the output of this node).
+        if (simulatedWinners.TryGetValue(game.Id, out var simPick))
+        {
+            return new[] { simPick };
+        }
+
+        // 3. If Undecided, the potential winners are the ENTRANTS of this game.
+        // (i.e., anyone playing in this game could win it).
+        return GetEntrantsForGame(game);
     }
+
+    /// <summary>
+    /// Determines who is playing in a game (Entrants).
+    /// Entrants = (Winners of Feeder Games) + (Fixed Seeds like 'Alabama')
+    /// </summary>
+    private IEnumerable<string> GetEntrantsForGame(BowlGame game)
+    {
+        var entrants = new HashSet<string>();
+
+        // A. Fixed Teams (Root nodes or pre-seeded slots)
+        // If the database has a concrete name (not TBD), it's an entrant.
+        if (!string.IsNullOrEmpty(game.TeamHome) && !game.TeamHome.Equals("TBD", StringComparison.OrdinalIgnoreCase))
+            entrants.Add(game.TeamHome);
+            
+        if (!string.IsNullOrEmpty(game.TeamAway) && !game.TeamAway.Equals("TBD", StringComparison.OrdinalIgnoreCase))
+            entrants.Add(game.TeamAway);
+
+        // B. Feeder Games (Recursive Step)
+        // Look for any games that point to this one as their 'NextGameId'
+        if (_feederMap != null && _feederMap.Contains(game.Id))
+        {
+            foreach (var feeder in _feederMap[game.Id])
+            {
+                // The potential winners of the feeder game become the entrants of this game
+                var incoming = GetPotentialWinnersForGame(feeder);
+                foreach (var team in incoming) entrants.Add(team);
+            }
+        }
+
+        return entrants;
+    }
+
+    // --- INTERACTION ---
 
     private void ToggleSimWinner(string gameId, string team)
     {
@@ -357,6 +409,10 @@
             simulatedWinners.Remove(gameId);
         else
             simulatedWinners[gameId] = team;
+            
+        // Check for invalid downstream picks (e.g. I picked Team A in Final, but switched Semi to Team B)
+        // In a complex app we might auto-remove them, but simply recalculating scores handles the math correctly.
+        // Visual cleanup could happen here if desired.
             
         Recalculate();
     }
@@ -379,7 +435,6 @@
 
     private void Recalculate()
     {
-        // Use the FILTERED list for calculations
         projectedStandings = WhatIfScoringEngine.Calculate(games, filteredEntries, simulatedWinners);
     }
 
