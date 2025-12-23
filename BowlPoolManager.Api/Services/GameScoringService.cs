@@ -24,6 +24,11 @@ namespace BowlPoolManager.Api.Services
             _cfbdService = cfbdService;
         }
 
+        public DateTime GetLastRefreshTime()
+        {
+            return _lastRefresh;
+        }
+
         public async Task CheckAndRefreshScoresAsync(List<BowlGame> games)
         {
             if (DateTime.UtcNow <= _lastRefresh.AddMinutes(RefreshIntervalMinutes)) return;

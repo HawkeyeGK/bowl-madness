@@ -49,6 +49,15 @@ namespace BowlPoolManager.Api.Functions
             return response;
         }
 
+        [Function("GetLastScoreUpdate")]
+        public async Task<HttpResponseData> GetLastScoreUpdate([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
+        {
+            var lastUpdate = _scoringService.GetLastRefreshTime();
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            await response.WriteAsJsonAsync(lastUpdate);
+            return response;
+        }
+
         [Function("GetExternalGames")]
         public async Task<HttpResponseData> GetExternalGames([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {

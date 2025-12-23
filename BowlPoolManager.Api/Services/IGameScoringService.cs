@@ -9,5 +9,10 @@ namespace BowlPoolManager.Api.Services
         /// updates the provided games list in-place, and persists changes to Cosmos DB.
         /// </summary>
         Task CheckAndRefreshScoresAsync(List<BowlGame> games);
+
+        /// <summary>
+        /// Returns the timestamp of the last successful score refresh.
+        /// </summary>
+        DateTime GetLastRefreshTime();
     }
 }
