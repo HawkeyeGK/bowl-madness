@@ -70,8 +70,14 @@ namespace BowlPoolManager.Core.Dtos
             
             // 1. Simple String (Common in /games endpoint)
             if (raw is string s) return s;
+
+            // 2. Dictionary (Fix for CfbdService manual mapping)
+            if (raw is IDictionary<string, object> dict)
+            {
+                return dict.TryGetValue(key, out var val) ? val?.ToString() : null;
+            }
             
-            // 2. Server-Side (Newtonsoft JObject)
+            // 3. Server-Side (Newtonsoft JObject)
             if (raw is JObject jo) return jo[key]?.ToString();
 
             // 3. Client-Side (System.Text.Json JsonElement)
@@ -94,7 +100,18 @@ namespace BowlPoolManager.Core.Dtos
 
         private int? GetInt(object? raw, string key)
         {
-            // 1. Server-Side (Newtonsoft)
+            // 1. Dictionary (Fix for CfbdService manual mapping)
+            if (raw is IDictionary<string, object> dict)
+            {
+                if (dict.TryGetValue(key, out var val) && val != null)
+                {
+                    // Handle Int64 (long) which Newtonsoft often produces for integers in object/dynamic contexts
+                    try { return Convert.ToInt32(val); } catch { return null; }
+                }
+                return null;
+            }
+
+            // 2. Server-Side (Newtonsoft)
             if (raw is JObject jo) return jo[key]?.Value<int?>();
 
             // 2. Client-Side (System.Text.Json)
