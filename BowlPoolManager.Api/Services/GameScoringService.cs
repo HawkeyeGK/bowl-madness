@@ -108,7 +108,7 @@ namespace BowlPoolManager.Api.Services
                 var oldStatus = localGame.Status;
                 var oldDetail = localGame.GameDetail;
 
-                if (apiGame.Completed || string.Equals(apiGame.StatusRaw, "final", StringComparison.OrdinalIgnoreCase))
+                if (apiGame.Completed || string.Equals(apiGame.StatusRaw, "completed", StringComparison.OrdinalIgnoreCase))
                 {
                     localGame.Status = GameStatus.Final;
                     localGame.GameDetail = "Final";
