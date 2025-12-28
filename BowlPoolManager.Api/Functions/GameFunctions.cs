@@ -111,5 +111,22 @@ namespace BowlPoolManager.Api.Functions
              
              return req.CreateResponse(HttpStatusCode.OK);
         }
+
+        [Function("DeleteGame")]
+        public async Task<HttpResponseData> DeleteGame([HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "DeleteGame/{gameId}")] HttpRequestData req, string gameId)
+        {
+             var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
+             if (!authResult.IsValid) return authResult.ErrorResponse!;
+
+             if (string.IsNullOrEmpty(gameId))
+             {
+                 var badRequest = req.CreateResponse(HttpStatusCode.BadRequest);
+                 await badRequest.WriteStringAsync("Game ID is required");
+                 return badRequest;
+             }
+
+             await _gameRepo.DeleteGameAsync(gameId);
+             return req.CreateResponse(HttpStatusCode.OK);
+        }
     }
 }

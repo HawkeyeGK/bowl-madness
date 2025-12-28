@@ -12,5 +12,6 @@ namespace BowlPoolManager.Api.Repositories
         public async Task AddGameAsync(BowlGame game) => await UpsertDocumentAsync(game, game.Id);
         public async Task UpdateGameAsync(BowlGame game) => await UpsertDocumentAsync(game, game.Id);
         public async Task<List<BowlGame>> GetGamesAsync() => await GetListAsync<BowlGame>(Constants.DocumentTypes.BowlGame);
+        public async Task DeleteGameAsync(string gameId) => await DeleteDocumentAsync<BowlGame>(gameId);
     }
 }

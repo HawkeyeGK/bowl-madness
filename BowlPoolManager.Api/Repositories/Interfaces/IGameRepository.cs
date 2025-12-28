@@ -7,5 +7,6 @@ namespace BowlPoolManager.Api.Repositories
         Task AddGameAsync(BowlGame game);
         Task UpdateGameAsync(BowlGame game);
         Task<List<BowlGame>> GetGamesAsync();
+        Task DeleteGameAsync(string gameId);
     }
 }

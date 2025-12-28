@@ -205,7 +205,8 @@
                                 }
                             </td>
                             <td class="text-end">
-                                <button class="btn btn-sm btn-outline-primary" @onclick="() => EditGame(game)">Edit</button>
+                                <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditGame(game)">Edit</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteGame(game)">Delete</button>
                             </td>
                         </tr>
                     }
@@ -293,6 +294,29 @@
         catch (Exception ex)
         {
             Console.WriteLine($"[Game Admin] Error saving game: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteGame(BowlGame game)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete '{game.BowlName}'? This action cannot be undone.");
+        if (!confirmed) return;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/DeleteGame/{game.Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadGames();
+            }
+            else
+            {
+                Console.WriteLine($"[Game Admin] Game delete failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Game Admin] Error deleting game: {ex.Message}");
         }
     }
 }
