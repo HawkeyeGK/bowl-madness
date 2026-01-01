@@ -66,17 +66,17 @@
                     <table class="table table-hover table-striped mb-0 align-middle text-center">
                         <thead class="bg-primary text-white">
                             <tr>
-                                <th class="ps-4 text-start cursor-pointer" @onclick='() => Sort("Rank")'>Rank @RenderSortIcon("Rank")</th>
-                                <th class="cursor-pointer" @onclick='() => Sort("Player")'>Player @RenderSortIcon("Player")</th>
-                                <th class="fw-bold cursor-pointer" @onclick='() => Sort("Score")'>Total @RenderSortIcon("Score")</th>
-                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Bowls")'>Bowls @RenderSortIcon("Bowls")</th>
-                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Round1")'>1st Rnd @RenderSortIcon("Round1")</th>
-                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("QuarterFinal")'>Quart @RenderSortIcon("QuarterFinal")</th>
-                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("SemiFinal")'>Semis @RenderSortIcon("SemiFinal")</th>
-                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Championship")'>Champ @RenderSortIcon("Championship")</th>
-                                <th title="Maximum Potential Score" class="text-dark cursor-pointer" @onclick='() => Sort("Max")'>Max @RenderSortIcon("Max")</th>
-                                <th class="d-none d-sm-table-cell cursor-pointer" @onclick='() => Sort("Correct")'>Correct @RenderSortIcon("Correct")</th>
-                                <th class="d-none d-lg-table-cell cursor-pointer" @onclick='() => Sort("Tiebreaker")'>Tiebreaker @RenderSortIcon("Tiebreaker")</th>
+                                <th class="ps-4 text-start cursor-pointer" @onclick='() => Sort("Rank")'><div class="d-flex flex-column align-items-start"><span>Rank</span>@RenderSortIcon("Rank")</div></th>
+                                <th class="cursor-pointer" @onclick='() => Sort("Player")'><div class="d-flex flex-column align-items-center"><span>Player</span>@RenderSortIcon("Player")</div></th>
+                                <th class="fw-bold cursor-pointer" @onclick='() => Sort("Score")'><div class="d-flex flex-column align-items-center"><span>Total</span>@RenderSortIcon("Score")</div></th>
+                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Bowls")'><div class="d-flex flex-column align-items-center"><span>Bowls</span>@RenderSortIcon("Bowls")</div></th>
+                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Round1")'><div class="d-flex flex-column align-items-center"><span>1st Rnd</span>@RenderSortIcon("Round1")</div></th>
+                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("QuarterFinal")'><div class="d-flex flex-column align-items-center"><span>Quart</span>@RenderSortIcon("QuarterFinal")</div></th>
+                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("SemiFinal")'><div class="d-flex flex-column align-items-center"><span>Semis</span>@RenderSortIcon("SemiFinal")</div></th>
+                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Championship")'><div class="d-flex flex-column align-items-center"><span>Champ</span>@RenderSortIcon("Championship")</div></th>
+                                <th title="Maximum Potential Score" class="text-dark cursor-pointer" @onclick='() => Sort("Max")'><div class="d-flex flex-column align-items-center"><span>Max</span>@RenderSortIcon("Max")</div></th>
+                                <th class="d-none d-sm-table-cell cursor-pointer" @onclick='() => Sort("Correct")'><div class="d-flex flex-column align-items-center"><span>Correct</span>@RenderSortIcon("Correct")</div></th>
+                                <th class="d-none d-lg-table-cell cursor-pointer" @onclick='() => Sort("Tiebreaker")'><div class="d-flex flex-column align-items-center"><span>Tiebreaker</span>@RenderSortIcon("Tiebreaker")</div></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -289,6 +289,6 @@
         bool isActive = (sortColumn == column);
         string visibilityStyle = isActive ? "visibility: visible" : "visibility: hidden";
         string iconClass = (isActive && isAscending) ? "bi-caret-up-fill" : "bi-caret-down-fill";
-        return @<i class="@($"bi {iconClass} small ms-1")" style="@visibilityStyle"></i>;
+        return @<i class="@($"bi {iconClass} small")" style="@visibilityStyle"></i>;
     }
 }
