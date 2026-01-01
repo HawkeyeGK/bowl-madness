@@ -489,15 +489,26 @@
     private string GetCellClass(BowlGame game, string pick)
     {
         if (string.IsNullOrEmpty(pick)) return "";
-        string winner = "";
         
-        // UI uses Simulation Dictionary for visuals since we synced them
+        // Check if the picked team is still a valid entrant (not eliminated)
+        var validEntrants = GetPotentialWinnersForGame(game).ToList();
+        bool isEliminated = !validEntrants.Any(e => string.Equals(e, pick, StringComparison.OrdinalIgnoreCase));
+        
+        // If the team has been eliminated, show red even if no winner selected yet
+        if (isEliminated)
+        {
+            return "cell-loss";
+        }
+        
+        // Check if a winner has been selected for this game
+        string winner = "";
         if (simulatedWinners.ContainsKey(game.Id)) winner = simulatedWinners[game.Id];
 
         if (!string.IsNullOrEmpty(winner))
         {
             return string.Equals(pick, winner, StringComparison.OrdinalIgnoreCase) ? "cell-win" : "cell-loss";
         }
+        
         return "";
     }
 }
