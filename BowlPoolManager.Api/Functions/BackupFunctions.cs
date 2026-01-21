@@ -64,11 +64,13 @@ namespace BowlPoolManager.Api.Functions
                 });
 
                 // 5. Serialize & Return
+                var jsonString = JsonSerializer.Serialize(backupData, new JsonSerializerOptions { WriteIndented = true });
+                
                 var response = req.CreateResponse(HttpStatusCode.OK);
                 response.Headers.Add("Content-Type", "application/json");
-                response.Headers.Add("Content-Disposition", $"attachment; filename=BowlPool_Backup_{DateTime.UtcNow:yyyy-MM-dd}.json");
+                response.Headers.Add("Content-Disposition", $"attachment; filename=\"BowlPool_Backup_{DateTime.UtcNow:yyyy-MM-dd}.json\"");
 
-                await response.WriteAsJsonAsync(backupData);
+                await response.WriteStringAsync(jsonString);
                 return response;
             }
             catch (Exception ex)
