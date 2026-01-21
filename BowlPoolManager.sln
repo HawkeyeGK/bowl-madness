@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BowlPoolManager.Core", "Bow
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BowlPoolManager.Api", "BowlPoolManager.Api\BowlPoolManager.Api.csproj", "{3344E3ED-7097-417E-B3C8-D2A13EEEDED8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BowlPoolManager.Tests", "BowlPoolManager.Tests\BowlPoolManager.Tests.csproj", "{916B2A35-D8C0-4308-8A22-273FF04E20B5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{3344E3ED-7097-417E-B3C8-D2A13EEEDED8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3344E3ED-7097-417E-B3C8-D2A13EEEDED8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3344E3ED-7097-417E-B3C8-D2A13EEEDED8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{916B2A35-D8C0-4308-8A22-273FF04E20B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{916B2A35-D8C0-4308-8A22-273FF04E20B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{916B2A35-D8C0-4308-8A22-273FF04E20B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{916B2A35-D8C0-4308-8A22-273FF04E20B5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
