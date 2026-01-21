@@ -40,12 +40,7 @@ builder.Services.AddSingleton<CosmosClient>(sp =>
     return new CosmosClient(connStr, clientOptions);
 });
 
-builder.Services.AddSingleton<Container>(sp =>
-{
-    var client = sp.GetRequiredService<CosmosClient>();
-    // Lightweight proxy only. Does not check existence.
-    return client.GetContainer(Constants.Database.DbName, Constants.Database.ContainerName);
-});
+// REMOVED: Single Container registration is no longer needed.
 
 builder.Services.AddSingleton<IGameRepository, GameRepository>();
 builder.Services.AddSingleton<IPoolRepository, PoolRepository>();
@@ -71,7 +66,11 @@ using (var scope = host.Services.CreateScope())
             
             // Async creation - perfectly safe here!
             var db = await client.CreateDatabaseIfNotExistsAsync(Constants.Database.DbName);
-            await db.Database.CreateContainerIfNotExistsAsync(Constants.Database.ContainerName, Constants.Database.PartitionKeyPath);
+            
+            // Create New Containers
+            await db.Database.CreateContainerIfNotExistsAsync(Constants.Database.PlayersContainer, Constants.Database.DefaultPartitionKey);
+            await db.Database.CreateContainerIfNotExistsAsync(Constants.Database.SeasonsContainer, Constants.Database.SeasonPartitionKey);
+            await db.Database.CreateContainerIfNotExistsAsync(Constants.Database.PicksContainer, Constants.Database.SeasonPartitionKey);
         }
         catch (Exception ex)
         {

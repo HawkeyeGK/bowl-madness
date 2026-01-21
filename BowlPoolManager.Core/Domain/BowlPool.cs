@@ -9,6 +9,10 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("id")]
         public string Id { get; set; } = Guid.NewGuid().ToString();
 
+        [JsonProperty("seasonId")]
+        [JsonPropertyName("seasonId")]
+        public string SeasonId { get; set; } = Constants.CurrentSeason;
+
         [JsonProperty("name")]
         [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;

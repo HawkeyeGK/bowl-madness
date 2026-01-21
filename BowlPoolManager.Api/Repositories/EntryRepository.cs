@@ -7,9 +7,9 @@ namespace BowlPoolManager.Api.Repositories
 {
     public class EntryRepository : CosmosRepositoryBase, IEntryRepository
     {
-        public EntryRepository(Container container) : base(container) { }
+        public EntryRepository(CosmosClient cosmosClient) : base(cosmosClient, Constants.Database.PicksContainer) { }
 
-        public async Task AddEntryAsync(BracketEntry entry) => await UpsertDocumentAsync(entry, entry.Id);
+        public async Task AddEntryAsync(BracketEntry entry) => await UpsertDocumentAsync(entry, entry.SeasonId);
 
         public async Task<List<BracketEntry>> GetEntriesAsync(string? poolId = null)
         {
@@ -23,8 +23,25 @@ namespace BowlPoolManager.Api.Repositories
             return await QueryAsync<BracketEntry>(new QueryDefinition(sql));
         }
 
-        public async Task<BracketEntry?> GetEntryAsync(string id) => await GetDocumentAsync<BracketEntry>(id);
-        public async Task DeleteEntryAsync(string id) => await DeleteDocumentAsync<BracketEntry>(id);
+        public async Task<BracketEntry?> GetEntryAsync(string id)
+        {
+             var sql = "SELECT * FROM c WHERE c.id = @id";
+             var queryDef = new QueryDefinition(sql).WithParameter("@id", id);
+             var results = await QueryAsync<BracketEntry>(queryDef);
+             return results.FirstOrDefault();
+        }
+
+        public async Task DeleteEntryAsync(string id)
+        {
+             var sql = "SELECT * FROM c WHERE c.id = @id";
+             var queryDef = new QueryDefinition(sql).WithParameter("@id", id);
+             var results = await QueryAsync<BracketEntry>(queryDef);
+             var entry = results.FirstOrDefault();
+             if (entry != null)
+             {
+                 await DeleteDocumentAsync<BracketEntry>(id, entry.SeasonId);
+             }
+        }
 
         public async Task<List<BracketEntry>> GetEntriesForUserAsync(string userId, string poolId)
         {

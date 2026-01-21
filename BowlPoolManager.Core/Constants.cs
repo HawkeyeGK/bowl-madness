@@ -5,9 +5,20 @@ namespace BowlPoolManager.Core
         public static class Database
         {
             public const string DbName = "BowlMadnessDb";
-            public const string ContainerName = "MainContainer";
-            public const string PartitionKeyPath = "/id";
+            public const string MainContainerName = "MainContainer"; // Deprecated after migration
+            
+            // New Architecture
+            public const string PlayersContainer = "Players";
+            public const string SeasonsContainer = "Seasons"; 
+            public const string PicksContainer = "Picks";
+
+            // Partition Keys
+            public const string DefaultPartitionKey = "/id";
+            public const string SeasonPartitionKey = "/seasonId";
         }
+
+        // Helper to standardize the current active season for the migration
+        public const string CurrentSeason = "2025";
 
         public static class Roles
         {

@@ -7,11 +7,22 @@ namespace BowlPoolManager.Api.Repositories
 {
     public class GameRepository : CosmosRepositoryBase, IGameRepository
     {
-        public GameRepository(Container container) : base(container) { }
+        public GameRepository(CosmosClient cosmosClient) : base(cosmosClient, Constants.Database.SeasonsContainer) { }
 
-        public async Task AddGameAsync(BowlGame game) => await UpsertDocumentAsync(game, game.Id);
-        public async Task UpdateGameAsync(BowlGame game) => await UpsertDocumentAsync(game, game.Id);
+        public async Task AddGameAsync(BowlGame game) => await UpsertDocumentAsync(game, game.SeasonId);
+        public async Task UpdateGameAsync(BowlGame game) => await UpsertDocumentAsync(game, game.SeasonId);
         public async Task<List<BowlGame>> GetGamesAsync() => await GetListAsync<BowlGame>(Constants.DocumentTypes.BowlGame);
-        public async Task DeleteGameAsync(string gameId) => await DeleteDocumentAsync<BowlGame>(gameId);
+        
+        public async Task DeleteGameAsync(string gameId)
+        {
+             var sql = "SELECT * FROM c WHERE c.id = @id";
+             var queryDef = new QueryDefinition(sql).WithParameter("@id", gameId);
+             var games = await QueryAsync<BowlGame>(queryDef);
+             var game = games.FirstOrDefault();
+             if (game != null)
+             {
+                 await DeleteDocumentAsync<BowlGame>(gameId, game.SeasonId);
+             }
+        }
     }
 }
