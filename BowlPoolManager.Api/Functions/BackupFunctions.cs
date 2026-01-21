@@ -16,13 +16,15 @@ namespace BowlPoolManager.Api.Functions
         private readonly IEntryRepository _entryRepo;
         private readonly IGameRepository _gameRepo;
         private readonly IUserRepository _userRepo;
+        private readonly IPoolRepository _poolRepo;
 
-        public BackupFunctions(ILoggerFactory loggerFactory, IEntryRepository entryRepo, IGameRepository gameRepo, IUserRepository userRepo)
+        public BackupFunctions(ILoggerFactory loggerFactory, IEntryRepository entryRepo, IGameRepository gameRepo, IUserRepository userRepo, IPoolRepository poolRepo)
         {
             _logger = loggerFactory.CreateLogger<BackupFunctions>();
             _entryRepo = entryRepo;
             _gameRepo = gameRepo;
             _userRepo = userRepo;
+            _poolRepo = poolRepo;
         }
 
         [Function("GetBackupData")]
@@ -43,24 +45,34 @@ namespace BowlPoolManager.Api.Functions
                 // 2. Fetch Data
                 var allEntries = await _entryRepo.GetEntriesAsync();
                 var allGames = await _gameRepo.GetGamesAsync();
+                var allPools = await _poolRepo.GetPoolsAsync();
+                var allUsers = await _userRepo.GetUsersAsync();
 
-                // 3. Create Game ID Lookup Map
+                // 3. Create ID Lookup Maps
                 var gameMap = allGames.ToDictionary(g => g.Id, g => g.BowlName);
+                var poolMap = allPools.ToDictionary(p => p.Id, p => p.Name);
+                
+                // For users, fallback to Email if DisplayName is empty, or "Unknown User"
+                var userMap = allUsers.ToDictionary(u => u.Id, u => !string.IsNullOrWhiteSpace(u.DisplayName) ? u.DisplayName : u.Email);
 
                 // 4. Transform Entries (Replace keys)
                 var backupData = allEntries.Select(entry => new
                 {
                     entry.Id,
-                    entry.PoolId,
-                    entry.UserId,
-                    entry.PlayerName,
+                    // Replace PoolId with Name
+                    PoolName = poolMap.ContainsKey(entry.PoolId) ? poolMap[entry.PoolId] : entry.PoolId,
+                    // Replace UserId with DisplayName/Email
+                    UserName = userMap.ContainsKey(entry.UserId) ? userMap[entry.UserId] : entry.UserId,
+                    
+                    entry.PlayerName, // This is the Bracket Name
                     entry.TieBreakerPoints,
                     entry.CreatedOn,
+                    
                     // Replace GameId keys with BowlName
                     Picks = entry.Picks?.ToDictionary(
                         kvp => gameMap.ContainsKey(kvp.Key) ? gameMap[kvp.Key] : kvp.Key, // Fallback to ID if not found
                         kvp => kvp.Value
-                    )
+                    ) ?? new Dictionary<string, string>()
                 });
 
                 // 5. Serialize & Return
