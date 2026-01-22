@@ -7,6 +7,7 @@
 @using BowlPoolManager.Client.Services
 @attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
 @inject IPoolService PoolService
+@inject ISeasonService SeasonService
 @inject IJSRuntime JS 
 
 <PageTitle>Pool Administration</PageTitle>
@@ -134,7 +135,15 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Season</label>
-                            <InputNumber @bind-Value="editingPool.Season" class="form-control" />
+                            <InputSelect @bind-Value="editingPool.SeasonId" class="form-select">
+                                @if (seasons != null)
+                                {
+                                    @foreach (var s in seasons)
+                                    {
+                                        <option value="@s.Id">@s.Name</option>
+                                    }
+                                }
+                            </InputSelect>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Invite Code</label>
@@ -158,6 +167,7 @@
 
 @code {
     private List<BowlPool> pools = new();
+    private List<Season> seasons = new();
     private BowlPool? editingPool;
     private bool isLoading = true;
     private bool showModal = false;
@@ -165,6 +175,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadSeasons();
         await LoadPools();
     }
 
@@ -185,12 +196,35 @@
         }
     }
 
+    private async Task LoadSeasons()
+    {
+        try
+        {
+            seasons = await SeasonService.GetSeasonsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading seasons: {ex.Message}");
+        }
+    }
+
     private void EditPool(BowlPool pool)
     {
         if (string.IsNullOrEmpty(pool.Id))
         {
             pool.LockDate = DateTime.UtcNow.AddDays(7);
-            pool.Season = DateTime.Now.Year;
+            // Default to current season (first in list as logic below or service logic)
+            var current = seasons.FirstOrDefault(s => s.IsCurrent);
+            if (current != null)
+            {
+                pool.SeasonId = current.Id;
+                pool.Season = int.Parse(current.Id);
+            }
+            else 
+            {
+                pool.Season = DateTime.Now.Year;
+                pool.SeasonId = pool.Season.ToString();
+            }
         }
         
         editingPool = pool;
@@ -216,6 +250,12 @@
         else 
         {
             return;
+        }
+
+        // Sync Season (Int) with SeasonId (String) just in case
+        if (int.TryParse(editingPool.SeasonId, out int year))
+        {
+            editingPool.Season = year;
         }
 
         // Use 'CreatePoolAsync'
