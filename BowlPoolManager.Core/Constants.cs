@@ -10,6 +10,7 @@ namespace BowlPoolManager.Core
             public const string PlayersContainer = "Players";
             public const string SeasonsContainer = "Seasons"; 
             public const string PicksContainer = "Picks";
+            public const string ArchivesContainer = "PoolArchives";
 
             // Partition Keys
             public const string DefaultPartitionKey = "/id";

@@ -46,6 +46,7 @@ builder.Services.AddSingleton<IGameRepository, GameRepository>();
 builder.Services.AddSingleton<IPoolRepository, PoolRepository>();
 builder.Services.AddSingleton<IEntryRepository, EntryRepository>();
 builder.Services.AddSingleton<IUserRepository, UserRepository>();
+builder.Services.AddSingleton<IArchiveRepository, ArchiveRepository>();
 // --------------------------------
 
 var host = builder.Build();
@@ -71,6 +72,8 @@ using (var scope = host.Services.CreateScope())
             await db.Database.CreateContainerIfNotExistsAsync(Constants.Database.PlayersContainer, Constants.Database.DefaultPartitionKey);
             await db.Database.CreateContainerIfNotExistsAsync(Constants.Database.SeasonsContainer, Constants.Database.SeasonPartitionKey);
             await db.Database.CreateContainerIfNotExistsAsync(Constants.Database.PicksContainer, Constants.Database.SeasonPartitionKey);
+            // NEW: Archives Container
+            await db.Database.CreateContainerIfNotExistsAsync(Constants.Database.ArchivesContainer, Constants.Database.SeasonPartitionKey);
         }
         catch (Exception ex)
         {

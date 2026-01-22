@@ -31,6 +31,15 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("inviteCode")]
         public string InviteCode { get; set; } = string.Empty;
 
+        // NEW: Phase 3.1 - Soft Archive support
+        [JsonProperty("isConcluded")]
+        [JsonPropertyName("isConcluded")]
+        public bool IsConcluded { get; set; } = false;
+
+        [JsonProperty("isArchived")]
+        [JsonPropertyName("isArchived")]
+        public bool IsArchived { get; set; } = false;
+
         // COSMOS DISCRIMINATOR
         [JsonProperty("type")]
         [JsonPropertyName("type")]

@@ -86,5 +86,27 @@ namespace BowlPoolManager.Api.Functions
             await response.WriteAsJsonAsync(pools);
             return response;
         }
+
+        [Function("ToggleConclusion")]
+        public async Task<HttpResponseData> ToggleConclusion(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "Pools/{poolId}/ToggleConclusion")] HttpRequestData req,
+            string poolId)
+        {
+            _logger.LogInformation($"Toggling conclusion for pool {poolId}.");
+            
+            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
+            if (!authResult.IsValid) return authResult.ErrorResponse!;
+
+            var pool = await _poolRepo.GetPoolAsync(poolId);
+            if (pool == null) return req.CreateResponse(HttpStatusCode.NotFound);
+
+            pool.IsConcluded = !pool.IsConcluded;
+            
+            await _poolRepo.AddPoolAsync(pool);
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            await response.WriteAsJsonAsync(pool);
+            return response;
+        }
     }
 }
