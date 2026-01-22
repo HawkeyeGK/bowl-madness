@@ -9,6 +9,7 @@
 @inject IPoolService PoolService
 @inject ISeasonService SeasonService
 @inject IJSRuntime JS 
+@inject HttpClient Http 
 
 <PageTitle>Pool Administration</PageTitle>
 
@@ -135,7 +136,10 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Season</label>
-                            <InputSelect @bind-Value="editingPool.SeasonId" class="form-select">
+                            <InputSelect Value="@editingPool.SeasonId" 
+                                         ValueChanged="@((string s) => OnSeasonChanged(s))" 
+                                         ValueExpression="@(() => editingPool.SeasonId)" 
+                                         class="form-select">
                                 @if (seasons != null)
                                 {
                                     @foreach (var s in seasons)
@@ -144,6 +148,43 @@
                                     }
                                 }
                             </InputSelect>
+                        </div>
+                        
+                        @* GAME SELECTION *@
+                        <div class="mb-3">
+                            <label class="form-label d-block">Included Games</label>
+                            
+                            @if (seasonGames == null)
+                            {
+                                <div class="text-muted small">Select a season to load games...</div>
+                            }
+                            else if (!seasonGames.Any())
+                            {
+                                <div class="alert alert-warning py-2 mb-0 small">No games found for this season.</div>
+                            }
+                            else
+                            {
+                                <div class="d-flex gap-2 mb-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="SelectAllGames">All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="DeselectAllGames">None</button>
+                                </div>
+                                <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
+                                    @foreach (var game in seasonGames.OrderBy(g => g.StartTime))
+                                    {
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" 
+                                                   id="game_@game.Id" 
+                                                   checked="@(editingPool.GameIds.Contains(game.Id))"
+                                                   @onchange="@(e => ToggleGame(game.Id, e.Value))" />
+                                            <label class="form-check-label small" for="game_@game.Id">
+                                                <strong>@game.BowlName</strong> 
+                                                <span class="text-muted">(@game.TeamHome vs @game.TeamAway)</span>
+                                            </label>
+                                        </div>
+                                    }
+                                </div>
+                                <div class="form-text">@editingPool.GameIds.Count games selected</div>
+                            }
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Invite Code</label>
@@ -168,6 +209,7 @@
 @code {
     private List<BowlPool> pools = new();
     private List<Season> seasons = new();
+    private List<BowlGame> seasonGames = new();
     private BowlPool? editingPool;
     private bool isLoading = true;
     private bool showModal = false;
@@ -213,7 +255,7 @@
         if (string.IsNullOrEmpty(pool.Id))
         {
             pool.LockDate = DateTime.UtcNow.AddDays(7);
-            // Default to current season (first in list as logic below or service logic)
+            // Default to current season
             var current = seasons.FirstOrDefault(s => s.IsCurrent);
             if (current != null)
             {
@@ -225,13 +267,90 @@
                 pool.Season = DateTime.Now.Year;
                 pool.SeasonId = pool.Season.ToString();
             }
+            // Initialize GameIds
+            pool.GameIds = new List<string>();
         }
         
         editingPool = pool;
+        
+        // Load games for the initial season
+        _ = LoadGamesForSeason(editingPool.SeasonId);
+
         var central = DateTimeHelper.ToCentral(pool.LockDate);
         lockDateString = central.ToString("yyyy-MM-ddTHH:mm");
         
         showModal = true;
+    }
+
+    private async Task OnSeasonChanged(string newSeasonId)
+    {
+        if (editingPool == null) return;
+        
+        editingPool.SeasonId = newSeasonId;
+        if (int.TryParse(newSeasonId, out int year))
+        {
+            editingPool.Season = year;
+        }
+
+        // Reload games for the new season
+        await LoadGamesForSeason(newSeasonId);
+        
+        // Optional: Auto-select all games for new pools? 
+        // For now, let's just clear selection if switching seasons involves completely different games
+        // Or keep IDs if they happen to match (unlikely between seasons)
+        // Let's safe-guard: available games list changed, IDs might be invalid, but user can manage.
+    }
+
+    private async Task LoadGamesForSeason(string seasonId)
+    {
+        try
+        {
+            seasonGames = await Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={seasonId}") ?? new List<BowlGame>();
+            
+            // If NEW pool, auto-select all games by default for convenience
+            if (string.IsNullOrEmpty(editingPool?.Id) && editingPool != null && !editingPool.GameIds.Any())
+            {
+               editingPool.GameIds = seasonGames.Select(g => g.Id).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading games: {ex.Message}");
+            seasonGames = new List<BowlGame>();
+        }
+        StateHasChanged();
+    }
+
+    private void ToggleGame(string gameId, object? checkedValue)
+    {
+        if (editingPool == null) return;
+        
+        bool isChecked = (bool)(checkedValue ?? false);
+        if (isChecked && !editingPool.GameIds.Contains(gameId))
+        {
+            editingPool.GameIds.Add(gameId);
+        }
+        else if (!isChecked && editingPool.GameIds.Contains(gameId))
+        {
+            editingPool.GameIds.Remove(gameId);
+        }
+    }
+
+    private void SelectAllGames()
+    {
+        if (editingPool == null) return;
+        foreach(var g in seasonGames)
+        {
+            if (!editingPool.GameIds.Contains(g.Id)) editingPool.GameIds.Add(g.Id);
+        }
+    }
+
+    private void DeselectAllGames()
+    {
+        if (editingPool == null) return;
+        // Only remove games that are in the current season list (preserve others if mixed?)
+        // Strictly speaking, a pool usually belongs to one season, so clearing all is fine.
+        editingPool.GameIds.Clear();
     }
 
     private void CloseModal()
