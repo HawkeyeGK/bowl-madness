@@ -45,6 +45,11 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("gameId")]
         public string GameId { get; set; } = string.Empty;
 
+        [JsonProperty("startTime")]
+        [JsonPropertyName("startTime")]
+        public DateTime StartTime { get; set; } = DateTime.UtcNow;
+
+
         [JsonProperty("bowlName")]
         [JsonPropertyName("bowlName")]
         public string BowlName { get; set; } = string.Empty;

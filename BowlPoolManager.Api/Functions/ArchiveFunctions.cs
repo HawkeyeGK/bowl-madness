@@ -79,6 +79,7 @@ namespace BowlPoolManager.Api.Functions
                 archive.Games.Add(new ArchiveGame
                 {
                     GameId = g.Id,
+                    StartTime = g.StartTime,
                     BowlName = g.BowlName,
                     TeamHome = g.TeamHome,
                     TeamHomeScore = g.TeamHomeScore,

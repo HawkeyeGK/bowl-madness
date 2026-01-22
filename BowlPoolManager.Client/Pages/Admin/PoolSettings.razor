@@ -85,6 +85,12 @@
                                             <a href="history/@pool.Id" class="btn btn-sm btn-info me-1" title="View Archive">
                                                 <i class="bi bi-eye"></i> View
                                             </a>
+                                            <button class="btn btn-sm btn-outline-warning me-1" 
+                                                    disabled="@(!pool.IsConcluded)"
+                                                    @onclick="() => ArchivePool(pool)"
+                                                    title="Re-Archive Pool">
+                                                <i class="bi bi-arrow-repeat"></i>
+                                            </button>
                                         }
                                         else
                                         {
@@ -238,7 +244,11 @@
 
     private async Task ArchivePool(BowlPool pool)
     {
-        if (!await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to archive '{pool.Name}'? This creates a permanent snapshot."))
+        var message = pool.IsArchived 
+            ? $"Are you sure you want to RE-ARCHIVE '{pool.Name}'? This will OVERWRITE the existing archive with current data." 
+            : $"Are you sure you want to archive '{pool.Name}'? This creates a permanent snapshot.";
+
+        if (!await JS.InvokeAsync<bool>("confirm", message))
         {
             return;
         }

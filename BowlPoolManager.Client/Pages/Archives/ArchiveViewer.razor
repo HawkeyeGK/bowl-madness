@@ -88,7 +88,7 @@
                         </h5>
                     </div>
                     <div class="list-group list-group-flush" style="max-height: 800px; overflow-y: auto;">
-                        @foreach (var game in archive.Games.OrderBy(g => g.BowlName)) 
+                        @foreach (var game in archive.Games.OrderByDescending(g => g.StartTime).ThenBy(g => g.BowlName)) 
                         {
                             <div class="list-group-item">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
