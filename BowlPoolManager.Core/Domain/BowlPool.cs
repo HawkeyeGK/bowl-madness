@@ -21,6 +21,11 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("season")]
         public int Season { get; set; } = DateTime.Now.Year;
 
+        // NEW: Explicitly list games in this pool (Phase 4 Decoupling)
+        [JsonProperty("gameIds")]
+        [JsonPropertyName("gameIds")]
+        public List<string> GameIds { get; set; } = new List<string>();
+
         // NEW: The Master Deadline (No picks/entries after this)
         [JsonProperty("lockDate")]
         [JsonPropertyName("lockDate")]
