@@ -391,6 +391,14 @@
 
     private void EditEntry(BracketEntry entry)
     {
+        // 1. Check for Archive
+        var pool = pools.FirstOrDefault(p => p.Id == entry.PoolId);
+        if (pool != null && pool.IsArchived)
+        {
+            Nav.NavigateTo($"history/{pool.Id}");
+            return;
+        }
+
         // Safe deep copy serialization
         activeEntry = System.Text.Json.JsonSerializer.Deserialize<BracketEntry>(
             System.Text.Json.JsonSerializer.Serialize(entry)
