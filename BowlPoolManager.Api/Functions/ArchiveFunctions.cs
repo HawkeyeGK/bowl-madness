@@ -157,5 +157,30 @@ namespace BowlPoolManager.Api.Functions
             await response.WriteAsJsonAsync(archive);
             return response;
         }
+
+        [Function("GetArchive")]
+        public async Task<HttpResponseData> GetArchive(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "Archives/{poolId}")] HttpRequestData req,
+            string poolId)
+        {
+            _logger.LogInformation($"Getting archive for pool {poolId}.");
+            
+            // Construct the deterministic ID
+            var archiveId = $"Archive_{poolId}";
+            
+            // We can try fetching directly using the Repo if it supported ID-based lookup without PartitionKey
+            // But our Repo uses SeasonId as partition key.
+            // However, GetArchiveAsync in the Repo implementation I wrote earlier does:
+            // "SELECT * FROM c WHERE c.id = @id"
+            // This is a cross-partition query if PK is not provided, which is acceptable for single-item lookups on low volume.
+            
+            var archive = await _archiveRepo.GetArchiveAsync(archiveId);
+            
+            if (archive == null) return req.CreateResponse(HttpStatusCode.NotFound);
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            await response.WriteAsJsonAsync(archive);
+            return response;
+        }
     }
 }

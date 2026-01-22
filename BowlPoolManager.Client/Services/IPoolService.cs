@@ -9,5 +9,6 @@ namespace BowlPoolManager.Client.Services
         Task<BowlPool?> CreatePoolAsync(BowlPool pool);
         Task<BowlPool?> ToggleConclusionAsync(string poolId); 
         Task<bool> ArchivePoolAsync(string poolId);
+        Task<PoolArchive?> GetArchiveAsync(string poolId);
     }
 }
