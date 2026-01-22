@@ -5,7 +5,6 @@ namespace BowlPoolManager.Core
         public static class Database
         {
             public const string DbName = "BowlMadnessDb";
-            public const string MainContainerName = "MainContainer"; // Deprecated after migration
             
             // New Architecture
             public const string PlayersContainer = "Players";

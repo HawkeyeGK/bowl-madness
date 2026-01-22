@@ -1,95 +1,108 @@
-using System.Net;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
+using System.Text;
 using System.Text.Json;
-using BowlPoolManager.Core;
-using BowlPoolManager.Core.Domain;
-using BowlPoolManager.Api.Helpers;
-using BowlPoolManager.Api.Repositories;
+using BowlPoolManager.Core; // Ensure access to Constants
 
 namespace BowlPoolManager.Api.Functions
 {
     public class BackupFunctions
     {
-        private readonly ILogger _logger;
-        private readonly IEntryRepository _entryRepo;
-        private readonly IGameRepository _gameRepo;
-        private readonly IUserRepository _userRepo;
-        private readonly IPoolRepository _poolRepo;
+        private readonly CosmosClient _cosmosClient;
+        private readonly ILogger<BackupFunctions> _logger;
 
-        public BackupFunctions(ILoggerFactory loggerFactory, IEntryRepository entryRepo, IGameRepository gameRepo, IUserRepository userRepo, IPoolRepository poolRepo)
+        public BackupFunctions(CosmosClient cosmosClient, ILogger<BackupFunctions> logger)
         {
-            _logger = loggerFactory.CreateLogger<BackupFunctions>();
-            _entryRepo = entryRepo;
-            _gameRepo = gameRepo;
-            _userRepo = userRepo;
-            _poolRepo = poolRepo;
+            _cosmosClient = cosmosClient;
+            _logger = logger;
         }
 
         [Function("GetBackupData")]
-        public async Task<HttpResponseData> GetBackupData([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
+        public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req)
         {
-            _logger.LogInformation("Generating backup download.");
+            _logger.LogInformation("Backup download requested.");
 
-            try
+            var db = _cosmosClient.GetDatabase(Constants.Database.DbName);
+            var seasonsContainer = db.GetContainer(Constants.Database.SeasonsContainer);
+            var picksContainer = db.GetContainer(Constants.Database.PicksContainer);
+
+            // 1. Fetch Bowl Games (from Seasons Container)
+            // Note: We scan all seasons or just current? For a full backup, usually all valid games.
+            // Using a cross-partition query to get all definitions.
+            var gamesQuery = new QueryDefinition("SELECT c.id, c.bowlName FROM c WHERE c.type = 'BowlGame'");
+            var gameMap = new Dictionary<string, string>();
+            
+            using (var feed = seasonsContainer.GetItemQueryIterator<BowlGameDto>(gamesQuery))
             {
-                // 1. Auth Check (SuperAdmin only)
-                var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
-                if (!authResult.IsValid) 
+                while (feed.HasMoreResults)
                 {
-                    _logger.LogWarning("Backup attempt failed validation.");
-                    return authResult.ErrorResponse!;
+                    var response = await feed.ReadNextAsync();
+                    foreach (var game in response)
+                    {
+                        if (!gameMap.ContainsKey(game.id))
+                        {
+                            gameMap.Add(game.id, game.bowlName);
+                        }
+                    }
                 }
-
-                // 2. Fetch Data
-                var allEntries = await _entryRepo.GetEntriesAsync();
-                var allGames = await _gameRepo.GetGamesAsync();
-                var allPools = await _poolRepo.GetPoolsAsync();
-                var allUsers = await _userRepo.GetUsersAsync();
-
-                // 3. Create ID Lookup Maps
-                var gameMap = allGames.ToDictionary(g => g.Id, g => g.BowlName);
-                var poolMap = allPools.ToDictionary(p => p.Id, p => p.Name);
-                
-                // For users, fallback to Email if DisplayName is empty, or "Unknown User"
-                var userMap = allUsers.ToDictionary(u => u.Id, u => !string.IsNullOrWhiteSpace(u.DisplayName) ? u.DisplayName : u.Email);
-
-                // 4. Transform Entries (Replace keys)
-                var backupData = allEntries.Select(entry => new
-                {
-                    entry.Id,
-                    // Replace PoolId with Name
-                    PoolName = poolMap.ContainsKey(entry.PoolId) ? poolMap[entry.PoolId] : entry.PoolId,
-                    // Replace UserId with DisplayName/Email
-                    UserName = userMap.ContainsKey(entry.UserId) ? userMap[entry.UserId] : entry.UserId,
-                    
-                    entry.PlayerName, // This is the Bracket Name
-                    entry.TieBreakerPoints,
-                    entry.CreatedOn,
-                    
-                    // Replace GameId keys with BowlName
-                    Picks = entry.Picks?.ToDictionary(
-                        kvp => gameMap.ContainsKey(kvp.Key) ? gameMap[kvp.Key] : kvp.Key, // Fallback to ID if not found
-                        kvp => kvp.Value
-                    ) ?? new Dictionary<string, string>()
-                });
-
-                // 5. Serialize & Return
-                var jsonString = JsonSerializer.Serialize(backupData, new JsonSerializerOptions { WriteIndented = true });
-                
-                var response = req.CreateResponse(HttpStatusCode.OK);
-                response.Headers.Add("Content-Type", "application/json");
-                response.Headers.Add("Content-Disposition", $"attachment; filename=\"BowlPool_Backup_{DateTime.UtcNow:yyyy-MM-dd}.json\"");
-
-                await response.WriteStringAsync(jsonString);
-                return response;
             }
-            catch (Exception ex)
+
+            // 2. Fetch Picks (from Picks Container)
+            var picksQuery = new QueryDefinition("SELECT * FROM c WHERE c.type = 'BracketEntry'");
+            var rawPicks = new List<BracketEntryDto>();
+
+            using (var feed = picksContainer.GetItemQueryIterator<BracketEntryDto>(picksQuery))
             {
-                _logger.LogError(ex, "GetBackupData failed.");
-                return req.CreateResponse(HttpStatusCode.InternalServerError);
+                while (feed.HasMoreResults)
+                {
+                    var response = await feed.ReadNextAsync();
+                    rawPicks.AddRange(response);
+                }
             }
+
+            // 3. Enrich Data (Join Picks with Bowl Names)
+            var exportData = rawPicks.Select(entry => new 
+            {
+                PlayerName = entry.playerName,
+                PlayerId = entry.userId,
+                Timestamp = entry.createdOn,
+                TieBreaker = entry.tieBreakerPoints,
+                Picks = entry.picks?.Select(p => new 
+                {
+                    BowlName = gameMap.ContainsKey(p.Key) ? gameMap[p.Key] : "Unknown Bowl",
+                    GameId = p.Key,
+                    SelectedTeam = p.Value
+                }).OrderBy(x => x.BowlName).ToList()
+            }).OrderBy(x => x.PlayerName).ToList();
+
+            // 4. Serialize and Return
+            var json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions { WriteIndented = true });
+            var bytes = Encoding.UTF8.GetBytes(json);
+            var fileName = $"BowlPool_Backup_{DateTime.UtcNow:yyyyMMdd}.json";
+
+            return new FileContentResult(bytes, "application/json")
+            {
+                FileDownloadName = fileName
+            };
+        }
+
+        // DTOs (Keep existing)
+        private class BowlGameDto
+        {
+            public string id { get; set; } = string.Empty;
+            public string bowlName { get; set; } = string.Empty;
+        }
+
+        private class BracketEntryDto
+        {
+            public string userId { get; set; } = string.Empty;
+            public string playerName { get; set; } = string.Empty;
+            public Dictionary<string, string> picks { get; set; } = new();
+            public int tieBreakerPoints { get; set; }
+            public DateTime createdOn { get; set; }
         }
     }
 }
