@@ -17,6 +17,7 @@ builder.Services.AddScoped<AuthenticationStateProvider, StaticWebAppsAuthenticat
 
 // DOMAIN SERVICES
 builder.Services.AddScoped<IPoolService, PoolService>();
+builder.Services.AddScoped<ISeasonService, SeasonService>();
 
 // REGISTER APPSTATE
 builder.Services.AddScoped<AppState>();

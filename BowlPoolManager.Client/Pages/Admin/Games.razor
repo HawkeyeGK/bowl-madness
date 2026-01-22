@@ -9,6 +9,7 @@
 @attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
 @inject HttpClient Http
 @inject IJSRuntime JS
+@inject ISeasonService SeasonService
 
 <PageTitle>Game Management</PageTitle>
 
@@ -16,6 +17,22 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>Bowl Game Schedule</h1>
         <span class="badge bg-danger">Super Admin Zone</span>
+    </div>
+
+    @* Season Selector *@
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <label class="form-label fw-bold">Select Season:</label>
+            <select class="form-select" value="@selectedSeasonId" @onchange="OnSeasonChanged">
+                @if (seasons != null)
+                {
+                    @foreach (var s in seasons)
+                    {
+                        <option value="@s.Id">@s.Name</option>
+                    }
+                }
+            </select>
+        </div>
     </div>
 
     @* ID for Anchor Scrolling *@
@@ -218,6 +235,8 @@
 
 @code {
     private List<BowlGame>? games;
+    private List<Season>? seasons;
+    private string selectedSeasonId = "";
     private BowlGame newGame = new BowlGame { PointValue = 1 };
     
     // Initialize to tomorrow at noon Central
@@ -225,13 +244,19 @@
 
     protected override async Task OnInitializedAsync()
     {
-        ResetForm();
+        await LoadSeasons();
         await LoadGames();
+        ResetForm();
     }
 
     private void ResetForm()
     {
         newGame = new BowlGame { PointValue = 1 };
+        // Default to selected season if available
+        if (!string.IsNullOrEmpty(selectedSeasonId))
+        {
+            newGame.SeasonId = selectedSeasonId;
+        }
         var tomorrowCentral = DateTimeHelper.ToCentral(DateTime.UtcNow.AddDays(1));
         startTimeString = tomorrowCentral.ToString("yyyy-MM-ddTHH:mm");
         StateHasChanged();
@@ -241,12 +266,45 @@
     {
         try
         {
-            games = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
+            var url = "api/GetGames";
+            if (!string.IsNullOrEmpty(selectedSeasonId))
+            {
+                url += $"?seasonId={selectedSeasonId}";
+            }
+            games = await Http.GetFromJsonAsync<List<BowlGame>>(url);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[Game Admin] Error loading games: {ex.Message}");
         }
+    }
+
+    private async Task LoadSeasons()
+    {
+        try
+        {
+            seasons = await SeasonService.GetSeasonsAsync();
+            var current = seasons.FirstOrDefault(s => s.IsCurrent);
+            if (current != null)
+            {
+                selectedSeasonId = current.Id;
+            }
+            else if (seasons.Any())
+            {
+                selectedSeasonId = seasons.First().Id;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Game Admin] Error loading seasons: {ex.Message}");
+        }
+    }
+
+    private async Task OnSeasonChanged(ChangeEventArgs e)
+    {
+        selectedSeasonId = e.Value?.ToString() ?? "";
+        await LoadGames();
+        ResetForm(); // Update the new game SeasonId default
     }
 
     private async Task EditGame(BowlGame game)

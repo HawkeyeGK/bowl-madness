@@ -1,0 +1,151 @@
+@page "/admin/seasons"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@using BowlPoolManager.Client.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
+@inject ISeasonService SeasonService
+
+<PageTitle>Season Management</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Manage Seasons</h1>
+        <span class="badge bg-danger">Super Admin Zone</span>
+    </div>
+
+    <!-- Edit/Create Form -->
+    <div class="card mb-5 shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">@(isEditing ? "Edit Season" : "Add Season")</h5>
+        </div>
+        <div class="card-body">
+            <EditForm Model="@currentSeason" OnValidSubmit="HandleSaveSeason">
+                <DataAnnotationsValidator />
+                
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3">
+                        <label for="seasonId" class="form-label">Season ID (Year)</label>
+                        <InputText id="seasonId" class="form-control" @bind-Value="currentSeason.Id" placeholder="e.g. 2025" disabled="@isEditing" />
+                        <div class="form-text">Acts as the unique key.</div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label for="seasonName" class="form-label">Season Name</label>
+                        <InputText id="seasonName" class="form-control" @bind-Value="currentSeason.Name" placeholder="e.g. 2025-2026 Season" />
+                    </div>
+
+                    <div class="col-md-3 d-flex align-items-end">
+                        <div class="form-check form-switch mb-2">
+                            <InputCheckbox id="isCurrent" class="form-check-input" @bind-Value="currentSeason.IsCurrent" />
+                            <label class="form-check-label fw-bold" for="isCurrent">Is Current Season?</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-end">
+                    @if (isEditing)
+                    {
+                        <button type="button" class="btn btn-secondary me-2" @onclick="ResetForm">Cancel</button>
+                    }
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-save"></i> Save Season
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+
+    <!-- List -->
+    <h3 class="mb-3">Existing Seasons</h3>
+    @if (seasons == null)
+    {
+        <div class="alert alert-info">Loading seasons...</div>
+    }
+    else if (!seasons.Any())
+    {
+        <div class="alert alert-warning">No seasons defined.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-hover border align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Is Current</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var season in seasons.OrderByDescending(s => s.Id))
+                    {
+                        <tr class="@(season.IsCurrent ? "table-success" : "")">
+                            <td><code>@season.Id</code></td>
+                            <td>@season.Name</td>
+                            <td>
+                                @if (season.IsCurrent)
+                                {
+                                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Current</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => EditSeason(season)">Edit</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Season>? seasons;
+    private Season currentSeason = new Season();
+    private bool isEditing = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSeasons();
+    }
+
+    private async Task LoadSeasons()
+    {
+        seasons = await SeasonService.GetSeasonsAsync();
+    }
+
+    private void EditSeason(Season season)
+    {
+        // Clone to avoid editing reference directly in list
+        var json = System.Text.Json.JsonSerializer.Serialize(season);
+        currentSeason = System.Text.Json.JsonSerializer.Deserialize<Season>(json) ?? new Season();
+        isEditing = true;
+    }
+
+    private void ResetForm()
+    {
+        currentSeason = new Season();
+        isEditing = false;
+    }
+
+    private async Task HandleSaveSeason()
+    {
+        if (string.IsNullOrWhiteSpace(currentSeason.Id))
+            return;
+
+        // Ensure SeasonId matches Id if it's not automatically handled (Getter handles it but setters might need it)
+        // With Getter-only property in Season.cs, deserialization might fail if it tries to set it?
+        // Actually, I made SeasonId have a setter { } in Season.cs but it does nothing?
+        // Wait, if SeasonId mirrors Id, and deserialization sets Id, then accessing SeasonId gets Id. That's fine.
+        
+        await SeasonService.UpsertSeasonAsync(currentSeason);
+        ResetForm();
+        await LoadSeasons();
+    }
+}

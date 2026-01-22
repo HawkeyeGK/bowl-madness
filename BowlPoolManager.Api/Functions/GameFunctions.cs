@@ -38,7 +38,8 @@ namespace BowlPoolManager.Api.Functions
         public async Task<HttpResponseData> GetGames([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
             // Use Repo
-            var games = await _gameRepo.GetGamesAsync();
+            var seasonId = req.Query["seasonId"];
+            var games = await _gameRepo.GetGamesAsync(seasonId);
 
             // Delegate logic to the service
             await _scoringService.CheckAndRefreshScoresAsync(games);
