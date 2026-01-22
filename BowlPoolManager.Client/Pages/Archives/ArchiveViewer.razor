@@ -60,7 +60,9 @@
                             <tbody>
                                 @foreach (var entry in archive.Standings.OrderBy(s => s.Rank))
                                 {
-                                    <tr class="@(entry.Rank == 1 ? "table-warning fw-bold" : "")">
+                                    <tr class="@(entry.Rank == 1 ? "table-warning fw-bold" : "") @(selectedStanding == entry ? "table-active border border-primary border-2" : "")" 
+                                        @onclick="() => SelectEntry(entry)" 
+                                        style="cursor: pointer;">
                                         <td class="text-center h5 text-secondary">@entry.Rank</td>
                                         <td>
                                             @entry.PlayerName
@@ -80,10 +82,13 @@
             <div class="col-lg-4">
                 <div class="card shadow-sm h-100">
                     <div class="card-header bg-white py-3">
-                        <h5 class="mb-0"><i class="bi bi-calendar-check text-success me-2"></i>Game Results</h5>
+                        <h5 class="mb-0">
+                            <i class="bi bi-calendar-check text-success me-2"></i>
+                            @(selectedStanding == null ? "Game Results" : $"{selectedStanding.PlayerName}'s Picks")
+                        </h5>
                     </div>
                     <div class="list-group list-group-flush" style="max-height: 800px; overflow-y: auto;">
-                        @foreach (var game in archive.Games.OrderBy(g => g.BowlName)) // Or date? Archive doesn't store date. Using Bowl Name.
+                        @foreach (var game in archive.Games.OrderBy(g => g.BowlName)) 
                         {
                             <div class="list-group-item">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
@@ -102,6 +107,26 @@
                                         <span class="me-1">@game.TeamAwayScore</span> @game.TeamAway
                                     </div>
                                 </div>
+
+                                @* PICK VISUALIZATION *@
+                                @if (selectedStanding != null)
+                                {
+                                    var pick = GetPick(game);
+                                    var winner = GetWinner(game);
+                                    var isFinished = !string.IsNullOrEmpty(winner);
+                                    var correct = isFinished && pick == winner;
+                                    
+                                    <div class="mt-2 pt-2 border-top d-flex justify-content-between align-items-center bg-light px-2 rounded">
+                                        <small class="text-muted text-uppercase" style="font-size: 0.7rem;">Pick:</small>
+                                        <div class="fw-bold @(isFinished ? (correct ? "text-success" : "text-danger") : "text-dark")">
+                                            @pick
+                                            @if (isFinished)
+                                            {
+                                                <i class="bi @(correct ? "bi-check-lg" : "bi-x-lg") ms-1"></i>
+                                            }
+                                        </div>
+                                    </div>
+                                }
                             </div>
                         }
                     </div>
@@ -123,6 +148,7 @@
 
     private PoolArchive? archive;
     private bool isLoading = true;
+    private ArchiveStanding? selectedStanding; // NEW: Track selected entry
 
     protected override async Task OnInitializedAsync()
     {
@@ -133,11 +159,35 @@
         isLoading = false;
     }
 
+    private void SelectEntry(ArchiveStanding entry)
+    {
+        if (selectedStanding == entry)
+            selectedStanding = null; // Toggle off
+        else
+            selectedStanding = entry;
+    }
+
     private string GetWinner(ArchiveGame game)
     {
         if (!game.TeamHomeScore.HasValue || !game.TeamAwayScore.HasValue) return "";
         if (game.TeamHomeScore > game.TeamAwayScore) return game.TeamHome;
         if (game.TeamAwayScore > game.TeamHomeScore) return game.TeamAway;
         return "Tie";
+    }
+
+    private string GetPick(ArchiveGame game)
+    {
+        if (selectedStanding == null) return "";
+        if (selectedStanding.Picks.TryGetValue(game.GameId, out var pick))
+        {
+            return pick;
+        }
+        return "No Pick";
+    }
+
+    private bool IsCorrect(ArchiveGame game, string pick)
+    {
+        var winner = GetWinner(game);
+        return !string.IsNullOrEmpty(winner) && winner != "Tie" && pick == winner;
     }
 }
