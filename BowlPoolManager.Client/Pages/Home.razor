@@ -153,6 +153,7 @@
     private bool isLoading = true;
     private List<BowlPool> pools = new();
     private BowlPool? currentPool;
+    private List<BowlGame> allSeasonGames = new();
     private List<BowlGame> games = new();
     private List<BracketEntry> entries = new();
     private List<LeaderboardRow> leaderboard = new();
@@ -175,9 +176,11 @@
             
             await Task.WhenAll(poolsTask, gamesTask, myEntriesTask);
             pools = await poolsTask ?? new();
-            games = await gamesTask ?? new();
+            allSeasonGames = await gamesTask ?? new();
+            // Initial Filtering will happen in LoadEntriesForPool
+            
             var myEntries = await myEntriesTask;
-            totalFinalGames = games.Count(g => g.Status == GameStatus.Final);
+            // totalFinalGames will be calculated after filtering
 
             // Fetch the last update timestamp
             try {
@@ -245,6 +248,19 @@
         try
         {
             entries = await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetEntries?poolId={poolId}") ?? new();
+            
+            // FILTER GAMES FOR THIS POOL
+            if (currentPool != null && currentPool.GameIds != null && currentPool.GameIds.Any())
+            {
+               games = allSeasonGames.Where(g => currentPool.GameIds.Contains(g.Id)).ToList();
+            }
+            else
+            {
+               games = allSeasonGames.ToList();
+            }
+            
+            totalFinalGames = games.Count(g => g.Status == GameStatus.Final);
+            
             leaderboard = ScoringEngine.Calculate(games, entries);
             Sort(sortColumn, forceToggle: false);
         }

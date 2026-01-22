@@ -182,10 +182,10 @@
                 @* GAMES LIST *@
                 <div class="card shadow-sm mb-5">
                     <div class="card-header bg-dark text-white fw-bold">
-                        Make Your Picks (@(activeEntry.Picks?.Count ?? 0) / @games.Count Selected)
+                        Make Your Picks (@(activeEntry.Picks?.Count ?? 0) / @ValidGames.Count Selected)
                     </div>
                      <ul class="list-group list-group-flush">
-                        @foreach (var game in games.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
+                        @foreach (var game in ValidGames.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
                         {
                              // FIX: Safe dictionary access
                              string pick = "";
@@ -306,7 +306,35 @@
     private string toastMessage = "";
     
     private List<BowlPool> pools = new();
-    private List<BowlGame> games = new();
+    
+    private List<BowlGame> allSeasonGames = new();
+    
+    // Dynamic Filter for Editor
+    private List<BowlGame> ValidGames 
+    {
+        get 
+        {
+            if (viewMode != ViewMode.Editor) return new List<BowlGame>();
+            
+            BowlPool? targetPool = null;
+            if (!string.IsNullOrEmpty(activeEntry.PoolId))
+            {
+                targetPool = pools.FirstOrDefault(p => p.Id == activeEntry.PoolId);
+            }
+            else if (!string.IsNullOrEmpty(joinModel.InviteCode))
+            {
+                // Find pool by invite code
+                targetPool = pools.FirstOrDefault(p => string.Equals(p.InviteCode, joinModel.InviteCode, StringComparison.OrdinalIgnoreCase));
+            }
+            
+            if (targetPool != null && targetPool.GameIds != null && targetPool.GameIds.Any())
+            {
+                return allSeasonGames.Where(g => targetPool.GameIds.Contains(g.Id)).ToList();
+            }
+            
+            return allSeasonGames;
+        }
+    }
     
     private List<BracketEntry> myEntries = new();
     private BracketEntry activeEntry = new() { Picks = new Dictionary<string, string>() };
@@ -324,7 +352,7 @@
             await Task.WhenAll(poolsTask, gamesTask, entriesTask);
             
             pools = await poolsTask ?? new();
-            games = await gamesTask ?? new();
+            allSeasonGames = await gamesTask ?? new();
             myEntries = await entriesTask ?? new();
             
             // Ensure Active Entry has instantiated Picks
@@ -431,7 +459,9 @@
         activeEntry.Picks ??= new Dictionary<string, string>();
 
         // --- VALIDATION: CHECK MISSING PICKS ---
-        var missingGames = games.Where(g => !activeEntry.Picks.ContainsKey(g.Id) || string.IsNullOrEmpty(activeEntry.Picks[g.Id]))
+        // Ensure we only validate games that are officially part of this pool
+        var currentGames = ValidGames;
+        var missingGames = currentGames.Where(g => !activeEntry.Picks.ContainsKey(g.Id) || string.IsNullOrEmpty(activeEntry.Picks[g.Id]))
                                 .OrderBy(g => g.StartTime)
                                 .ToList();
         if (missingGames.Any())
@@ -499,7 +529,7 @@
 
     private LeaderboardRow GetEntryStats(BracketEntry entry)
     {
-        var rows = ScoringEngine.Calculate(games, new List<BracketEntry> { entry });
+        var rows = ScoringEngine.Calculate(allSeasonGames, new List<BracketEntry> { entry });
         return rows.FirstOrDefault() ?? new LeaderboardRow();
     }
 
@@ -523,7 +553,8 @@
 
         if (game.IsPlayoff)
         {
-             var feeders = games.Where(g => g.NextGameId == game.Id).OrderBy(g => g.StartTime).ToList();
+             // Look up in all games to find feeders, even if not in current view (unlikely but safe)
+             var feeders = allSeasonGames.Where(g => g.NextGameId == game.Id).OrderBy(g => g.StartTime).ToList();
              var feederQueue = new Queue<BowlGame>(feeders);
 
              if (string.IsNullOrWhiteSpace(home) || home.Equals("TBD", StringComparison.OrdinalIgnoreCase))

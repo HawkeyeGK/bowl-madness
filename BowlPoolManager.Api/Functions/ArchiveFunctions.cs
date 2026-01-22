@@ -58,7 +58,9 @@ namespace BowlPoolManager.Api.Functions
             // 3. Fetch Data
             // Games (Filter by SeasonId of the pool)
             var allGames = await _gameRepo.GetGamesAsync();
-            var seasonGames = allGames.Where(g => g.SeasonId == pool.SeasonId).ToList();
+            var seasonGames = allGames
+                .Where(g => g.SeasonId == pool.SeasonId && (pool.GameIds?.Contains(g.Id) ?? false))
+                .ToList();
 
             // Entries
             var entries = await _entryRepo.GetEntriesAsync(poolId);
