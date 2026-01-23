@@ -216,9 +216,13 @@
             var predictedWinners = new Queue<string>();
             foreach (var feeder in feeders)
             {
-                if (entry.Picks.TryGetValue(feeder.Id, out var winner))
+                if (entry.Picks.TryGetValue(feeder.Id, out var winner) && !string.IsNullOrEmpty(winner))
                 {
                     predictedWinners.Enqueue(winner);
+                }
+                else
+                {
+                    predictedWinners.Enqueue($"Winner of {feeder.BowlName}");
                 }
             }
             if (string.IsNullOrEmpty(home) && predictedWinners.Count > 0) home = predictedWinners.Dequeue();
