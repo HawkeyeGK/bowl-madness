@@ -345,7 +345,8 @@ else
         }
         else
         {
-            games = allSeasonGames.ToList();
+            // Fix: Filter by SeasonId to avoid showing games from all seasons
+            games = allSeasonGames.Where(g => g.SeasonId == currentPool.SeasonId).ToList();
         }
 
         standardGames = games.Where(g => !g.IsPlayoff).OrderBy(g => g.StartTime).ToList();
