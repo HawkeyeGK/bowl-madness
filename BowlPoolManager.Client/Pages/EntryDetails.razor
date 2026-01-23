@@ -176,26 +176,48 @@
         {
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
             var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries");
-            await Task.WhenAll(gamesTask, entriesTask);
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
+            await Task.WhenAll(gamesTask, entriesTask, poolsTask);
 
-            games = await gamesTask ?? new();
+            // 1. Get All Data
+            var allGames = await gamesTask ?? new();
             var allEntries = await entriesTask ?? new();
+            var allPools = await poolsTask ?? new();
 
-            // Logic Consolidation: Use Domain Model properties
-            foreach (var g in games.Where(x => x.IsFinal))
-            {
-                if (!string.IsNullOrEmpty(g.LosingTeamName))
-                {
-                    eliminatedTeams.Add(g.LosingTeamName);
-                }
-            }
-
+            // 2. Find Entry
             entry = allEntries.FirstOrDefault(e => e.Id == EntryId);
-            if (entry != null && entry.Picks != null)
+            
+            if (entry != null)
             {
-                var stats = ScoringEngine.Calculate(games, new List<BracketEntry> { entry }).First();
-                currentScore = stats.Score;
-                maxPossible = stats.MaxPossible;
+                // 3. Find Pool and Filter Games
+                var pool = allPools.FirstOrDefault(p => p.Id == entry.PoolId);
+                
+                if (pool != null && pool.GameIds != null && pool.GameIds.Any())
+                {
+                    games = allGames.Where(g => pool.GameIds.Contains(g.Id)).ToList();
+                }
+                else
+                {
+                    // Fallback: If no pool found or no specific games linked, show all (or could filter by season if we had that)
+                    // For now, default to all to avoid breaking legacy views
+                    games = allGames.ToList();
+                }
+
+                // Logic Consolidation: Use Domain Model properties
+                foreach (var g in games.Where(x => x.IsFinal))
+                {
+                    if (!string.IsNullOrEmpty(g.LosingTeamName))
+                    {
+                        eliminatedTeams.Add(g.LosingTeamName);
+                    }
+                }
+
+                if (entry.Picks != null)
+                {
+                    var stats = ScoringEngine.Calculate(games, new List<BracketEntry> { entry }).First();
+                    currentScore = stats.Score;
+                    maxPossible = stats.MaxPossible;
+                }
             }
         }
         catch (Exception ex)
