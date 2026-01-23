@@ -6,6 +6,9 @@
 @using BowlPoolManager.Client.Helpers
 @inject HttpClient Http
 
+@inject NavigationManager Nav
+@inject IJSRuntime JSRuntime
+
 <PageTitle>Printable Bracket</PageTitle>
 
 @if (games == null)
@@ -14,7 +17,16 @@
 }
 else
 {
-    <div class="text-center mb-2 no-print d-flex gap-2 justify-content-center">
+    <div class="text-center mb-2 no-print d-flex gap-2 justify-content-center align-items-center">
+        @if (string.IsNullOrEmpty(EntryId) && pools.Count > 1)
+        {
+            <select class="form-select form-select-sm w-auto" @onchange="OnPoolChanged">
+                @foreach (var pool in pools)
+                {
+                    <option value="@pool.Id" selected="@(pool.Id == currentPool?.Id)">@pool.Name</option>
+                }
+            </select>
+        }
         <button class="btn btn-primary btn-sm" onclick="window.print()">
             <i class="bi bi-printer"></i> Print (Landscape)
         </button>
@@ -207,7 +219,13 @@ else
 @code {
     [Parameter] public string? EntryId { get; set; }
 
+    [SupplyParameterFromQuery(Name = "poolId")]
+    public string? QueryPoolId { get; set; }
+
     private List<BowlGame>? games;
+    private List<BowlGame> allSeasonGames = new();
+    private List<BowlPool> pools = new();
+    private BowlPool? currentPool;
     private BracketEntry? userEntry;
     
     private List<BowlGame> standardGames = new();
@@ -220,15 +238,88 @@ else
     {
         try 
         {
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
             var entryTask = FetchEntry();
+            var myEntriesTask = FetchMyEntriesSafe(); // Needed for fallback logic if EntryId is null
 
-            await Task.WhenAll(gamesTask, entryTask);
+            await Task.WhenAll(poolsTask, gamesTask, entryTask, myEntriesTask);
 
-            games = await gamesTask ?? new();
+            pools = await poolsTask ?? new();
+            allSeasonGames = await gamesTask ?? new();
+            
+            // Only active pools for the selector
+            pools = pools.Where(p => !p.IsArchived).ToList();
+
+            // 1. DETERMINE POOL
+            if (!string.IsNullOrEmpty(EntryId) && userEntry != null)
+            {
+                // Locked to Entry's pool
+                currentPool = pools.FirstOrDefault(p => p.Id == userEntry.PoolId);
+            }
+            else
+            {
+                // Blank Bracket Logic
+                if (!string.IsNullOrEmpty(QueryPoolId))
+                {
+                     currentPool = pools.FirstOrDefault(p => p.Id == QueryPoolId);
+                }
+                else
+                {
+                    // Try Local Storage
+                     try
+                    {
+                        var savedPoolId = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "lastSelectedPoolId");
+                        if (!string.IsNullOrEmpty(savedPoolId))
+                        {
+                            currentPool = pools.FirstOrDefault(p => p.Id == savedPoolId);
+                        }
+                    }
+                    catch { /* Ignore */ }
+
+                    // Fallback to My Entries
+                    if (currentPool == null)
+                    {
+                        var myEntries = await myEntriesTask;
+                        if (myEntries.Any())
+                        {
+                             var lastEntry = myEntries.OrderByDescending(e => e.CreatedOn).First();
+                             currentPool = pools.FirstOrDefault(p => p.Id == lastEntry.PoolId);
+                        }
+                    }
+                }
+            }
+
+            // Fallback Default
+            if (currentPool == null) currentPool = pools.FirstOrDefault();
+
             PrepareBracket();
         }
         catch(Exception ex) { Console.WriteLine(ex.Message); }
+    }
+
+    private async Task<List<BracketEntry>> FetchMyEntriesSafe()
+    {
+        try 
+        {
+             // We can check local storage or auth state if needed, but the API handles the auth check
+             // This needs to be safe because the user might not be logged in
+             return await Http.GetFromJsonAsync<List<BracketEntry>>("api/GetMyEntries") ?? new();
+        }
+        catch { return new(); }
+    }
+
+    private async Task OnPoolChanged(ChangeEventArgs e)
+    {
+        var poolId = e.Value?.ToString();
+        if (string.IsNullOrEmpty(poolId)) return;
+
+        currentPool = pools.FirstOrDefault(p => p.Id == poolId);
+        if (currentPool != null)
+        {
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "lastSelectedPoolId", currentPool.Id);
+            PrepareBracket();
+        }
     }
 
     private async Task FetchEntry()
@@ -245,12 +336,25 @@ else
 
     private void PrepareBracket()
     {
-        if (games == null) return;
+        if (currentPool == null) return;
+        
+        // Filter games based on the selected pool
+        if (currentPool.GameIds != null && currentPool.GameIds.Any())
+        {
+            games = allSeasonGames.Where(g => currentPool.GameIds.Contains(g.Id)).ToList();
+        }
+        else
+        {
+            games = allSeasonGames.ToList();
+        }
+
         standardGames = games.Where(g => !g.IsPlayoff).OrderBy(g => g.StartTime).ToList();
         champGames = games.Where(g => g.IsPlayoff && g.Round == PlayoffRound.Championship).OrderBy(g => g.StartTime).ToList();
         semiGames = SortRoundByNext(PlayoffRound.SemiFinal, champGames);
         quarterGames = SortRoundByNext(PlayoffRound.QuarterFinal, semiGames);
         round1Games = SortRoundByNext(PlayoffRound.Round1, quarterGames);
+        
+        StateHasChanged();
     }
 
     private List<BowlGame> SortRoundByNext(PlayoffRound currentRound, List<BowlGame> nextRoundSorted)
@@ -305,6 +409,7 @@ else
         if (userEntry != null && userEntry.Picks != null && userEntry.Picks.TryGetValue(game.Id, out var winner)) return winner;
         return null;
     }
+
 
     private string FormatTimeShort(DateTime utc) => DateTimeHelper.ToCentral(utc).ToString("MMM d h:mm tt") + " CT";
     private string FormatCompact(BowlGame g)
