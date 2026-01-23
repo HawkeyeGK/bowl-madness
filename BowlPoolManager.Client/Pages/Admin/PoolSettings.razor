@@ -107,6 +107,10 @@
                                         <button class="btn btn-sm btn-outline-primary" @onclick="() => EditPool(pool)">
                                             <i class="bi bi-pencil"></i> Edit
                                         </button>
+                                        
+                                        <button class="btn btn-sm btn-outline-danger ms-1" @onclick="() => DeletePool(pool)" title="Delete Pool">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
                                     </td>
                                 </tr>
                             }
@@ -377,12 +381,41 @@
             editingPool.Season = year;
         }
 
-        // Use 'CreatePoolAsync'
-        var result = await PoolService.CreatePoolAsync(editingPool);
+        // Logic split: Create vs Update
+        BowlPool? result;
+        if (string.IsNullOrEmpty(editingPool.Id))
+        {
+             result = await PoolService.CreatePoolAsync(editingPool);
+        }
+        else
+        {
+             result = await PoolService.UpdatePoolAsync(editingPool);
+        }
+        
         if (result != null)
         {
             showModal = false;
             await LoadPools();
+        }
+    }
+
+    private async Task DeletePool(BowlPool pool)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to DELETE '{pool.Name}'? This cannot be undone."))
+        {
+            return;
+        }
+
+        isLoading = true;
+        var success = await PoolService.DeletePoolAsync(pool.Id);
+        if (success)
+        {
+            await LoadPools();
+        }
+        else
+        {
+             await JS.InvokeVoidAsync("alert", "Failed to delete pool.");
+             isLoading = false;
         }
     }
 

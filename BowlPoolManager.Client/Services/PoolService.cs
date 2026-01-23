@@ -54,6 +54,22 @@ namespace BowlPoolManager.Client.Services
             return null;
         }
 
+        public async Task<BowlPool?> UpdatePoolAsync(BowlPool pool)
+        {
+            var response = await _http.PutAsJsonAsync("api/UpdatePool", pool);
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<BowlPool>();
+            }
+            return null;
+        }
+
+        public async Task<bool> DeletePoolAsync(string poolId)
+        {
+            var response = await _http.DeleteAsync($"api/DeletePool/{poolId}");
+            return response.IsSuccessStatusCode;
+        }
+
         public async Task<BowlPool?> ToggleConclusionAsync(string poolId)
         {
             var response = await _http.PostAsync($"api/Pools/{poolId}/ToggleConclusion", null);

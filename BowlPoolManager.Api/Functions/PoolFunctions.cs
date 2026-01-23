@@ -74,6 +74,53 @@ namespace BowlPoolManager.Api.Functions
             }
         }
 
+        [Function("UpdatePool")]
+        public async Task<HttpResponseData> UpdatePool([HttpTrigger(AuthorizationLevel.Anonymous, "put")] HttpRequestData req)
+        {
+            _logger.LogInformation("Updating existing pool.");
+            try
+            {
+                var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
+                if (!authResult.IsValid) return authResult.ErrorResponse!;
+
+                var pool = await JsonSerializer.DeserializeAsync<BowlPool>(req.Body);
+                if (pool == null || string.IsNullOrEmpty(pool.Id)) return req.CreateResponse(HttpStatusCode.BadRequest);
+
+                if (string.IsNullOrWhiteSpace(pool.Name))
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("Pool Name is required.");
+                    return badReq;
+                }
+
+                // Upsert logic reuse
+                await _poolRepo.AddPoolAsync(pool);
+
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(pool);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "UpdatePool failed.");
+                return req.CreateResponse(HttpStatusCode.InternalServerError);
+            }
+        }
+
+        [Function("DeletePool")]
+        public async Task<HttpResponseData> DeletePool([HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "DeletePool/{poolId}")] HttpRequestData req, string poolId)
+        {
+            _logger.LogInformation($"Deleting pool: {poolId}");
+             
+            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
+            if (!authResult.IsValid) return authResult.ErrorResponse!;
+
+            if (string.IsNullOrEmpty(poolId)) return req.CreateResponse(HttpStatusCode.BadRequest);
+            
+            await _poolRepo.DeletePoolAsync(poolId);
+            return req.CreateResponse(HttpStatusCode.OK);
+        }
+
         [Function("GetPools")]
         public async Task<HttpResponseData> GetPools([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {

@@ -27,5 +27,14 @@ namespace BowlPoolManager.Api.Repositories
             var results = await QueryAsync<BowlPool>(queryDef);
             return results.FirstOrDefault();
         }
+
+        public async Task DeletePoolAsync(string poolId)
+        {
+             var pool = await GetPoolAsync(poolId);
+             if (pool != null)
+             {
+                 await DeleteDocumentAsync<BowlPool>(poolId, pool.SeasonId);
+             }
+        }
     }
 }
