@@ -10,6 +10,7 @@
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
 @inject BowlPoolManager.Client.Services.AppState AppState
+@inject BowlPoolManager.Client.Services.ISeasonService SeasonService
 @inject IJSRuntime JS
 
 <PageTitle>My Picks</PageTitle>
@@ -27,12 +28,14 @@
     }
     else
     {
+        @if (viewMode == ViewMode.Dashboard)
+        {
             @* --- DASHBOARD VIEW --- *@
             
             @* CURRENT SEASON SECTION *@
             <div class="mb-5">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h2 class="h4 text-secondary mb-0">Current Season (@Constants.CurrentSeason)</h2>
+                    <h2 class="h4 text-secondary mb-0">Current Season (@currentSeasonId)</h2>
                     <button class="btn btn-primary" @onclick="CreateAdditionalEntry">
                          <i class="bi bi-plus-lg"></i> New Entry
                     </button>
@@ -40,13 +43,21 @@
 
                 @if (!currentEntries.Any())
                 {
-                    <div class="alert alert-info text-center py-4 shadow-sm">
-                        <i class="bi bi-info-circle display-4 d-block mb-3 text-info"></i>
-                        <h4 class="alert-heading">No Picks for @Constants.CurrentSeason</h4>
-                        <p class="mb-3">You haven't entered any pools for the current season yet.</p>
-                        <button class="btn btn-primary btn-lg" @onclick="CreateAdditionalEntry">
-                            <i class="bi bi-pencil-square"></i> Create New Entry
-                        </button>
+                     <div class="card shadow-sm border-0 bg-light mb-5">
+                        <div class="card-body p-4 text-center">
+                            <i class="bi bi-ticket-perforated display-4 text-primary mb-3"></i>
+                            <h4 class="card-title fw-bold">Join the Action for @currentSeasonId!</h4>
+                            <p class="text-muted mb-4">You don't have any brackets yet. Enter an invite code below to get started.</p>
+                            
+                            <div class="mx-auto" style="max-width: 400px;">
+                                <EditForm Model="@joinModel" OnValidSubmit="StartNewEntry">
+                                    <div class="input-group input-group-lg mb-3">
+                                        <InputText @bind-Value="joinModel.InviteCode" class="form-control" placeholder="Enter Invite Code" />
+                                        <button class="btn btn-primary" type="submit">Join Pool</button>
+                                    </div>
+                                </EditForm>
+                            </div>
+                        </div>
                     </div>
                 }
                 else
@@ -109,50 +120,46 @@
             @* PAST SEASONS SECTION *@
             @if (pastEntries.Any())
             {
-                <div class="mb-4 pt-3 border-top">
-                    <h2 class="h4 text-secondary mb-3">Past Seasons</h2>
+                <div class="mb-4 pt-4 border-top">
+                    <h3 class="h5 text-secondary mb-3"><i class="bi bi-clock-history me-2"></i>Past Seasons</h3>
                     
                     <div class="row g-3">
                         @foreach (var entry in pastEntries.OrderByDescending(e => e.SeasonId))
                         {
-                            var stats = GetEntryStats(entry);
                             var poolName = pools.FirstOrDefault(p => p.Id == entry.PoolId)?.Name ?? "Unknown Pool";
-                            <div class="col-md-6 col-lg-4 opacity-75"> 
+                            <div class="col-md-6 col-lg-4"> 
                                 <div class="card h-100 shadow-sm border-0 bg-light">
-                                    <div class="card-header bg-transparent border-bottom-0 pb-0 d-flex justify-content-between align-items-center">
-                                         <span class="badge bg-secondary">Season @entry.SeasonId</span>
-                                         <small class="text-muted">@poolName</small>
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <div>
+                                                 <h5 class="card-title text-dark mb-1">@poolName</h5>
+                                                 <h6 class="card-subtitle text-muted small">Season @entry.SeasonId</h6>
+                                            </div>
+                                            <span class="badge bg-secondary">Archived</span>
+                                        </div>
+                                        
+                                        <p class="card-text small mt-2">
+                                            Bracket: <strong>@entry.PlayerName</strong>
+                                        </p>
+
+                                        <div class="d-grid mt-3">
+                                            @* Link to the Archive Viewer for this pool, passing context if needed? 
+                                               Actually, just linking to the standard archive viewer for the pool is safest. 
+                                               But the user might want to see THEIR specific bracket. 
+                                               ArchiveViewer supports selecting an entry. We might not be able to deep link easily without query params.
+                                               For now, link to the pool archive. *@
+                                            <a href="history/@entry.PoolId" class="btn btn-outline-primary btn-sm">
+                                                <i class="bi bi-eye me-1"></i> View Pool Archive
+                                            </a>
+                                        </div>
                                     </div>
-                                    <div class="card-body pt-2">
-                                         <div class="mb-3">
-                                            <h5 class="card-title fw-bold text-dark mb-0 text-truncate" title="@entry.PlayerName">
-                                                @entry.PlayerName
-                                            </h5>
-                                        </div>
-
-                                         <div class="row text-center mb-3 g-0 border rounded bg-white py-2">
-                                            <div class="col border-end">
-                                                 <small class="text-muted d-block">Score</small>
-                                                <span class="fw-bold">@stats.Score</span>
-                                            </div>
-                                             <div class="col">
-                                                <small class="text-muted d-block">Finish</small>
-                                                 <span class="fw-bold">-</span> @* Rank calculation expensive, omit for archive or calc later *@
-                                            </div>
-                                        </div>
-
-                                         <div class="d-grid">
-                                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => EditEntry(entry)">
-                                                 <i class="bi bi-eye-fill"></i> View Past Bracket
-                                            </button>
-                                        </div>
-                                      </div>
                                 </div>
                             </div>
                         }
                     </div>
                 </div>
             }
+        }
         else if (viewMode == ViewMode.Join)
         {
              @* --- JOIN FORM --- *@
@@ -393,31 +400,37 @@
     private List<BracketEntry> pastEntries = new();
     private BracketEntry activeEntry = new() { Picks = new Dictionary<string, string>() };
 
+    private string currentSeasonId = Constants.CurrentSeason;
+
     protected override async Task OnInitializedAsync()
     {
         try 
         {
             isLoading = true;
+            
+            // 0. Fetch Seasons (Dynamic Source of Truth)
+            // Fetch seasons first to determine the current one
+            var seasons = await SeasonService.GetSeasonsAsync();
+            var activeSeason = seasons.FirstOrDefault(s => s.IsCurrent);
+            if (activeSeason != null)
+            {
+                currentSeasonId = activeSeason.Id;
+            }
+            
             // 1. Fetch Global Data
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
-            // 2. Fetch My Entries (ALL)
             var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetMyEntries");
+            
             await Task.WhenAll(poolsTask, gamesTask, entriesTask);
             
-            pools = await poolsTask ?? new();
-            allSeasonGames = await gamesTask ?? new();
             pools = await poolsTask ?? new();
             allSeasonGames = await gamesTask ?? new();
             var allEntries = await entriesTask ?? new();
             
             // Separation of Church and State (Current vs Past)
-            currentEntries = allEntries.Where(e => e.SeasonId == Constants.CurrentSeason).ToList();
-            pastEntries = allEntries.Where(e => e.SeasonId != Constants.CurrentSeason).ToList();
-            
-            // Backward compatibility: if no SeasonId, assume 2024 if pool matches? 
-            // Better: just dump into past if not explicitly current. 
-            // (Most likely data has SeasonId due to previous migrations)
+            currentEntries = allEntries.Where(e => e.SeasonId == currentSeasonId).ToList();
+            pastEntries = allEntries.Where(e => e.SeasonId != currentSeasonId).ToList();
             
             // Keep myEntries for delete logic or other ops?
             myEntries = allEntries;
@@ -427,6 +440,8 @@
         }
         catch (Exception ex)
         {
+            errorMessage = "Error loading data: " + ex.Message;
+        }
             errorMessage = "Error loading data: " + ex.Message;
         }
         finally
@@ -507,7 +522,7 @@
             if (response.IsSuccessStatusCode)
             {
                 myEntries.Remove(entry);
-                if (entry.SeasonId == Constants.CurrentSeason)
+                if (entry.SeasonId == currentSeasonId)
                 {
                     currentEntries.Remove(entry);
                 }
@@ -572,7 +587,7 @@
                 var savedEntry = await response.Content.ReadFromJsonAsync<BracketEntry>();
                 if (savedEntry != null)
                 {
-                    var targetList = (savedEntry.SeasonId == Constants.CurrentSeason) ? currentEntries : pastEntries;
+                    var targetList = (savedEntry.SeasonId == currentSeasonId) ? currentEntries : pastEntries;
                     var existingIndex = targetList.FindIndex(e => e.Id == savedEntry.Id);
                     
                     if (existingIndex >= 0)
