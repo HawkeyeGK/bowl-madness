@@ -159,6 +159,7 @@
                     </div>
                 </div>
             }
+            }
         }
         else if (viewMode == ViewMode.Join)
         {
@@ -183,8 +184,10 @@
         else
         {
             @* --- EDITOR VIEW --- *@
-            var entryPool = pools.FirstOrDefault(p => p.Id == activeEntry.PoolId);
-            bool isLocked = entryPool != null && DateTime.UtcNow > entryPool.LockDate;
+            @{
+                var entryPool = pools.FirstOrDefault(p => p.Id == activeEntry.PoolId);
+                bool isLocked = entryPool != null && DateTime.UtcNow > entryPool.LockDate;
+            }
             
              <div class="d-flex justify-content-between align-items-center mb-4">
                 <div class="d-flex align-items-center">
@@ -438,10 +441,9 @@
             // Ensure Active Entry has instantiated Picks
             if (activeEntry.Picks == null) activeEntry.Picks = new Dictionary<string, string>();
         }
+
         catch (Exception ex)
         {
-            errorMessage = "Error loading data: " + ex.Message;
-        }
             errorMessage = "Error loading data: " + ex.Message;
         }
         finally
