@@ -3,7 +3,11 @@
 @using BowlPoolManager.Core
 @using BowlPoolManager.Core.Helpers
 @using BowlPoolManager.Client.Helpers
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.JSInterop
 @inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Path to Victory</PageTitle>
 
@@ -254,6 +258,9 @@
     // Smart Bracket Map: Key = TargetGameId, Value = List of Games that feed into it
     private ILookup<string, BowlGame>? _feederMap;
 
+    [SupplyParameterFromQuery(Name = "poolId")]
+    public string? QueryPoolId { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -261,20 +268,24 @@
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
             var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries");
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
+            var myEntriesTask = FetchMyEntriesSafe(); // Fetch proactively for fallback logic
 
-            await Task.WhenAll(gamesTask, entriesTask, poolsTask);
+            await Task.WhenAll(gamesTask, entriesTask, poolsTask, myEntriesTask);
 
             games = (await gamesTask ?? new()).OrderBy(g => g.StartTime).ToList();
             allEntries = await entriesTask ?? new();
-            poolList = await poolsTask ?? new();
+            var allPools = await poolsTask ?? new();
+            var myEntries = await myEntriesTask;
 
-            // 1. Build the Bracket Tree
+            // 1. Filter Pools (Active Season Only)
+            poolList = allPools.Where(p => !p.IsArchived).ToList();
+
+            // 2. Build the Bracket Tree
             _feederMap = games
                 .Where(g => !string.IsNullOrEmpty(g.NextGameId))
                 .ToLookup(g => g.NextGameId!);
 
-            // 2. Pre-fill Simulation with Reality
-            // This ensures Final games show as "Selected" immediately
+            // 3. Pre-fill Simulation with Reality
             foreach(var game in games.Where(g => g.Status == GameStatus.Final))
             {
                 var winner = GetRealWinner(game);
@@ -284,11 +295,46 @@
                 }
             }
 
-            // 3. Default Pool
-            if (poolList.Any())
+            // 4. Determine Current Pool (Smart Default Logic)
+            BowlPool? targetPool = null;
+
+            // A. Query Param
+            if (!string.IsNullOrEmpty(QueryPoolId))
             {
-                selectedPoolId = poolList.First().Id;
+                targetPool = poolList.FirstOrDefault(p => p.Id == QueryPoolId);
             }
+
+            // B. Local Storage
+            if (targetPool == null)
+            {
+                try
+                {
+                    var savedPoolId = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "lastSelectedPoolId");
+                    if (!string.IsNullOrEmpty(savedPoolId))
+                    {
+                        targetPool = poolList.FirstOrDefault(p => p.Id == savedPoolId);
+                    }
+                }
+                catch { /* Ignore JS errors */ }
+            }
+
+            // C. My Entries (Most recent active pool I'm in)
+            if (targetPool == null && myEntries.Any())
+            {
+                var lastEntry = myEntries.OrderByDescending(e => e.CreatedOn).FirstOrDefault();
+                if (lastEntry != null)
+                {
+                    targetPool = poolList.FirstOrDefault(p => p.Id == lastEntry.PoolId);
+                }
+            }
+
+            // D. Fallback to First
+            if (targetPool == null && poolList.Any())
+            {
+                targetPool = poolList.First();
+            }
+
+            selectedPoolId = targetPool?.Id ?? "";
             
             UpdateFilteredEntries();
         }
@@ -299,11 +345,29 @@
         finally { isLoading = false; }
     }
 
+    private async Task<List<BracketEntry>> FetchMyEntriesSafe()
+    {
+        try 
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            if (auth.User.Identity?.IsAuthenticated == true)
+            {
+                return await Http.GetFromJsonAsync<List<BracketEntry>>("api/GetMyEntries") ?? new();
+            }
+        }
+        catch { /* Ignore auth errors */ }
+        return new();
+    }
+
     // --- FILTERING LOGIC ---
     
-    private void OnPoolChanged(ChangeEventArgs e)
+    private async Task OnPoolChanged(ChangeEventArgs e)
     {
         selectedPoolId = e.Value?.ToString() ?? "";
+        if (!string.IsNullOrEmpty(selectedPoolId))
+        {
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "lastSelectedPoolId", selectedPoolId);
+        }
         UpdateFilteredEntries();
     }
 
