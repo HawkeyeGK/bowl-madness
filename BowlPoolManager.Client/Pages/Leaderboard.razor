@@ -185,7 +185,7 @@
             var myEntriesTask = FetchMyEntriesSafe();
             
             await Task.WhenAll(poolsTask, gamesTask, myEntriesTask);
-            pools = await poolsTask ?? new();
+            var allPools = await poolsTask ?? new();
             allSeasonGames = await gamesTask ?? new();
             // Initial Filtering will happen in LoadEntriesForPool
             
@@ -197,7 +197,21 @@
                 LastUpdate = await Http.GetFromJsonAsync<DateTime>("api/GetLastScoreUpdate");
             } catch { /* Ignore if fails */ }
 
-            // SMART DEFAULT LOGIC
+            // 0. CHECK FOR DIRECT LINK TO ARCHIVED POOL
+            if (!string.IsNullOrEmpty(QueryPoolId))
+            {
+                var requestedPool = allPools.FirstOrDefault(p => p.Id == QueryPoolId);
+                if (requestedPool != null && requestedPool.IsArchived)
+                {
+                    Nav.NavigateTo($"/history/{requestedPool.Id}");
+                    return;
+                }
+            }
+
+            // 1. FILTER UI LIST (Only show active pools)
+            pools = allPools.Where(p => !p.IsArchived).ToList();
+
+            // 2. DETERMINE CURRENT POOL
             if (!string.IsNullOrEmpty(QueryPoolId))
             {
                 currentPool = pools.FirstOrDefault(p => p.Id == QueryPoolId);
@@ -205,24 +219,18 @@
             else if (myEntries.Any())
             {
                 var lastEntry = myEntries.OrderByDescending(e => e.CreatedOn).First();
+                // Only select if it matches an ACTIVE pool
                 currentPool = pools.FirstOrDefault(p => p.Id == lastEntry.PoolId);
             }
             
-            // Fallback
+            // 3. FALLBACK
             if (currentPool == null)
             {
-                currentPool = pools.FirstOrDefault(p => !p.IsArchived) ?? pools.FirstOrDefault();
+                currentPool = pools.FirstOrDefault();
             }
 
             if (currentPool != null)
             {
-                // REDIRECT IF ARCHIVED
-                if (currentPool.IsArchived)
-                {
-                    Nav.NavigateTo($"/history/{currentPool.Id}");
-                    return;
-                }
-                
                 await LoadEntriesForPool(currentPool.Id);
             }
         }
