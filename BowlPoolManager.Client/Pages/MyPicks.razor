@@ -545,7 +545,7 @@
         isSaving = true;
         try
         {
-            var response = await Http.DeleteAsync($"api/DeleteMyEntry?id={entry.Id}");
+            var response = await Http.DeleteAsync($"api/DeleteEntry?id={entry.Id}");
             if (response.IsSuccessStatusCode)
             {
                 myEntries.Remove(entry);
@@ -601,7 +601,7 @@
 
         try
         {
-            string url = "api/SaveMyEntry";
+            string url = "api/CreateEntry";
             if (!string.IsNullOrEmpty(joinModel.InviteCode) && string.IsNullOrEmpty(activeEntry.PoolId))
             {
                 activeEntry.Id = "";
@@ -646,7 +646,7 @@
             {
                 var errorText = await response.Content.ReadAsStringAsync();
                 errorMessage = $"Save failed: {errorText}";
-                TriggerToast("Save failed.", false);
+                TriggerToast($"Save failed: {errorText}", false);
             }
         }
         catch (Exception ex)
