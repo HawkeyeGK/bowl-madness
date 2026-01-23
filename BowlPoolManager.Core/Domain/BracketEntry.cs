@@ -12,7 +12,7 @@ namespace BowlPoolManager.Core.Domain
 
         [JsonProperty("seasonId")]
         [JsonPropertyName("seasonId")]
-        public string SeasonId { get; set; } = Constants.CurrentSeason;
+        public string SeasonId { get; set; } = string.Empty;
 
         [JsonProperty("poolId")]
         [JsonPropertyName("poolId")]

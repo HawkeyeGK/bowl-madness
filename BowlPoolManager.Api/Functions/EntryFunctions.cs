@@ -140,6 +140,9 @@ namespace BowlPoolManager.Api.Functions
                 if (string.IsNullOrEmpty(entry.UserId)) entry.UserId = principal.UserId;
                 if (string.IsNullOrEmpty(entry.Id)) entry.Id = Guid.NewGuid().ToString();
 
+                // FORCE SYNC: Ensure Entry Season matches Pool Season
+                entry.SeasonId = pool.SeasonId;
+
                 bool isTaken = await _entryRepo.IsBracketNameTakenAsync(entry.PoolId, entry.PlayerName, entry.Id);
                 if (isTaken)
                 {
