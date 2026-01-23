@@ -104,7 +104,7 @@
                                     <div class="small text-muted mx-2">vs</div>
                                     @* AWAY *@
                                     <div class="@(GetWinner(game) == game.TeamAway ? "fw-bold text-success" : "text-end")">
-                                        <span class="me-1">@game.TeamAwayScore</span> @game.TeamAway
+                                        @game.TeamAway <span class="ms-1">@game.TeamAwayScore</span>
                                     </div>
                                 </div>
 
