@@ -8,6 +8,7 @@
 @inject HttpClient Http
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Nav
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Leaderboard</PageTitle>
 
@@ -213,11 +214,26 @@
             {
                 currentPool = pools.FirstOrDefault(p => p.Id == QueryPoolId);
             }
-            else if (myEntries.Any())
+            else
             {
-                var lastEntry = myEntries.OrderByDescending(e => e.CreatedOn).First();
-                // Only select if it matches an ACTIVE pool
-                currentPool = pools.FirstOrDefault(p => p.Id == lastEntry.PoolId);
+                // Try from local storage
+                try
+                {
+                    var savedPoolId = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "lastSelectedPoolId");
+                    if (!string.IsNullOrEmpty(savedPoolId))
+                    {
+                        currentPool = pools.FirstOrDefault(p => p.Id == savedPoolId);
+                    }
+                }
+                catch { /* Ignore JS interop errors during prerendering or if disallowed */ }
+
+                // If not found in storage, try "My Entries"
+                if (currentPool == null && myEntries.Any())
+                {
+                    var lastEntry = myEntries.OrderByDescending(e => e.CreatedOn).First();
+                    // Only select if it matches an ACTIVE pool
+                    currentPool = pools.FirstOrDefault(p => p.Id == lastEntry.PoolId);
+                }
             }
             
             // 3. FALLBACK
@@ -264,6 +280,7 @@
         if (currentPool != null)
         {
             isLoading = true;
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "lastSelectedPoolId", currentPool.Id);
             await LoadEntriesForPool(currentPool.Id);
             isLoading = false;
         }
