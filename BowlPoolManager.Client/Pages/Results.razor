@@ -2,7 +2,9 @@
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
 @using BowlPoolManager.Client.Helpers
+@using BowlPoolManager.Client.Services
 @inject HttpClient Http
+@inject ISeasonService SeasonService
 
 <PageTitle>Scoreboard</PageTitle>
 
@@ -149,7 +151,21 @@
     {
         try
         {
-            games = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames") ?? new();
+            // 1. Fetch all games (this endpoint returns ALL games, so we must filter client-side or update API)
+            //    For now, we filter client-side as per plan.
+            var allGames = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames") ?? new();
+
+            // 2. Fetch Seasons to know which is "Current"
+            var seasons = await SeasonService.GetSeasonsAsync();
+            var currentSeason = seasons.FirstOrDefault(s => s.IsCurrent);
+
+            // 3. Determine the target SeasonId
+            //    If no season is marked current in DB, fallback to Constants (or "2025").
+            string targetSeasonId = currentSeason?.Id ?? Constants.CurrentSeason;
+
+            // 4. Filter
+            games = allGames.Where(g => g.SeasonId == targetSeasonId).ToList();
+
             try {
                 LastUpdate = await Http.GetFromJsonAsync<DateTime>("api/GetLastScoreUpdate");
             } catch { /* Handle gracefully if missing */ }
