@@ -91,7 +91,12 @@
 
                         @* 4. Tiebreaker *@
                         <div class="col-md-3">
-                            <label class="form-label fw-bold">Tiebreaker</label>
+                            @{
+                                var pool = pools.FirstOrDefault(p => p.Id == entry.PoolId);
+                                var tbGame = games?.FirstOrDefault(g => g.Id == pool?.TieBreakerGameId);
+                                string tbLabel = tbGame != null ? $"Tiebreaker ({tbGame.TeamHome} vs {tbGame.TeamAway})" : "Tiebreaker";
+                            }
+                            <label class="form-label fw-bold">@tbLabel</label>
                             <InputNumber class="form-control" @bind-Value="entry.TieBreakerPoints" />
                         </div>
                     </div>
@@ -106,7 +111,7 @@
                 <div class="card-body">
                     @foreach (var round in new[] { PlayoffRound.Round1, PlayoffRound.QuarterFinal, PlayoffRound.SemiFinal, PlayoffRound.Championship })
                     {
-                        var roundGames = games.Where(g => g.IsPlayoff && g.Round == round).OrderBy(g => g.StartTime).ToList();
+                        var roundGames = games!.Where(g => g.IsPlayoff && g.Round == round).OrderBy(g => g.StartTime).ToList();
                         if (roundGames.Any())
                         {
                             <h5 class="mt-3 border-bottom pb-2">@GetRoundName(round)</h5>
@@ -135,7 +140,7 @@
                 <div class="card-header bg-secondary text-white">Standard Bowl Games</div>
                 <div class="card-body">
                     <div class="row g-3">
-                        @foreach (var game in games.Where(g => !g.IsPlayoff).OrderBy(g => g.StartTime))
+                        @foreach (var game in games!.Where(g => !g.IsPlayoff).OrderBy(g => g.StartTime))
                         {
                             <div class="col-md-6 col-lg-4">
                                 <div class="p-2 border rounded h-100">

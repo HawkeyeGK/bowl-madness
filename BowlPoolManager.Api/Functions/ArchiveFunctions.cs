@@ -104,8 +104,10 @@ namespace BowlPoolManager.Api.Functions
                 
                 // Calculate Points
                 int points = 0;
-                foreach (var pick in entry.Picks) // Dictionary<GameId, string>
+                if (entry.Picks != null)
                 {
+                    foreach (var pick in entry.Picks) // Dictionary<GameId, string>
+                    {
                     var game = seasonGames.FirstOrDefault(g => g.Id == pick.Key);
                     if (game == null) continue;
 
@@ -124,6 +126,7 @@ namespace BowlPoolManager.Api.Functions
                             points += game.PointValue;
                         }
                     }
+                }
                 }
                 standing.TotalPoints = points;
                 calculatedStandings.Add(standing);

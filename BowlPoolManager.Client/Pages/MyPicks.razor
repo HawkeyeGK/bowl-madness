@@ -303,7 +303,13 @@
                  @* TIEBREAKER *@
                 <div class="card mb-4 shadow-sm border-warning">
                      <div class="card-body bg-warning bg-opacity-10">
-                        <label class="form-label fw-bold text-dark">Tiebreaker: Total Points in ReliaQuest Bowl - Iowa vs. Vanderbilt</label>
+                        @{
+                             var tieBreakerGame = allSeasonGames.FirstOrDefault(g => g.Id == EntryPool?.TieBreakerGameId);
+                             string tbText = tieBreakerGame != null 
+                                 ? $"Tiebreaker: Total Points in {tieBreakerGame.BowlName} - {tieBreakerGame.TeamHome} vs {tieBreakerGame.TeamAway}"
+                                 : "Tiebreaker: Total Points";
+                        }
+                        <label class="form-label fw-bold text-dark">@tbText</label>
                          <InputNumber @bind-Value="activeEntry.TieBreakerPoints" class="form-control" disabled="@IsEntryLocked" />
                     </div>
                 </div>

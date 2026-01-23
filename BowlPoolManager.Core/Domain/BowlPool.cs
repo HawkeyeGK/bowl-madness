@@ -45,6 +45,11 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("isArchived")]
         public bool IsArchived { get; set; } = false;
 
+        // NEW: Dynamic Tiebreaker
+        [JsonProperty("tieBreakerGameId")]
+        [JsonPropertyName("tieBreakerGameId")]
+        public string TieBreakerGameId { get; set; } = string.Empty;
+
         // COSMOS DISCRIMINATOR
         [JsonProperty("type")]
         [JsonPropertyName("type")]

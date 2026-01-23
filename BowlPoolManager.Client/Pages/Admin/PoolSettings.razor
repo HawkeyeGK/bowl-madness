@@ -138,6 +138,19 @@
                             <label class="form-label">Pool Name</label>
                             <InputText @bind-Value="editingPool.Name" class="form-control" placeholder="e.g. Office Pool" />
                         </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Tiebreaker Game</label>
+                            <InputSelect @bind-Value="editingPool.TieBreakerGameId" class="form-select">
+                                <option value="">-- Select Tiebreaker Game --</option>
+                                @foreach (var g in seasonGames.OrderBy(x => x.StartTime))
+                                {
+                                    <option value="@g.Id">@g.BowlName (@g.TeamHome vs @g.TeamAway)</option>
+                                }
+                            </InputSelect>
+                            <div class="form-text">The score of this game will be used as the tiebreaker.</div>
+                        </div>
+
                         <div class="mb-3">
                             <label class="form-label">Season</label>
                             <InputSelect Value="@editingPool.SeasonId" 
