@@ -396,6 +396,13 @@
                 return allSeasonGames.Where(g => targetPool.GameIds.Contains(g.Id)).ToList();
             }
             
+            // FALLBACK SAFETY: If we are in "New Entry" mode (have an invite code) but found no pool,
+            // return NONE instead of ALL.
+            if (!string.IsNullOrEmpty(joinModel.InviteCode) && string.IsNullOrEmpty(activeEntry.PoolId))
+            {
+                return new List<BowlGame>();
+            }
+
             return allSeasonGames;
         }
     }
@@ -472,9 +479,22 @@
             return;
         }
 
+        // VALIDATION: Check if code corresponds to an valid, active pool
+        var targetPool = pools.FirstOrDefault(p => 
+            string.Equals(p.InviteCode, joinModel.InviteCode, StringComparison.OrdinalIgnoreCase) && 
+            !p.IsArchived);
+
+        if (targetPool == null)
+        {
+             TriggerToast("Invalid Invite Code. Please check and try again.", false);
+             return;
+        }
+
         activeEntry = new BracketEntry(); 
         activeEntry.Picks = new Dictionary<string, string>(); // Safe Init
         activeEntry.Id = "";
+        activeEntry.PoolId = targetPool.Id; // Pre-set the Pool ID
+        
         viewMode = ViewMode.Editor;
     }
 
