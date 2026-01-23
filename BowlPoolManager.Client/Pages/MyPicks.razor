@@ -28,10 +28,9 @@
     }
     else
     {
+        @* --- DASHBOARD VIEW --- *@
         @if (viewMode == ViewMode.Dashboard)
         {
-            @* --- DASHBOARD VIEW --- *@
-            
             @* CURRENT SEASON SECTION *@
             <div class="mb-5">
                 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -143,11 +142,6 @@
                                         </p>
 
                                         <div class="d-grid mt-3">
-                                            @* Link to the Archive Viewer for this pool, passing context if needed? 
-                                               Actually, just linking to the standard archive viewer for the pool is safest. 
-                                               But the user might want to see THEIR specific bracket. 
-                                               ArchiveViewer supports selecting an entry. We might not be able to deep link easily without query params.
-                                               For now, link to the pool archive. *@
                                             <a href="history/@entry.PoolId" class="btn btn-outline-primary btn-sm">
                                                 <i class="bi bi-eye me-1"></i> View Pool Archive
                                             </a>
@@ -159,11 +153,11 @@
                     </div>
                 </div>
             }
-            }
         }
-        else if (viewMode == ViewMode.Join)
+
+        @* --- JOIN VIEW (STANDALONE) --- *@
+        @if (viewMode == ViewMode.Join)
         {
-             @* --- JOIN FORM --- *@
              <div class="card shadow-sm mw-100 mx-auto mt-5" style="max-width: 500px;">
                 <div class="card-body p-5 text-center">
                     <button class="btn btn-sm btn-close position-absolute top-0 end-0 m-3" @onclick="BackToDashboard"></button>
@@ -181,14 +175,10 @@
                 </div>
             </div>
         }
-        else
+
+        @* --- EDITOR VIEW --- *@
+        @if (viewMode == ViewMode.Editor)
         {
-            @* --- EDITOR VIEW --- *@
-            @{
-                var entryPool = pools.FirstOrDefault(p => p.Id == activeEntry.PoolId);
-                bool isLocked = entryPool != null && DateTime.UtcNow > entryPool.LockDate;
-            }
-            
              <div class="d-flex justify-content-between align-items-center mb-4">
                 <div class="d-flex align-items-center">
                     <button class="btn btn-outline-secondary me-3" @onclick="BackToDashboard">
@@ -198,18 +188,18 @@
                         <h2 class="fw-bold mb-0">
                             @(string.IsNullOrEmpty(activeEntry.Id) ? "New Entry" : "Edit Entry")
                         </h2>
-                        @if (entryPool != null)
+                        @if (EntryPool != null)
                         {
-                            <div class="small text-muted">@entryPool.Name</div>
+                            <div class="small text-muted">@EntryPool.Name</div>
                         }
 
-                        @if (isLocked)
+                        @if (IsEntryLocked)
                         {
                              <span class="badge bg-warning text-dark"><i class="bi bi-lock-fill"></i> Locked</span>
                           }
-                        else if (entryPool != null)
+                        else if (EntryPool != null)
                         {
-                            <span class="text-muted small">Deadline: @entryPool.LockDate.ToLocalTime().ToString("g")</span>
+                            <span class="text-muted small">Deadline: @EntryPool.LockDate.ToLocalTime().ToString("g")</span>
                          }
                     </div>
                 </div>
@@ -236,7 +226,7 @@
                 <div class="card mb-4 shadow-sm">
                     <div class="card-body">
                         <label class="form-label fw-bold">Bracket Name</label>
-                         <InputText @bind-Value="activeEntry.PlayerName" class="form-control" disabled="@isLocked" placeholder="Give this bracket a unique name" />
+                         <InputText @bind-Value="activeEntry.PlayerName" class="form-control" disabled="@IsEntryLocked" placeholder="Give this bracket a unique name" />
                         <ValidationMessage For="@(() => activeEntry.PlayerName)" />
                     </div>
                 </div>
@@ -259,7 +249,7 @@
                             bool isSelected = !string.IsNullOrEmpty(pick);
                             var slots = GetMatchupSlots(game);
                             bool isGameReady = slots.Home != "TBD" && slots.Away != "TBD";
-                            bool isDisabled = isLocked || !isGameReady;
+                            bool isDisabled = IsEntryLocked || !isGameReady;
                             
                              <li class="list-group-item p-3 @(isSelected ? "bg-light-success" : "")">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
@@ -314,12 +304,12 @@
                 <div class="card mb-4 shadow-sm border-warning">
                      <div class="card-body bg-warning bg-opacity-10">
                         <label class="form-label fw-bold text-dark">Tiebreaker: Total Points in ReliaQuest Bowl - Iowa vs. Vanderbilt</label>
-                         <InputNumber @bind-Value="activeEntry.TieBreakerPoints" class="form-control" disabled="@isLocked" />
+                         <InputNumber @bind-Value="activeEntry.TieBreakerPoints" class="form-control" disabled="@IsEntryLocked" />
                     </div>
                 </div>
 
                 @* ACTIONS *@
-                @if (!isLocked)
+                @if (!IsEntryLocked)
                  {
                     <div class="d-grid gap-2 mb-5">
                         <button type="submit" class="btn btn-success btn-lg" disabled="@isSaving">
@@ -404,6 +394,10 @@
     private BracketEntry activeEntry = new() { Picks = new Dictionary<string, string>() };
 
     private string currentSeasonId = Constants.CurrentSeason;
+    
+    // Helpers for Editor
+    private BowlPool? EntryPool => pools.FirstOrDefault(p => p.Id == activeEntry.PoolId);
+    private bool IsEntryLocked => EntryPool != null && DateTime.UtcNow > EntryPool.LockDate;
 
     protected override async Task OnInitializedAsync()
     {
@@ -441,7 +435,6 @@
             // Ensure Active Entry has instantiated Picks
             if (activeEntry.Picks == null) activeEntry.Picks = new Dictionary<string, string>();
         }
-
         catch (Exception ex)
         {
             errorMessage = "Error loading data: " + ex.Message;
