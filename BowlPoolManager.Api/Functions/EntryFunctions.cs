@@ -78,95 +78,153 @@ namespace BowlPoolManager.Api.Functions
         [Function("CreateEntry")]
         public async Task<HttpResponseData> CreateEntry([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
         {
-            _logger.LogInformation("Creating/Updating Entry.");
-            
-            var principal = SecurityHelper.ParseSwaHeader(req);
-            if (principal == null) return req.CreateResponse(HttpStatusCode.Unauthorized);
-
-            var entry = await JsonSerializer.DeserializeAsync<BracketEntry>(req.Body);
-            if (entry == null) return req.CreateResponse(HttpStatusCode.BadRequest);
-
-            var pool = await _poolRepo.GetPoolAsync(entry.PoolId);
-            if (pool == null)
+            try
             {
-                var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badReq.WriteStringAsync("Invalid Pool ID.");
-                return badReq;
-            }
-
-            if (DateTime.UtcNow > pool.LockDate)
-            {
-                var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badReq.WriteStringAsync("This pool is locked. No new picks or changes allowed.");
-                return badReq;
-            }
-
-            if (!string.IsNullOrEmpty(entry.Id))
-            {
-                var existing = await _entryRepo.GetEntryAsync(entry.Id);
-                if (existing != null && existing.UserId != principal.UserId)
+                _logger.LogInformation("Creating/Updating Entry.");
+                
+                var principal = SecurityHelper.ParseSwaHeader(req);
+                if (principal == null) 
                 {
-                    var user = await _userRepo.GetUserAsync(principal.UserId);
-                    if (user == null || user.AppRole != Constants.Roles.SuperAdmin)
+                    var unauth = req.CreateResponse(HttpStatusCode.Unauthorized);
+                    await unauth.WriteStringAsync("User is not authenticated.");
+                    return unauth;
+                }
+
+                BracketEntry? entry = null;
+                try
+                {
+                    entry = await JsonSerializer.DeserializeAsync<BracketEntry>(req.Body);
+                }
+                catch
+                {
+                    // entry remains null
+                }
+
+                if (entry == null) 
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("Invalid entry data.");
+                    return badReq;
+                }
+
+                var pool = await _poolRepo.GetPoolAsync(entry.PoolId);
+                if (pool == null)
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("Invalid Pool ID.");
+                    return badReq;
+                }
+
+                if (DateTime.UtcNow > pool.LockDate)
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("This pool is locked. No new picks or changes allowed.");
+                    return badReq;
+                }
+
+                if (!string.IsNullOrEmpty(entry.Id))
+                {
+                    var existing = await _entryRepo.GetEntryAsync(entry.Id);
+                    if (existing != null && existing.UserId != principal.UserId)
                     {
-                        return req.CreateResponse(HttpStatusCode.Forbidden);
+                        var user = await _userRepo.GetUserAsync(principal.UserId);
+                        if (user == null || user.AppRole != Constants.Roles.SuperAdmin)
+                        {
+                            var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
+                            await forbidden.WriteStringAsync("You do not have permission to modify this entry.");
+                            return forbidden;
+                        }
                     }
                 }
-            }
 
-            if (string.IsNullOrEmpty(entry.UserId)) entry.UserId = principal.UserId;
-            
-            bool isTaken = await _entryRepo.IsBracketNameTakenAsync(entry.PoolId, entry.PlayerName, entry.Id);
-            if (isTaken)
+                if (string.IsNullOrEmpty(entry.UserId)) entry.UserId = principal.UserId;
+                
+                bool isTaken = await _entryRepo.IsBracketNameTakenAsync(entry.PoolId, entry.PlayerName, entry.Id);
+                if (isTaken)
+                {
+                    var conflict = req.CreateResponse(HttpStatusCode.Conflict);
+                    await conflict.WriteStringAsync("Bracket Name is already taken in this pool.");
+                    return conflict;
+                }
+
+                await _entryRepo.AddEntryAsync(entry);
+
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(entry);
+                return response;
+            }
+            catch (Exception ex)
             {
-                var conflict = req.CreateResponse(HttpStatusCode.Conflict);
-                await conflict.WriteStringAsync("Bracket Name is already taken in this pool.");
-                return conflict;
+                _logger.LogError(ex, "Error creating entry");
+                var error = req.CreateResponse(HttpStatusCode.InternalServerError);
+                await error.WriteStringAsync($"Internal Server Error: {ex.Message}");
+                return error;
             }
-
-            await _entryRepo.AddEntryAsync(entry);
-
-            var response = req.CreateResponse(HttpStatusCode.OK);
-            await response.WriteAsJsonAsync(entry);
-            return response;
         }
 
         [Function("DeleteEntry")]
         public async Task<HttpResponseData> DeleteEntry([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
         {
-            var principal = SecurityHelper.ParseSwaHeader(req);
-            if (principal == null) return req.CreateResponse(HttpStatusCode.Unauthorized);
-
-            var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
-            var id = query["id"];
-            if (string.IsNullOrEmpty(id)) return req.CreateResponse(HttpStatusCode.BadRequest);
-
-            var entry = await _entryRepo.GetEntryAsync(id);
-            if (entry == null) return req.CreateResponse(HttpStatusCode.NotFound);
-
-            if (entry.UserId != principal.UserId)
+            try
             {
-                var user = await _userRepo.GetUserAsync(principal.UserId);
-                if (user == null || user.AppRole != Constants.Roles.SuperAdmin)
+                var principal = SecurityHelper.ParseSwaHeader(req);
+                if (principal == null) 
                 {
-                    return req.CreateResponse(HttpStatusCode.Forbidden);
+                    var unauth = req.CreateResponse(HttpStatusCode.Unauthorized);
+                    await unauth.WriteStringAsync("User is not authenticated.");
+                    return unauth;
                 }
-            }
 
-            var pool = await _poolRepo.GetPoolAsync(entry.PoolId);
-            if (pool != null && DateTime.UtcNow > pool.LockDate)
+                var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+                var id = query["id"];
+                if (string.IsNullOrEmpty(id)) 
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("Missing ID parameter.");
+                    return badReq;
+                }
+
+                var entry = await _entryRepo.GetEntryAsync(id);
+                if (entry == null) 
+                {
+                    var notFound = req.CreateResponse(HttpStatusCode.NotFound);
+                    await notFound.WriteStringAsync("Entry not found.");
+                    return notFound;
+                }
+
+                if (entry.UserId != principal.UserId)
+                {
+                    var user = await _userRepo.GetUserAsync(principal.UserId);
+                    if (user == null || user.AppRole != Constants.Roles.SuperAdmin)
+                    {
+                        var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
+                        await forbidden.WriteStringAsync("You do not have permission to delete this entry.");
+                        return forbidden;
+                    }
+                }
+
+                var pool = await _poolRepo.GetPoolAsync(entry.PoolId);
+                if (pool != null && DateTime.UtcNow > pool.LockDate)
+                {
+                    var user = await _userRepo.GetUserAsync(principal.UserId);
+                    if (user == null || user.AppRole != Constants.Roles.SuperAdmin)
+                    {
+                        var lockedResp = req.CreateResponse(HttpStatusCode.BadRequest);
+                        await lockedResp.WriteStringAsync("Cannot delete entry after pool is locked.");
+                        return lockedResp;
+                    }
+                }
+
+                await _entryRepo.DeleteEntryAsync(id);
+                return req.CreateResponse(HttpStatusCode.OK);
+            }
+            catch (Exception ex)
             {
-                var user = await _userRepo.GetUserAsync(principal.UserId);
-                if (user == null || user.AppRole != Constants.Roles.SuperAdmin)
-                {
-                    var lockedResp = req.CreateResponse(HttpStatusCode.BadRequest);
-                    await lockedResp.WriteStringAsync("Cannot delete entry after pool is locked.");
-                    return lockedResp;
-                }
+                _logger.LogError(ex, "Error deleting entry");
+                var error = req.CreateResponse(HttpStatusCode.InternalServerError);
+                await error.WriteStringAsync($"Internal Server Error: {ex.Message}");
+                return error;
             }
-
-            await _entryRepo.DeleteEntryAsync(id);
-            return req.CreateResponse(HttpStatusCode.OK);
         }
     }
 }
