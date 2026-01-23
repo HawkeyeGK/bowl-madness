@@ -381,8 +381,14 @@
             }
             else if (!string.IsNullOrEmpty(joinModel.InviteCode))
             {
-                // Find pool by invite code
-                targetPool = pools.FirstOrDefault(p => string.Equals(p.InviteCode, joinModel.InviteCode, StringComparison.OrdinalIgnoreCase));
+                // Find pool by invite code - PRIORITIZE ACTIVE POOLS
+                targetPool = pools.FirstOrDefault(p => 
+                    string.Equals(p.InviteCode, joinModel.InviteCode, StringComparison.OrdinalIgnoreCase) && 
+                    !p.IsArchived);
+                
+                // Fallback: If no active pool found, allow archived? (User request implies strictly active check)
+                // For now, let's stick to the requirement: "only active pools should be checked"
+
             }
             
             if (targetPool != null && targetPool.GameIds != null && targetPool.GameIds.Any())

@@ -22,7 +22,7 @@ namespace BowlPoolManager.Api.Repositories
 
         public async Task<BowlPool?> GetPoolByInviteCodeAsync(string inviteCode)
         {
-            var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BowlPool}' AND StringEquals(c.inviteCode, @inviteCode, true)";
+            var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BowlPool}' AND StringEquals(c.inviteCode, @inviteCode, true) AND c.isArchived != true";
             var queryDef = new QueryDefinition(sql).WithParameter("@inviteCode", inviteCode);
             var results = await QueryAsync<BowlPool>(queryDef);
             return results.FirstOrDefault();
