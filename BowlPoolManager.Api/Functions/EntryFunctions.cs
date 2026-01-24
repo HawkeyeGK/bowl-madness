@@ -90,6 +90,10 @@ namespace BowlPoolManager.Api.Functions
                     return unauth;
                 }
 
+                // Check Admin Status
+                var userProfile = await _userRepo.GetUserAsync(principal.UserId);
+                bool isAdmin = userProfile != null && userProfile.AppRole == Constants.Roles.SuperAdmin;
+
                 BracketEntry? entry = null;
                 try
                 {
@@ -125,19 +129,19 @@ namespace BowlPoolManager.Api.Functions
                 if (!string.IsNullOrEmpty(entry.Id))
                 {
                     var existing = await _entryRepo.GetEntryAsync(entry.Id);
-                    if (existing != null && existing.UserId != principal.UserId)
+                    if (existing != null && existing.UserId != principal.UserId && !isAdmin)
                     {
-                        var user = await _userRepo.GetUserAsync(principal.UserId);
-                        if (user == null || user.AppRole != Constants.Roles.SuperAdmin)
-                        {
-                            var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
-                            await forbidden.WriteStringAsync("You do not have permission to modify this entry.");
-                            return forbidden;
-                        }
+                        var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
+                        await forbidden.WriteStringAsync("You do not have permission to modify this entry.");
+                        return forbidden;
                     }
                 }
 
-                if (string.IsNullOrEmpty(entry.UserId)) entry.UserId = principal.UserId;
+                if (!isAdmin)
+                {
+                    entry.UserId = principal.UserId;
+                }
+
                 if (string.IsNullOrEmpty(entry.Id)) entry.Id = Guid.NewGuid().ToString();
 
                 // FORCE SYNC: Ensure Entry Season matches Pool Season
