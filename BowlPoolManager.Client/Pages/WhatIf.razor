@@ -242,6 +242,7 @@
 @code {
     private bool isLoading = true;
     private List<BowlGame> games = new();
+    private List<BowlGame> allGames = new();
     
     // Raw Data
     private List<BracketEntry> allEntries = new();
@@ -272,7 +273,8 @@
 
             await Task.WhenAll(gamesTask, entriesTask, poolsTask, myEntriesTask);
 
-            games = (await gamesTask ?? new()).OrderBy(g => g.StartTime).ToList();
+            allGames = (await gamesTask ?? new()).OrderBy(g => g.StartTime).ToList();
+            games = allGames.ToList();
             allEntries = await entriesTask ?? new();
             var allPools = await poolsTask ?? new();
             var myEntries = await myEntriesTask;
@@ -281,12 +283,12 @@
             poolList = allPools.Where(p => !p.IsArchived).ToList();
 
             // 2. Build the Bracket Tree
-            _feederMap = games
+            _feederMap = allGames
                 .Where(g => !string.IsNullOrEmpty(g.NextGameId))
                 .ToLookup(g => g.NextGameId!);
 
             // 3. Pre-fill Simulation with Reality
-            foreach(var game in games.Where(g => g.Status == GameStatus.Final))
+            foreach(var game in allGames.Where(g => g.Status == GameStatus.Final))
             {
                 var winner = GetRealWinner(game);
                 if (!string.IsNullOrEmpty(winner))
@@ -376,10 +378,21 @@
         if (string.IsNullOrEmpty(selectedPoolId))
         {
             filteredEntries = new();
+            games = allGames.ToList();
         }
         else
         {
             filteredEntries = allEntries.Where(e => e.PoolId == selectedPoolId).ToList();
+            
+            var pool = poolList.FirstOrDefault(p => p.Id == selectedPoolId);
+            if (pool != null && pool.GameIds != null && pool.GameIds.Any())
+            {
+                games = allGames.Where(g => pool.GameIds.Contains(g.Id)).OrderBy(g => g.StartTime).ToList();
+            }
+            else
+            {
+                games = allGames.ToList();
+            }
         }
         Recalculate();
     }
