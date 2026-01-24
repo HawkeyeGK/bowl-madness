@@ -126,14 +126,74 @@ namespace BowlPoolManager.Api.Functions
                     return badReq;
                 }
 
+                BracketEntry? existingEntry = null;
                 if (!string.IsNullOrEmpty(entry.Id))
                 {
-                    var existing = await _entryRepo.GetEntryAsync(entry.Id);
-                    if (existing != null && existing.UserId != principal.UserId && !isAdmin)
+                    existingEntry = await _entryRepo.GetEntryAsync(entry.Id);
+                    if (existingEntry != null && existingEntry.UserId != principal.UserId && !isAdmin)
                     {
                         var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
                         await forbidden.WriteStringAsync("You do not have permission to modify this entry.");
                         return forbidden;
+                    }
+                }
+
+                // AUDIT LOG LOGIC
+                string userEmail = userProfile?.Email ?? "Unknown User";
+                string timestamp = DateTimeHelper.ToCentral(DateTime.UtcNow).ToString("MMM d, yyyy h:mm tt");
+
+                if (existingEntry == null)
+                {
+                    // New Entry
+                    entry.AuditLog = new List<string>
+                    {
+                        $"Entry Created by {userEmail} on {timestamp}"
+                    };
+                }
+                else
+                {
+                    // Update: Compare and Log Changes
+                    entry.AuditLog = existingEntry.AuditLog ?? new List<string>();
+                    var changes = new List<string>();
+
+                    // 1. Bracket Name
+                    if (!string.Equals(existingEntry.PlayerName, entry.PlayerName, StringComparison.Ordinal))
+                    {
+                        changes.Add($"Changed Bracket Name: {existingEntry.PlayerName} -> {entry.PlayerName}");
+                    }
+
+                    // 2. Tiebreaker
+                    if (existingEntry.TieBreakerPoints != entry.TieBreakerPoints)
+                    {
+                        changes.Add($"Changed Tiebreaker: {existingEntry.TieBreakerPoints} -> {entry.TieBreakerPoints}");
+                    }
+
+                    // 3. Picks
+                    var allGames = await _gameRepo.GetGamesAsync();
+                    var existingPicks = existingEntry.Picks ?? new Dictionary<string, string>();
+                    var newPicks = entry.Picks ?? new Dictionary<string, string>();
+                    var allKeys = existingPicks.Keys.Union(newPicks.Keys).Distinct();
+
+                    foreach (var gameId in allKeys)
+                    {
+                        existingPicks.TryGetValue(gameId, out var oldPick);
+                        newPicks.TryGetValue(gameId, out var newPick);
+
+                        if (!string.Equals(oldPick, newPick, StringComparison.OrdinalIgnoreCase))
+                        {
+                            var game = allGames.FirstOrDefault(g => g.Id == gameId);
+                            string gameName = game != null ? game.BowlName : "Unknown Bowl";
+                            string oldVal = string.IsNullOrEmpty(oldPick) ? "No Pick" : oldPick;
+                            string newVal = string.IsNullOrEmpty(newPick) ? "No Pick" : newPick;
+
+                            changes.Add($"Changed Winner: {gameName} - {oldVal} -> {newVal}");
+                        }
+                    }
+
+                    if (changes.Any())
+                    {
+                        entry.AuditLog.Add($"Changes by {userEmail} on {timestamp}:");
+                        entry.AuditLog.AddRange(changes);
                     }
                 }
 

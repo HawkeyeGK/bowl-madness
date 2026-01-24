@@ -47,5 +47,9 @@ namespace BowlPoolManager.Core.Domain
         [JsonProperty("type")]
         [JsonPropertyName("type")]
         public string Type { get; set; } = Constants.DocumentTypes.BracketEntry;
+
+        [JsonProperty("auditLog")]
+        [JsonPropertyName("auditLog")]
+        public List<string> AuditLog { get; set; } = new List<string>();
     }
 }

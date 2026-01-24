@@ -189,6 +189,24 @@
                     else { <i class="bi bi-save"></i> <span>Save Entry</span> }
                 </button>
             </div>
+            
+            @* AUDIT LOG *@
+            @if (entry.AuditLog != null && entry.AuditLog.Any())
+            {
+                <div class="card mb-4 shadow-sm mt-4">
+                    <div class="card-header bg-secondary text-white small py-1">
+                        <i class="bi bi-clock-history me-1"></i> Audit Log
+                    </div>
+                    <div class="card-body bg-light p-2" style="max-height: 250px; overflow-y: auto; font-family: monospace; font-size: 0.85em;">
+                        <ul class="list-unstyled mb-0">
+                            @foreach (var log in entry.AuditLog.AsEnumerable().Reverse())
+                            {
+                                <li class="mb-1 border-bottom pb-1">@log</li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            }
         </EditForm>
         
         @* MOVE MODAL *@
