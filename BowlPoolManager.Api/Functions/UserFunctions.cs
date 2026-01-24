@@ -85,9 +85,10 @@ namespace BowlPoolManager.Api.Functions
 
             // Use Repo for Authorization check
             var currentUser = await _userRepo.GetUserAsync(principal.UserId);
-            if (currentUser == null || currentUser.AppRole != Constants.Roles.SuperAdmin)
+            // Allow Admin access for Entry Management (needed to see user emails)
+            if (!SecurityHelper.IsAdmin(currentUser))
             {
-                _logger.LogWarning($"User {principal.UserId} attempted to access user list without SuperAdmin rights.");
+                _logger.LogWarning($"User {principal.UserId} attempted to access user list without Admin rights.");
                 return req.CreateResponse(HttpStatusCode.Forbidden);
             }
 

@@ -39,6 +39,11 @@ namespace BowlPoolManager.Api.Helpers
             public HttpResponseData? ErrorResponse { get; set; }
         }
 
+        public static bool IsAdmin(UserProfile? user)
+        {
+            return user != null && (user.AppRole == Constants.Roles.SuperAdmin || user.AppRole == Constants.Roles.Admin);
+        }
+
         public static async Task<AuthResult> ValidateSuperAdminAsync(HttpRequestData req, IUserRepository userRepo)
         {
             var principal = ParseSwaHeader(req);

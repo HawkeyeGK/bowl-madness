@@ -5,7 +5,7 @@
 @using BowlPoolManager.Client.Services
 @using Microsoft.AspNetCore.Authorization
 @using System.Net.Http.Json
-@attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
+@attribute [Authorize(Roles = "SuperAdmin,Admin")]
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject IJSRuntime JS

@@ -92,7 +92,7 @@ namespace BowlPoolManager.Api.Functions
 
                 // Check Admin Status
                 var userProfile = await _userRepo.GetUserAsync(principal.UserId);
-                bool isAdmin = userProfile != null && userProfile.AppRole == Constants.Roles.SuperAdmin;
+                bool isAdmin = SecurityHelper.IsAdmin(userProfile);
 
                 BracketEntry? entry = null;
                 try
@@ -203,7 +203,7 @@ namespace BowlPoolManager.Api.Functions
                 if (entry.UserId != principal.UserId)
                 {
                     var user = await _userRepo.GetUserAsync(principal.UserId);
-                    if (user == null || user.AppRole != Constants.Roles.SuperAdmin)
+                    if (!SecurityHelper.IsAdmin(user))
                     {
                         var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
                         await forbidden.WriteStringAsync("You do not have permission to delete this entry.");
@@ -215,7 +215,7 @@ namespace BowlPoolManager.Api.Functions
                 if (pool != null && DateTime.UtcNow > pool.LockDate)
                 {
                     var user = await _userRepo.GetUserAsync(principal.UserId);
-                    if (user == null || user.AppRole != Constants.Roles.SuperAdmin)
+                    if (!SecurityHelper.IsAdmin(user))
                     {
                         var lockedResp = req.CreateResponse(HttpStatusCode.BadRequest);
                         await lockedResp.WriteStringAsync("Cannot delete entry after pool is locked.");
