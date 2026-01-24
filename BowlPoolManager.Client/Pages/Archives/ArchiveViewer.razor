@@ -6,7 +6,7 @@
 
 <PageTitle>Archive Viewer</PageTitle>
 
-<div class="container mt-4">
+<div class="container-fluid mt-3 px-4">
     @if (isLoading)
     {
          <div class="d-flex justify-content-center">
@@ -25,17 +25,19 @@
     else
     {
         @* HEADER *@
-        <div class="card shadow-sm mb-4 border-0 bg-light">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-uppercase text-muted fw-bold mb-1">Season @archive.SeasonId Archive</h6>
-                        <h2 class="display-6 fw-bold text-primary mb-0">@archive.PoolName</h2>
-                    </div>
-                    <div class="text-end">
-                        <div class="badge bg-secondary mb-1">ARCHIVED COPY</div>
-                        <div class="small text-muted">Snapshot: @archive.ArchivedOn.ToLocalTime().ToString("g")</div>
-                    </div>
+        <div class="d-flex justify-content-between align-items-end mb-3">
+             @* LEFT SIDE *@
+            <div class="d-flex align-items-center gap-3">
+                <h1 class="h3 fw-bold mb-0">
+                    <i class="bi bi-archive-fill text-muted"></i> @archive.PoolName
+                </h1>
+                <span class="badge bg-secondary">Season @archive.SeasonId</span>
+            </div>
+
+            @* RIGHT SIDE *@
+            <div class="text-end">
+                <div class="text-muted small">
+                     <i class="bi bi-clock"></i> Archived: @archive.ArchivedOn.ToLocalTime().ToString("g")
                 </div>
             </div>
         </div>
