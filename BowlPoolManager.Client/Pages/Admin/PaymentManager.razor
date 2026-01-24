@@ -1,11 +1,12 @@
-@page "/admin/payments"
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
 @using Microsoft.AspNetCore.Authorization
+@using BowlPoolManager.Client.Services
 @using System.Net.Http.Json
 @attribute [Authorize(Roles = "SuperAdmin,Admin")]
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject ISeasonService SeasonService
 
 <PageTitle>Payment Manager</PageTitle>
 
@@ -24,9 +25,9 @@
                 <div class="col-md-4">
                     <label class="form-label fw-bold">Select Season</label>
                     <select class="form-select" @onchange="OnSeasonChanged">
-                        @foreach (var season in Seasons)
+                        @foreach (var seasonId in Seasons)
                         {
-                            <option value="@season" selected="@(season == SelectedSeason)">@season</option>
+                            <option value="@seasonId" selected="@(seasonId == SelectedSeason)">@seasonId</option>
                         }
                     </select>
                 </div>
@@ -116,7 +117,7 @@
     private string SelectedPoolId = "";
     private bool ShowUnpaidOnly = false;
 
-    private List<string> Seasons = new() { Constants.CurrentSeason, "2024", "2023" }; // TODO: Fetch from logic if needed, simplify for now
+    private List<string> Seasons = new();
     private List<BowlPool> Pools = new();
     private List<BracketEntry> AllEntries = new();
 
@@ -128,7 +129,36 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadSeasons();
         await LoadData();
+    }
+
+    private async Task LoadSeasons()
+    {
+        try
+        {
+            var seasonsList = await SeasonService.GetSeasonsAsync();
+            if (seasonsList != null && seasonsList.Any())
+            {
+                Seasons = seasonsList.Select(s => s.Id).OrderByDescending(s => s).ToList();
+                
+                // Ensure selected season is in the list, otherwise default to first available
+                if (!Seasons.Contains(SelectedSeason))
+                {
+                    SelectedSeason = Seasons.First();
+                }
+            }
+            else 
+            {
+                // Fallback
+                Seasons = new List<string> { Constants.CurrentSeason };
+            }
+        }
+        catch
+        {
+             // Fallback on error
+             Seasons = new List<string> { Constants.CurrentSeason };
+        }
     }
 
     private async Task OnSeasonChanged(ChangeEventArgs e)
