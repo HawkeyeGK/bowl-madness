@@ -53,18 +53,17 @@
                                         <div class="small text-muted fw-normal d-block d-md-none">@user.Id</div>
                                     </td>
                                     <td>
-                                        @if (user.AppRole == Constants.Roles.SuperAdmin)
-                                        {
-                                            <span class="badge bg-danger">@user.AppRole</span>
-                                        }
-                                        else if (user.AppRole == Constants.Roles.Admin)
-                                        {
-                                            <span class="badge bg-warning text-dark">@user.AppRole</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge bg-info text-dark">@user.AppRole</span>
-                                        }
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm dropdown-toggle @GetRoleBadgeClass(user.AppRole)" type="button" id="roleDropdown-@user.Id" data-bs-toggle="dropdown" aria-expanded="false">
+                                                @user.AppRole
+                                            </button>
+                                            <ul class="dropdown-menu" aria-labelledby="roleDropdown-@user.Id">
+                                                <li><a class="dropdown-item" href="javascript:void(0)" @onclick="() => UpdateRole(user, Constants.Roles.Player)">Player</a></li>
+                                                <li><a class="dropdown-item" href="javascript:void(0)" @onclick="() => UpdateRole(user, Constants.Roles.Admin)">Admin</a></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item text-danger" href="javascript:void(0)" @onclick="() => UpdateRole(user, Constants.Roles.SuperAdmin)">SuperAdmin</a></li>
+                                            </ul>
+                                        </div>
                                     </td>
                                     <td>
                                         @if (user.IsDisabled)
@@ -104,6 +103,8 @@
         </div>
     }
 </div>
+
+@inject IJSRuntime JS
 
 @code {
     private List<UserProfile>? users;
@@ -150,6 +151,44 @@
         {
              user.IsDisabled = originalState;
             Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+
+    private string GetRoleBadgeClass(string role)
+    {
+        return role switch
+        {
+            Constants.Roles.SuperAdmin => "btn-danger",
+            Constants.Roles.Admin => "btn-warning text-dark",
+            _ => "btn-info text-dark"
+        };
+    }
+
+    private async Task UpdateRole(UserProfile user, string newRole)
+    {
+        if (user.AppRole == newRole) return;
+
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to change {user.DisplayName}'s role to {newRole}?");
+        
+        if (!confirmed) return;
+
+        var originalRole = user.AppRole;
+        user.AppRole = newRole;
+
+        try
+        {
+            var response = await Http.PostAsync($"api/UpdateUserRole?userId={user.Id}&role={newRole}", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                 user.AppRole = originalRole;
+                 string msg = await response.Content.ReadAsStringAsync();
+                 await JS.InvokeVoidAsync("alert", $"Failed to update role: {msg}");
+            }
+        }
+        catch (Exception ex)
+        {
+             user.AppRole = originalRole;
+             await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
         }
     }
 }

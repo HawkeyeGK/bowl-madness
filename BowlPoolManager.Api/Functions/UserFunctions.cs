@@ -145,5 +145,58 @@ namespace BowlPoolManager.Api.Functions
                 return req.CreateResponse(HttpStatusCode.InternalServerError);
             }
         }
+        [Function("UpdateUserRole")]
+        public async Task<HttpResponseData> UpdateUserRole([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+        {
+            _logger.LogInformation("Updating user role.");
+
+            try
+            {
+                var principal = SecurityHelper.ParseSwaHeader(req);
+                if (principal == null) return req.CreateResponse(HttpStatusCode.Unauthorized);
+
+                // Use Repo
+                var currentUser = await _userRepo.GetUserAsync(principal.UserId);
+                if (currentUser == null || currentUser.AppRole != Constants.Roles.SuperAdmin)
+                {
+                    return req.CreateResponse(HttpStatusCode.Forbidden);
+                }
+
+                var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+                var targetUserId = query["userId"];
+                var newRole = query["role"];
+
+                if (string.IsNullOrEmpty(targetUserId) || string.IsNullOrEmpty(newRole))
+                {
+                    return req.CreateResponse(HttpStatusCode.BadRequest);
+                }
+
+                if (newRole != Constants.Roles.Admin && newRole != Constants.Roles.Player && newRole != Constants.Roles.SuperAdmin)
+                {
+                    return req.CreateResponse(HttpStatusCode.BadRequest);
+                }
+
+                // Use Repo
+                var targetUser = await _userRepo.GetUserAsync(targetUserId);
+                if (targetUser == null)
+                {
+                    return req.CreateResponse(HttpStatusCode.NotFound);
+                }
+
+                targetUser.AppRole = newRole;
+
+                // Use Repo
+                await _userRepo.UpsertUserAsync(targetUser);
+
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(targetUser);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "UpdateUserRole failed.");
+                return req.CreateResponse(HttpStatusCode.InternalServerError);
+            }
+        }
     }
 }
