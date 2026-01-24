@@ -91,13 +91,23 @@
                                 <tr>
                                     <td class="ps-4 text-start">@row.Rank</td>
                                     <td class="fw-bold">
-                                        <a href="entry/@row.Entry.Id" class="text-decoration-none text-dark">
-                                            @if (isRedacted)
-                                            {
-                                                <i class="bi bi-lock-fill text-muted me-1" title="Picks Hidden"></i>
-                                            }
-                                            @row.Entry.PlayerName
-                                        </a>
+                                        @if (currentPool != null && DateTime.UtcNow < currentPool.LockDate)
+                                        {
+                                            <span class="text-secondary" title="Picks Hidden until @currentPool.LockDate">
+                                                <i class="bi bi-lock-fill text-muted me-1"></i>
+                                                @row.Entry.PlayerName
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <a href="entry/@row.Entry.Id" class="text-decoration-none text-dark">
+                                                @if (isRedacted)
+                                                {
+                                                    <i class="bi bi-lock-fill text-muted me-1" title="Picks Hidden"></i>
+                                                }
+                                                @row.Entry.PlayerName
+                                            </a>
+                                        }
                                     </td>
                                     <td class="fs-5 text-primary fw-bold">@row.Score</td>
                                     <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.Standard]</td>
