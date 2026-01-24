@@ -415,7 +415,7 @@
     private List<BracketEntry> pastEntries = new();
     private BracketEntry activeEntry = new() { Picks = new Dictionary<string, string>() };
 
-    private string currentSeasonId = Constants.CurrentSeason;
+    private string currentSeasonId = "";
     
     // Helpers for Editor
     private BowlPool? EntryPool => pools.FirstOrDefault(p => p.Id == activeEntry.PoolId);
@@ -430,7 +430,8 @@
             // 0. Fetch Seasons (Dynamic Source of Truth)
             // Fetch seasons first to determine the current one
             var seasons = await SeasonService.GetSeasonsAsync();
-            var activeSeason = seasons.FirstOrDefault(s => s.IsCurrent);
+            var activeSeason = seasons.FirstOrDefault(s => s.IsCurrent) ?? seasons.OrderByDescending(s => s.Id).FirstOrDefault();
+            
             if (activeSeason != null)
             {
                 currentSeasonId = activeSeason.Id;

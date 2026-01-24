@@ -26,6 +26,13 @@ namespace BowlPoolManager.Client.Services
             }
         }
 
+        public async Task<Season?> GetCurrentSeasonAsync()
+        {
+            var seasons = await GetSeasonsAsync();
+            // Return season marked IsCurrent, or the latest one by ID as fallback
+            return seasons.FirstOrDefault(s => s.IsCurrent) ?? seasons.OrderByDescending(s => s.Id).FirstOrDefault();
+        }
+
         public async Task UpsertSeasonAsync(Season season)
         {
             try

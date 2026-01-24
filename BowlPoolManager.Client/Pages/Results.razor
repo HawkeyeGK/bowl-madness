@@ -165,8 +165,8 @@
             var currentSeason = seasons.FirstOrDefault(s => s.IsCurrent);
 
             // 3. Determine the target SeasonId
-            //    If no season is marked current in DB, fallback to Constants (or "2025").
-            string targetSeasonId = currentSeason?.Id ?? Constants.CurrentSeason;
+            //    If no season is marked current in DB, fallback to latest.
+            string targetSeasonId = currentSeason?.Id ?? seasons.OrderByDescending(s => s.Id).FirstOrDefault()?.Id ?? "";
 
             // 4. Filter
             games = allGames.Where(g => g.SeasonId == targetSeasonId).ToList();

@@ -17,8 +17,7 @@ namespace BowlPoolManager.Core
             public const string SeasonPartitionKey = "/seasonId";
         }
 
-        // Helper to standardize the current active season for the migration
-        public const string CurrentSeason = "2025";
+
 
         public static class Roles
         {
