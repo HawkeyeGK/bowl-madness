@@ -23,26 +23,17 @@
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-body">
             <div class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label fw-bold">Select Season</label>
-                    <select class="form-select" @onchange="OnSeasonChanged">
-                        @foreach (var seasonId in Seasons)
-                        {
-                            <option value="@seasonId" selected="@(seasonId == SelectedSeason)">@seasonId</option>
-                        }
-                    </select>
-                </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <label class="form-label fw-bold">Select Pool</label>
                     <select class="form-select" @bind="SelectedPoolId" disabled="@(Pools.Count == 0)">
-                        <option value="">-- All Pools --</option>
+                        <option value="">-- All Pools (Current Season) --</option>
                         @foreach (var pool in Pools)
                         {
                             <option value="@pool.Id">@pool.Name</option>
                         }
                     </select>
                 </div>
-                <div class="col-md-4 d-flex align-items-end">
+                <div class="col-md-6 d-flex align-items-end">
                     <div class="form-check form-switch mb-2">
                         <input class="form-check-input" type="checkbox" id="unpaidOnly" @bind="ShowUnpaidOnly">
                         <label class="form-check-label user-select-none" for="unpaidOnly">Show Unpaid Only</label>
@@ -75,6 +66,7 @@
                     <thead class="bg-light">
                         <tr>
                             <th scope="col" class="ps-4">Player Name</th>
+                            <th scope="col">User ID</th>
                             <th scope="col">Pool</th>
                             <th scope="col">Payment Status</th>
                         </tr>
@@ -85,7 +77,9 @@
                             <tr>
                                 <td class="ps-4">
                                     <span class="fw-bold text-dark">@entry.PlayerName</span>
-                                    <div class="small text-muted">User ID: @entry.UserId.Substring(0, Math.Min(8, entry.UserId.Length))...</div>
+                                </td>
+                                <td>
+                                    <span class="small text-muted">@entry.UserId</span>
                                 </td>
                                 <td>
                                     <span class="badge bg-light text-dark border">@GetPoolName(entry.PoolId)</span>
@@ -114,11 +108,9 @@
 
 @code {
     private bool IsLoading = true;
-    private string SelectedSeason = Constants.CurrentSeason;
     private string SelectedPoolId = "";
     private bool ShowUnpaidOnly = false;
 
-    private List<string> Seasons = new();
     private List<BowlPool> Pools = new();
     private List<BracketEntry> AllEntries = new();
 
@@ -130,41 +122,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadSeasons();
-        await LoadData();
-    }
-
-    private async Task LoadSeasons()
-    {
-        try
-        {
-            var seasonsList = await SeasonService.GetSeasonsAsync();
-            if (seasonsList != null && seasonsList.Any())
-            {
-                Seasons = seasonsList.Select(s => s.Id).OrderByDescending(s => s).ToList();
-                
-                // Ensure selected season is in the list, otherwise default to first available
-                if (!Seasons.Contains(SelectedSeason))
-                {
-                    SelectedSeason = Seasons.First();
-                }
-            }
-            else 
-            {
-                // Fallback
-                Seasons = new List<string> { Constants.CurrentSeason };
-            }
-        }
-        catch
-        {
-             // Fallback on error
-             Seasons = new List<string> { Constants.CurrentSeason };
-        }
-    }
-
-    private async Task OnSeasonChanged(ChangeEventArgs e)
-    {
-        SelectedSeason = e.Value?.ToString() ?? Constants.CurrentSeason;
         await LoadData();
     }
 
@@ -173,15 +130,11 @@
         IsLoading = true;
         try
         {
-            // 1. Load Pools for Season
-            var allPools = await Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={SelectedSeason}") ?? new();
+            // 1. Load Pools for Current Season
+            var allPools = await Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={Constants.CurrentSeason}") ?? new();
             Pools = allPools;
 
-            // 2. Load Entries (We might need an endpoint directly, or just iterate active pools)
-            // Ideally we have GetEntries?poolId=... but we want ALL for the season or selected pools.
-            // For efficiency let's loop pools if needed or grab all if there's an API. 
-            // Existing API: GetEntries?poolId=X
-            
+            // 2. Load Entries
             AllEntries.Clear();
             foreach (var pool in Pools)
             {
@@ -221,7 +174,6 @@
             {
                 // Revert on failure
                 entry.IsPaid = !isPaid;
-                // Add toast/alert error here in future
                 Console.WriteLine("Failed to update payment status.");
             }
         }
