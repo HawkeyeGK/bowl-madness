@@ -8,17 +8,22 @@
 
 <PageTitle>Scoreboard</PageTitle>
 
-<div class="container mt-4">
-    <div class="text-center mb-5">
-        <h1 class="display-4 fw-bold text-primary"><i class="bi bi-display"></i> Scoreboard</h1>
-        <p class="lead text-muted mb-1">Scores & Schedules</p>
-        
-        @if (LastUpdate != DateTime.MinValue)
-        {
-            <div class="small text-secondary fst-italic">
-                Updates automatically &bull; Last update: @DateTimeHelper.ToCentral(LastUpdate).ToString("MMM d, h:mm tt") CT
-            </div>
-        }
+<div class="container-fluid mt-3 px-4">
+    <div class="d-flex justify-content-between align-items-end mb-3">
+        @* LEFT SIDE *@
+        <div class="d-flex align-items-center gap-3">
+            <h1 class="h3 fw-bold mb-0"><i class="bi bi-display text-primary"></i> Scoreboard</h1>
+        </div>
+
+        @* RIGHT SIDE *@
+        <div class="text-end">
+            @if (LastUpdate != DateTime.MinValue)
+            {
+                <div class="text-muted small">
+                    <i class="bi bi-arrow-repeat"></i> Updated: @DateTimeHelper.ToCentral(LastUpdate).ToString("MMM d, h:mm tt") CT
+                </div>
+            }
+        </div>
     </div>
 
     @if (isLoading)
