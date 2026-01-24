@@ -40,6 +40,10 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("createdOn")]
         public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
 
+        [JsonProperty("isPaid")]
+        [JsonPropertyName("isPaid")]
+        public bool IsPaid { get; set; } = false;
+
         [JsonProperty("type")]
         [JsonPropertyName("type")]
         public string Type { get; set; } = Constants.DocumentTypes.BracketEntry;

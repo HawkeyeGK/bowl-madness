@@ -234,5 +234,69 @@ namespace BowlPoolManager.Api.Functions
                 return error;
             }
         }
+        [Function("SetEntryPaidStatus")]
+        public async Task<HttpResponseData> SetEntryPaidStatus([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+        {
+            try
+            {
+                var principal = SecurityHelper.ParseSwaHeader(req);
+                if (principal == null)
+                {
+                    var unauth = req.CreateResponse(HttpStatusCode.Unauthorized);
+                    await unauth.WriteStringAsync("User is not authenticated.");
+                    return unauth;
+                }
+
+                // Check Admin Status
+                var userProfile = await _userRepo.GetUserAsync(principal.UserId);
+                if (!SecurityHelper.IsAdmin(userProfile))
+                {
+                    var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
+                    await forbidden.WriteStringAsync("You must be an admin to update payment status.");
+                    return forbidden;
+                }
+
+                var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+                var id = query["id"];
+                var isPaidStr = query["isPaid"];
+
+                if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(isPaidStr))
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("Missing id or isPaid parameter.");
+                    return badReq;
+                }
+
+                if (!bool.TryParse(isPaidStr, out bool isPaid))
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("Invalid isPaid parameter.");
+                    return badReq;
+                }
+
+                var entry = await _entryRepo.GetEntryAsync(id);
+                if (entry == null)
+                {
+                    var notFound = req.CreateResponse(HttpStatusCode.NotFound);
+                    await notFound.WriteStringAsync("Entry not found.");
+                    return notFound;
+                }
+
+                // Update Status
+                entry.IsPaid = isPaid;
+                await _entryRepo.AddEntryAsync(entry);
+
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(entry);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating payment status");
+                var error = req.CreateResponse(HttpStatusCode.InternalServerError);
+                await error.WriteStringAsync($"Internal Server Error: {ex.Message}");
+                return error;
+            }
+        }
     }
 }

@@ -1,0 +1,203 @@
+@page "/admin/payments"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@attribute [Authorize(Roles = "SuperAdmin,Admin")]
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<PageTitle>Payment Manager</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-primary"><i class="bi bi-cash-coin"></i> Payment Manager</h2>
+        <a href="admin/dashboard" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Dashboard
+        </a>
+    </div>
+
+    @* --- FILTERS --- *@
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Select Season</label>
+                    <select class="form-select" @onchange="OnSeasonChanged">
+                        @foreach (var season in Seasons)
+                        {
+                            <option value="@season" selected="@(season == SelectedSeason)">@season</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Select Pool</label>
+                    <select class="form-select" @bind="SelectedPoolId" disabled="@(Pools.Count == 0)">
+                        <option value="">-- All Pools --</option>
+                        @foreach (var pool in Pools)
+                        {
+                            <option value="@pool.Id">@pool.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="unpaidOnly" @bind="ShowUnpaidOnly">
+                        <label class="form-check-label user-select-none" for="unpaidOnly">Show Unpaid Only</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* --- ENTRIES TABLE --- *@
+    @if (IsLoading)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (FilteredEntries.Count == 0)
+    {
+        <div class="alert alert-info text-center">
+            No entries found for the selected criteria.
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm border-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th scope="col" class="ps-4">Player Name</th>
+                            <th scope="col">Pool</th>
+                            <th scope="col">Payment Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in FilteredEntries)
+                        {
+                            <tr>
+                                <td class="ps-4">
+                                    <span class="fw-bold text-dark">@entry.PlayerName</span>
+                                    <div class="small text-muted">User ID: @entry.UserId.Substring(0, Math.Min(8, entry.UserId.Length))...</div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border">@GetPoolName(entry.PoolId)</span>
+                                </td>
+                                <td>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="pay-@entry.Id" 
+                                               checked="@entry.IsPaid" 
+                                               @onchange="@(e => TogglePayment(entry, (bool)e.Value))">
+                                        <label class="form-check-label fw-bold @(entry.IsPaid ? "text-success" : "text-danger")" for="pay-@entry.Id">
+                                            @(entry.IsPaid ? "PAID" : "UNPAID")
+                                        </label>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer bg-white text-muted small">
+                Showing @FilteredEntries.Count entries
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool IsLoading = true;
+    private string SelectedSeason = Constants.CurrentSeason;
+    private string SelectedPoolId = "";
+    private bool ShowUnpaidOnly = false;
+
+    private List<string> Seasons = new() { Constants.CurrentSeason, "2024", "2023" }; // TODO: Fetch from logic if needed, simplify for now
+    private List<Pool> Pools = new();
+    private List<BracketEntry> AllEntries = new();
+
+    private List<BracketEntry> FilteredEntries => AllEntries
+        .Where(e => (string.IsNullOrEmpty(SelectedPoolId) || e.PoolId == SelectedPoolId) &&
+                    (!ShowUnpaidOnly || !e.IsPaid))
+        .OrderBy(e => e.PlayerName)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task OnSeasonChanged(ChangeEventArgs e)
+    {
+        SelectedSeason = e.Value?.ToString() ?? Constants.CurrentSeason;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        IsLoading = true;
+        try
+        {
+            // 1. Load Pools for Season
+            var allPools = await Http.GetFromJsonAsync<List<Pool>>($"api/GetPools?seasonId={SelectedSeason}") ?? new();
+            Pools = allPools;
+
+            // 2. Load Entries (We might need an endpoint directly, or just iterate active pools)
+            // Ideally we have GetEntries?poolId=... but we want ALL for the season or selected pools.
+            // For efficiency let's loop pools if needed or grab all if there's an API. 
+            // Existing API: GetEntries?poolId=X
+            
+            AllEntries.Clear();
+            foreach (var pool in Pools)
+            {
+                var poolEntries = await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetEntries?poolId={pool.Id}");
+                if (poolEntries != null)
+                {
+                    AllEntries.AddRange(poolEntries);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading data: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private string GetPoolName(string poolId)
+    {
+        var pool = Pools.FirstOrDefault(p => p.Id == poolId);
+        return pool?.Name ?? "Unknown Pool";
+    }
+
+    private async Task TogglePayment(BracketEntry entry, bool isPaid)
+    {
+        try
+        {
+            // Optimistic Update
+            entry.IsPaid = isPaid;
+
+            // Call API
+            var response = await Http.PostAsync($"api/SetEntryPaidStatus?id={entry.Id}&isPaid={isPaid}", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                // Revert on failure
+                entry.IsPaid = !isPaid;
+                // Add toast/alert error here in future
+                Console.WriteLine("Failed to update payment status.");
+            }
+        }
+        catch (Exception ex)
+        {
+             entry.IsPaid = !isPaid;
+             Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+}
