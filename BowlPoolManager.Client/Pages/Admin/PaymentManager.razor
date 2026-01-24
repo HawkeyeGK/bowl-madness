@@ -26,7 +26,7 @@
                 <div class="col-md-6">
                     <label class="form-label fw-bold">Select Pool</label>
                     <select class="form-select" @bind="SelectedPoolId" disabled="@(Pools.Count == 0)">
-                        <option value="">-- All Pools (Current Season) --</option>
+                        <option value="">-- All Active Pools (Current Season) --</option>
                         @foreach (var pool in Pools)
                         {
                             <option value="@pool.Id">@pool.Name</option>
@@ -65,10 +65,18 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="bg-light">
                         <tr>
-                            <th scope="col" class="ps-4">Player Name</th>
-                            <th scope="col">User ID</th>
-                            <th scope="col">Pool</th>
-                            <th scope="col">Payment Status</th>
+                            <th scope="col" class="ps-4 cursor-pointer" style="cursor: pointer;" @onclick="@(() => Sort("PlayerName"))">
+                                Player Name @GetSortIcon("PlayerName")
+                            </th>
+                            <th scope="col" class="cursor-pointer" style="cursor: pointer;" @onclick="@(() => Sort("Email"))">
+                                Email @GetSortIcon("Email")
+                            </th>
+                            <th scope="col" class="cursor-pointer" style="cursor: pointer;" @onclick="@(() => Sort("Pool"))">
+                                Pool @GetSortIcon("Pool")
+                            </th>
+                            <th scope="col" class="cursor-pointer" style="cursor: pointer;" @onclick="@(() => Sort("Status"))">
+                                Payment Status @GetSortIcon("Status")
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -79,7 +87,7 @@
                                     <span class="fw-bold text-dark">@entry.PlayerName</span>
                                 </td>
                                 <td>
-                                    <span class="small text-muted">@entry.UserId</span>
+                                    <span class="small text-muted">@GetUserEmail(entry.UserId)</span>
                                 </td>
                                 <td>
                                     <span class="badge bg-light text-dark border">@GetPoolName(entry.PoolId)</span>
@@ -110,15 +118,44 @@
     private bool IsLoading = true;
     private string SelectedPoolId = "";
     private bool ShowUnpaidOnly = false;
+    private string CurrentSortColumn = "PlayerName";
+    private bool IsAscending = true;
 
     private List<BowlPool> Pools = new();
     private List<BracketEntry> AllEntries = new();
+    private Dictionary<string, string> UserEmailMap = new();
 
-    private List<BracketEntry> FilteredEntries => AllEntries
-        .Where(e => (string.IsNullOrEmpty(SelectedPoolId) || e.PoolId == SelectedPoolId) &&
-                    (!ShowUnpaidOnly || !e.IsPaid))
-        .OrderBy(e => e.PlayerName)
-        .ToList();
+    private List<BracketEntry> FilteredEntries
+    {
+        get
+        {
+            var query = AllEntries
+                .Where(e => (string.IsNullOrEmpty(SelectedPoolId) || e.PoolId == SelectedPoolId) &&
+                            (!ShowUnpaidOnly || !e.IsPaid));
+
+            switch (CurrentSortColumn)
+            {
+                case "PlayerName":
+                    query = IsAscending ? query.OrderBy(e => e.PlayerName) : query.OrderByDescending(e => e.PlayerName);
+                    break;
+                case "Email":
+                    query = IsAscending 
+                        ? query.OrderBy(e => GetUserEmail(e.UserId)) 
+                        : query.OrderByDescending(e => GetUserEmail(e.UserId));
+                    break;
+                case "Pool":
+                    query = IsAscending 
+                        ? query.OrderBy(e => GetPoolName(e.PoolId)) 
+                        : query.OrderByDescending(e => GetPoolName(e.PoolId));
+                    break;
+                case "Status":
+                    query = IsAscending ? query.OrderBy(e => e.IsPaid) : query.OrderByDescending(e => e.IsPaid);
+                    break;
+            }
+
+            return query.ToList();
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -130,11 +167,15 @@
         IsLoading = true;
         try
         {
-            // 1. Load Pools for Current Season
+            // 1. Load Pools for Current Season ONLY
             var allPools = await Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={Constants.CurrentSeason}") ?? new();
-            Pools = allPools;
+            Pools = allPools.Where(p => p.SeasonId == Constants.CurrentSeason).ToList();
 
-            // 2. Load Entries
+            // 2. Load Users for Email Lookup
+            var users = await Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers") ?? new();
+            UserEmailMap = users.ToDictionary(u => u.Id, u => u.Email);
+
+            // 3. Load Entries
             AllEntries.Clear();
             foreach (var pool in Pools)
             {
@@ -159,6 +200,30 @@
     {
         var pool = Pools.FirstOrDefault(p => p.Id == poolId);
         return pool?.Name ?? "Unknown Pool";
+    }
+
+    private string GetUserEmail(string userId)
+    {
+        return UserEmailMap.TryGetValue(userId, out var email) ? email : "Unknown";
+    }
+
+    private void Sort(string column)
+    {
+        if (CurrentSortColumn == column)
+        {
+            IsAscending = !IsAscending;
+        }
+        else
+        {
+            CurrentSortColumn = column;
+            IsAscending = true;
+        }
+    }
+
+    private string GetSortIcon(string column)
+    {
+        if (CurrentSortColumn != column) return "↕";
+        return IsAscending ? "↑" : "↓";
     }
 
     private async Task TogglePayment(BracketEntry entry, bool isPaid)
