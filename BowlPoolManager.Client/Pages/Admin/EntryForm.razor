@@ -2,9 +2,11 @@
 @page "/admin/entry/{EntryId}"
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
+@using BowlPoolManager.Core.Helpers
 @using Microsoft.AspNetCore.Authorization
 @using System.Net.Http.Json
 @using System.Text.Json
+@using BowlPoolManager.Client.Helpers
 @attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
 @inject HttpClient Http
 @inject NavigationManager Nav
@@ -18,9 +20,11 @@
         <a href="/admin/entries" class="btn btn-outline-secondary">Back to List</a>
     </div>
 
-    @if (games == null || isLoading)
+    @if (isLoading)
     {
-        <div class="alert alert-info">Loading...</div>
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
     }
     else
     {
@@ -59,7 +63,7 @@
                             {
                                 <InputSelect class="form-select" @bind-Value="entry.PoolId">
                                     <option value="">-- Select Pool --</option>
-                                    @foreach (var p in pools)
+                                    @foreach (var p in pools.Where(p => !p.IsArchived))
                                     {
                                         <option value="@p.Id">@p.Name</option>
                                     }
@@ -88,75 +92,91 @@
                             </InputSelect>
                             <div class="form-text small">Who manages this bracket?</div>
                         </div>
-
-                        @* 4. Tiebreaker *@
-                        <div class="col-md-3">
-                            @{
-                                var pool = pools.FirstOrDefault(p => p.Id == entry.PoolId);
-                                var tbGame = games?.FirstOrDefault(g => g.Id == pool?.TieBreakerGameId);
-                                string tbLabel = tbGame != null ? $"Tiebreaker ({tbGame.TeamHome} vs {tbGame.TeamAway})" : "Tiebreaker";
-                            }
-                            <label class="form-label fw-bold">@tbLabel</label>
-                            <InputNumber class="form-control" @bind-Value="entry.TieBreakerPoints" />
-                        </div>
                     </div>
                 </div>
             </div>
 
-            @* PLAYOFF BRACKET *@
-            <div class="card mb-4 shadow-sm border-warning">
-                <div class="card-header bg-warning text-dark fw-bold">
-                    <i class="bi bi-trophy"></i> Playoff Bracket
-                </div>
-                <div class="card-body">
-                    @foreach (var round in new[] { PlayoffRound.Round1, PlayoffRound.QuarterFinal, PlayoffRound.SemiFinal, PlayoffRound.Championship })
-                    {
-                        var roundGames = games!.Where(g => g.IsPlayoff && g.Round == round).OrderBy(g => g.StartTime).ToList();
-                        if (roundGames.Any())
+            @* GAME SELECTION (MYPICKS STYLE) *@
+            @if (!string.IsNullOrEmpty(entry.PoolId))
+            {
+                <div class="card shadow-sm mb-5">
+                    <div class="card-header bg-dark text-white fw-bold">
+                        Picks (@(entry.Picks?.Count ?? 0) / @ValidGames.Count Selected)
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        @foreach (var game in ValidGames.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
                         {
-                            <h5 class="mt-3 border-bottom pb-2">@GetRoundName(round)</h5>
-                            <div class="row g-3">
-                                @foreach (var game in roundGames)
-                                {
-                                    <div class="col-md-6 col-lg-4">
-                                        <div class="p-2 border rounded bg-light h-100">
-                                            <div class="small fw-bold text-muted mb-1">@game.BowlName</div>
-                                            @{ var options = GetTeamsForGame(game); }
-                                            <select class="form-select" value="@GetPick(game.Id)" @onchange="@(e => UpdatePick(game.Id, e.Value?.ToString()))">
-                                                <option value="">-- Select Winner --</option>
-                                                @foreach (var team in options) { <option value="@team">@team</option> }
-                                            </select>
+                            string pick = "";
+                            if (entry.Picks?.TryGetValue(game.Id, out var p) == true)
+                            {
+                                pick = p;
+                            }
+                            
+                            bool isSelected = !string.IsNullOrEmpty(pick);
+                            var slots = GetMatchupSlots(game);
+                            
+                            <li class="list-group-item p-3 @(isSelected ? "bg-light-success" : "")">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <span class="badge bg-secondary">@game.BowlName</span>
+                                        @if (game.IsPlayoff)
+                                        {
+                                            <span class="badge bg-warning text-dark ms-1">Playoff</span>
+                                        }
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="small fw-bold text-dark">
+                                            @DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d, h:mm tt") CT
+                                        </div>
+                                        <div class="small text-muted" style="font-size: 0.85em;">
+                                            @game.Location 
                                         </div>
                                     </div>
-                                }
-                            </div>
-                        }
-                    }
-                </div>
-            </div>
-
-            @* STANDARD GAMES *@
-            <div class="card mb-4 shadow-sm">
-                <div class="card-header bg-secondary text-white">Standard Bowl Games</div>
-                <div class="card-body">
-                    <div class="row g-3">
-                        @foreach (var game in games!.Where(g => !g.IsPlayoff).OrderBy(g => g.StartTime))
-                        {
-                            <div class="col-md-6 col-lg-4">
-                                <div class="p-2 border rounded h-100">
-                                    <div class="small fw-bold text-muted mb-1">@game.BowlName</div>
-                                    <div class="small text-secondary mb-2">@game.TeamHome vs @game.TeamAway</div>
-                                    <select class="form-select" value="@GetPick(game.Id)" @onchange="@(e => UpdatePick(game.Id, e.Value?.ToString()))">
-                                        <option value="">-- Select Winner --</option>
-                                        @if (!string.IsNullOrEmpty(game.TeamHome)) { <option value="@game.TeamHome">@game.TeamHome</option> }
-                                        @if (!string.IsNullOrEmpty(game.TeamAway)) { <option value="@game.TeamAway">@game.TeamAway</option> }
-                                    </select>
                                 </div>
-                            </div>
+                                
+                                <div class="row g-2">
+                                    <div class="col">
+                                        <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_home")" 
+                                               checked="@(pick == slots.Home && slots.Home != "TBD")" 
+                                               @onchange="@(() => UpdatePick(game.Id, slots.Home))" autocomplete="off">
+                                        
+                                        <label class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center h-100 @(pick == slots.Home && slots.Home != "TBD" ? "active fw-bold" : "")" 
+                                               for="@($"{game.Id}_home")">
+                                            @slots.Home
+                                        </label>
+                                    </div>
+
+                                    <div class="col">
+                                        <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_away")" 
+                                               checked="@(pick == slots.Away && slots.Away != "TBD")" 
+                                               @onchange="@(() => UpdatePick(game.Id, slots.Away))" autocomplete="off">
+                                        
+                                        <label class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center h-100 @(pick == slots.Away && slots.Away != "TBD" ? "active fw-bold" : "")" 
+                                               for="@($"{game.Id}_away")">
+                                            @slots.Away
+                                        </label>
+                                    </div>
+                                </div>
+                            </li>
                         }
+                    </ul>
+                </div>
+
+                @* TIEBREAKER *@
+                <div class="card mb-4 shadow-sm border-warning">
+                    <div class="card-body bg-warning bg-opacity-10">
+                        @{
+                            var pool = pools.FirstOrDefault(p => p.Id == entry.PoolId);
+                            var tieBreakerGame = allGames.FirstOrDefault(g => g.Id == pool?.TieBreakerGameId);
+                            string tbText = tieBreakerGame != null 
+                                ? $"Tiebreaker: Total Points in {tieBreakerGame.BowlName} - {tieBreakerGame.TeamHome} vs {tieBreakerGame.TeamAway}"
+                                : "Tiebreaker: Total Points";
+                        }
+                        <label class="form-label fw-bold text-dark">@tbText</label>
+                        <InputNumber @bind-Value="entry.TieBreakerPoints" class="form-control" />
                     </div>
                 </div>
-            </div>
+            }
 
             <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-5">
                 <button type="button" class="btn btn-secondary me-2" @onclick="ResetForm" disabled="@isSaving">Clear / Reset</button>
@@ -217,7 +237,7 @@
 @code {
     [Parameter] public string? EntryId { get; set; }
 
-    private List<BowlGame>? games;
+    private List<BowlGame> allGames = new();
     private List<BowlPool> pools = new();
     private List<UserProfile> users = new();
     private BracketEntry entry = new BracketEntry();
@@ -231,6 +251,22 @@
     // Move Modal
     private bool showMoveModal = false;
     private string targetPoolId = "";
+
+    private List<BowlGame> ValidGames 
+    {
+        get 
+        {
+            if (string.IsNullOrEmpty(entry.PoolId)) return new List<BowlGame>();
+            
+            var targetPool = pools.FirstOrDefault(p => p.Id == entry.PoolId);
+            if (targetPool != null && targetPool.GameIds != null && targetPool.GameIds.Any())
+            {
+                return allGames.Where(g => targetPool.GameIds.Contains(g.Id)).ToList();
+            }
+            
+            return allGames;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -248,7 +284,7 @@
             
             await Task.WhenAll(gamesTask, poolsTask, usersTask);
             
-            games = await gamesTask ?? new();
+            allGames = await gamesTask ?? new();
             pools = await poolsTask ?? new();
             users = await usersTask ?? new();
 
@@ -267,8 +303,9 @@
             }
             else
             {
-                // Set default pool if only one exists
-                if (pools.Count == 1) entry.PoolId = pools[0].Id;
+                // Set default pool if only one active exists
+                var activePools = pools.Where(p => !p.IsArchived).ToList();
+                if (activePools.Count == 1) entry.PoolId = activePools[0].Id;
             }
         }
         catch (Exception ex)
@@ -281,20 +318,55 @@
         }
     }
 
-    private string GetRoundName(PlayoffRound round) => round switch { PlayoffRound.Round1 => "First Round", PlayoffRound.QuarterFinal => "Quarterfinals", PlayoffRound.SemiFinal => "Semifinals", PlayoffRound.Championship => "National Championship", _ => "Playoffs" };
-    private string GetPick(string gameId) { if (entry.Picks == null) return ""; return entry.Picks.ContainsKey(gameId) ? entry.Picks[gameId] : ""; }
-    private void UpdatePick(string gameId, string? selection) { if (entry.Picks == null) entry.Picks = new Dictionary<string, string>(); if (string.IsNullOrEmpty(selection)) { if (entry.Picks.ContainsKey(gameId)) entry.Picks.Remove(gameId); } else { entry.Picks[gameId] = selection; } StateHasChanged(); }
+    private void UpdatePick(string gameId, string selection) 
+    { 
+        if (entry.Picks == null) entry.Picks = new Dictionary<string, string>(); 
+        if (string.IsNullOrEmpty(selection)) 
+        { 
+            if (entry.Picks.ContainsKey(gameId)) entry.Picks.Remove(gameId); 
+        } 
+        else 
+        { 
+            entry.Picks[gameId] = selection; 
+        } 
+        StateHasChanged(); 
+    }
 
-    private List<string> GetTeamsForGame(BowlGame game)
+    private (string Home, string Away) GetMatchupSlots(BowlGame game)
     {
-        var teams = new List<string>();
-        if (!string.IsNullOrEmpty(game.TeamHome)) teams.Add(game.TeamHome);
-        if (!string.IsNullOrEmpty(game.TeamAway)) teams.Add(game.TeamAway);
-        if (game.IsPlayoff && games != null && entry.Picks != null) {
-            var feederGames = games.Where(g => g.NextGameId == game.Id).ToList();
-            foreach (var feeder in feederGames) { if (entry.Picks.TryGetValue(feeder.Id, out var winnerOfFeeder)) { teams.Add(winnerOfFeeder); } }
+        string home = game.TeamHome;
+        string away = game.TeamAway;
+
+        if (game.IsPlayoff)
+        {
+             var feeders = allGames.Where(g => g.NextGameId == game.Id).OrderBy(g => g.StartTime).ToList();
+             var feederQueue = new Queue<BowlGame>(feeders);
+
+             if (string.IsNullOrWhiteSpace(home) || home.Equals("TBD", StringComparison.OrdinalIgnoreCase))
+             {
+                 if (feederQueue.TryDequeue(out var f1))
+                 {
+                     if (entry.Picks != null && entry.Picks.TryGetValue(f1.Id, out var w1)) home = w1;
+                     else home = $"Winner of {f1.BowlName}";
+                 }
+                 else home = "TBD";
+             }
+
+             if (string.IsNullOrWhiteSpace(away) || away.Equals("TBD", StringComparison.OrdinalIgnoreCase))
+             {
+                 if (feederQueue.TryDequeue(out var f2))
+                 {
+                     if (entry.Picks != null && entry.Picks.TryGetValue(f2.Id, out var w2)) away = w2;
+                     else away = $"Winner of {f2.BowlName}";
+                 }
+                 else away = "TBD";
+             }
         }
-        return teams.Distinct().ToList();
+
+        if (string.IsNullOrWhiteSpace(home)) home = "TBD";
+        if (string.IsNullOrWhiteSpace(away)) away = "TBD";
+        
+        return (home, away);
     }
 
     private async Task ExecuteMove()
@@ -334,7 +406,8 @@
         statusMessage = null; errorMessage = null; showToast = false; isSaving = true;
         try
         {
-            var response = await Http.PostAsJsonAsync("api/SaveEntry", entry);
+            // Use CreateEntry instead of SaveEntry
+            var response = await Http.PostAsJsonAsync("api/CreateEntry", entry);
             if (response.IsSuccessStatusCode)
             {
                 toastMessage = "Changes saved successfully!";
@@ -342,7 +415,11 @@
                 if (string.IsNullOrEmpty(EntryId)) { statusMessage = $"Entry for {entry.PlayerName} saved!"; ResetForm(); }
                 _ = Task.Delay(3000).ContinueWith(t => { showToast = false; InvokeAsync(StateHasChanged); });
             }
-            else { errorMessage = "Failed to save entry."; }
+            else 
+            { 
+                 var errorText = await response.Content.ReadAsStringAsync();
+                 errorMessage = $"Failed to save entry: {errorText}"; 
+            }
         }
         catch (Exception ex) { errorMessage = $"Error: {ex.Message}"; }
         finally { isSaving = false; }
@@ -364,7 +441,10 @@
     private void ResetForm()
     {
         entry = new BracketEntry();
-        if (pools.Count == 1) entry.PoolId = pools[0].Id; // Re-apply default
+        // Re-apply default if only one active exists
+        var activePools = pools.Where(p => !p.IsArchived).ToList();
+        if (activePools.Count == 1) entry.PoolId = activePools[0].Id;
+        
         if (!string.IsNullOrEmpty(EntryId)) { Nav.NavigateTo("/admin/entries"); }
     }
 }
