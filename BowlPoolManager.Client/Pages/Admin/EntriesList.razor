@@ -2,12 +2,14 @@
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
 @using BowlPoolManager.Client.Helpers
+@using BowlPoolManager.Client.Services
 @using Microsoft.AspNetCore.Authorization
 @using System.Net.Http.Json
 @attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject ISeasonService SeasonService
 
 <PageTitle>Manage Entries</PageTitle>
 
@@ -20,20 +22,34 @@
         </div>
     </div>
     
-    @* POOL FILTER *@
+    @* FILTERS *@
     <div class="card mb-4">
         <div class="card-body py-2">
-            <div class="row align-items-center">
-                <div class="col-auto fw-bold">Filter by Pool:</div>
+            <div class="row align-items-center g-3">
+                @* Season Filter *@
                 <div class="col-auto">
-                    <select class="form-select form-select-sm" @onchange="OnPoolFilterChanged">
-                        <option value="">-- All Pools --</option>
-                        @foreach (var pool in pools)
+                    <label class="fw-bold me-2">Season:</label>
+                    <select class="form-select form-select-sm d-inline-block w-auto" @onchange="OnSeasonFilterChanged" value="@selectedSeasonId">
+                        <option value="">All Seasons</option>
+                        @foreach (var s in seasons)
                         {
-                            <option value="@pool.Id" selected="@(selectedPoolId == pool.Id)">@pool.Name</option>
+                            <option value="@s.Id">@s.Name @(s.IsCurrent ? "(Current)" : "")</option>
                         }
                     </select>
                 </div>
+
+                @* Pool Filter *@
+                <div class="col-auto">
+                    <label class="fw-bold me-2">Pool:</label>
+                    <select class="form-select form-select-sm d-inline-block w-auto" @onchange="OnPoolFilterChanged" value="@selectedPoolId">
+                        <option value="">-- All Pools --</option>
+                        @foreach (var pool in FilteredPoolOptions)
+                        {
+                            <option value="@pool.Id">@pool.SeasonId - @pool.Name</option>
+                        }
+                    </select>
+                </div>
+                
                 <div class="col text-end small text-muted">
                     Showing @filteredEntries.Count entries
                 </div>
@@ -49,7 +65,7 @@
     }
     else if (filteredEntries.Count == 0)
     {
-        <div class="alert alert-info">No entries found.</div>
+        <div class="alert alert-info">No entries found matching the current filters.</div>
     }
     else
     {
@@ -61,7 +77,7 @@
                             <tr>
                                 <th>Player Name</th>
                                 <th>Email</th>
-                                <th>Pool</th>
+                                <th>Season / Pool</th>
                                 <th>Tiebreaker</th>
                                 <th>Created On (CT)</th>
                                 <th class="text-end">Actions</th>
@@ -86,7 +102,10 @@
                                         @{
                                             var poolName = pools.FirstOrDefault(p => p.Id == entry.PoolId)?.Name ?? "Unknown";
                                         }
-                                        <span class="badge bg-light text-dark border">@poolName</span>
+                                        <div class="d-flex flex-column">
+                                            <span class="badge bg-light text-dark border mb-1 align-self-start">@poolName</span>
+                                            <small class="text-muted">Season: @entry.SeasonId</small>
+                                        </div>
                                     </td>
                                     <td>@entry.TieBreakerPoints</td>
                                     <td>@DateTimeHelper.ToCentral(entry.CreatedOn).ToString("g")</td>
@@ -110,10 +129,18 @@
     private List<BracketEntry> allEntries = new();
     private List<BracketEntry> filteredEntries = new();
     private List<BowlPool> pools = new();
+    private List<Season> seasons = new();
     private Dictionary<string, string> userEmailMap = new();
     private bool isLoading = true;
     
+    private string selectedSeasonId = "";
     private string selectedPoolId = "";
+    
+    // Derived property for Pool dropdown options
+    private IEnumerable<BowlPool> FilteredPoolOptions => 
+        string.IsNullOrEmpty(selectedSeasonId) 
+            ? pools 
+            : pools.Where(p => p.SeasonId == selectedSeasonId);
 
     protected override async Task OnInitializedAsync()
     {
@@ -126,13 +153,15 @@
         {
             isLoading = true;
             
+            var seasonsTask = SeasonService.GetSeasonsAsync();
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
-            // Target standard entry point
+            // Target standard entry point which gets ALL entries across all pools/seasons
             var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries"); 
             var usersTask = Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers");
 
-            await Task.WhenAll(poolsTask, entriesTask, usersTask);
+            await Task.WhenAll(seasonsTask, poolsTask, entriesTask, usersTask);
 
+            seasons = await seasonsTask ?? new();
             pools = await poolsTask ?? new();
             allEntries = await entriesTask ?? new();
             var users = await usersTask ?? new();
@@ -140,6 +169,13 @@
             userEmailMap = users.ToDictionary(u => u.Id, u => u.Email);
             
             allEntries = allEntries.OrderByDescending(e => e.CreatedOn).ToList();
+            
+            // Set Default Season
+            var currentSeason = seasons.FirstOrDefault(s => s.IsCurrent);
+            if (currentSeason != null)
+            {
+                selectedSeasonId = currentSeason.Id;
+            }
             
             FilterData();
         }
@@ -153,6 +189,14 @@
         }
     }
     
+    private void OnSeasonFilterChanged(ChangeEventArgs e)
+    {
+        selectedSeasonId = e.Value?.ToString() ?? "";
+        // Reset pool selection when season changes, as the pool might not exist in the new season scope
+        selectedPoolId = ""; 
+        FilterData();
+    }
+    
     private void OnPoolFilterChanged(ChangeEventArgs e)
     {
         selectedPoolId = e.Value?.ToString() ?? "";
@@ -161,14 +205,19 @@
     
     private void FilterData()
     {
-        if (string.IsNullOrEmpty(selectedPoolId))
+        var query = allEntries.AsQueryable();
+        
+        if (!string.IsNullOrEmpty(selectedSeasonId))
         {
-            filteredEntries = allEntries;
+            query = query.Where(e => e.SeasonId == selectedSeasonId);
         }
-        else
+        
+        if (!string.IsNullOrEmpty(selectedPoolId))
         {
-            filteredEntries = allEntries.Where(e => e.PoolId == selectedPoolId).ToList();
+            query = query.Where(e => e.PoolId == selectedPoolId);
         }
+        
+        filteredEntries = query.ToList();
     }
 
     private async Task DeleteEntry(BracketEntry entry)
