@@ -169,7 +169,8 @@
         {
             // 1. Load Pools for Current Season ONLY
             var allPools = await Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={Constants.CurrentSeason}") ?? new();
-            Pools = allPools.Where(p => p.SeasonId == Constants.CurrentSeason).ToList();
+            // FILTER: Season match + Not Archived + Not Concluded (Assuming "Active" means open for business)
+            Pools = allPools.Where(p => p.SeasonId == Constants.CurrentSeason && !p.IsArchived && !p.IsConcluded).ToList();
 
             // 2. Load Users for Email Lookup
             var users = await Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers") ?? new();
