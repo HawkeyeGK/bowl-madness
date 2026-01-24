@@ -1,6 +1,8 @@
 @page "/admin/linker"
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core.Dtos
+@using BowlPoolManager.Client.Services
+@inject ISeasonService SeasonService
 @inject HttpClient Http
 @inject NavigationManager Nav
 
@@ -14,60 +16,67 @@
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-striped table-hover align-middle">
-            <thead class="table-dark">
-                <tr>
-                    <th>Local Game</th>
-                    <th>Date</th>
-                    <th style="min-width: 300px;">Link Map (Local &rarr; API)</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var game in LocalGames)
-                {
-                    <tr class="@(IsLinked(game) ? "table-success" : "")">
-                        <td>
-                            <strong>@game.BowlName</strong><br/>
-                            <span class="text-muted small">@game.TeamHome vs @game.TeamAway</span>
-                        </td>
-                        <td>@game.StartTime.ToLocalTime().ToString("MMM dd, h:mm tt")</td>
-                        <td>
-                            @if(IsLinked(game))
-                            {
-                                <div class="bg-white rounded p-1 border shadow-sm" style="max-width: 350px;">
-                                    <table class="table table-sm table-borderless mb-0" style="font-size: 0.85rem;">
-                                        <tbody>
-                                            <tr>
-                                                <td class="text-end fw-bold py-0 pe-1">@game.TeamHome</td>
-                                                <td class="text-center text-muted py-0 px-1">&rarr;</td>
-                                                <td class="text-start text-success fw-bold py-0 ps-1">@game.ApiHomeTeam</td>
-                                            </tr>
-                                            <tr>
-                                                <td class="text-end fw-bold py-0 pe-1">@game.TeamAway</td>
-                                                <td class="text-center text-muted py-0 px-1">&rarr;</td>
-                                                <td class="text-start text-success fw-bold py-0 ps-1">@game.ApiAwayTeam</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            }
-                            else
-                            {
-                                <span class="badge bg-warning text-dark">Unlinked</span>
-                            }
-                        </td>
-                        <td>
-                            <button class="btn btn-outline-primary btn-sm" @onclick="() => OpenLinkModal(game)">
-                                @(IsLinked(game) ? "Edit Link" : "Link Game")
-                            </button>
-                        </td>
+    @if (!LocalGames.Any())
+    {
+        <div class="alert alert-warning">No games found for the current season.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Local Game</th>
+                        <th>Date</th>
+                        <th style="min-width: 300px;">Link Map (Local &rarr; API)</th>
+                        <th>Action</th>
                     </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+                </thead>
+                <tbody>
+                    @foreach (var game in LocalGames)
+                    {
+                        <tr class="@(IsLinked(game) ? "table-success" : "")">
+                            <td>
+                                <strong>@game.BowlName</strong><br/>
+                                <span class="text-muted small">@game.TeamHome vs @game.TeamAway</span>
+                            </td>
+                            <td>@game.StartTime.ToLocalTime().ToString("MMM dd, h:mm tt")</td>
+                            <td>
+                                @if(IsLinked(game))
+                                {
+                                    <div class="bg-white rounded p-1 border shadow-sm" style="max-width: 350px;">
+                                        <table class="table table-sm table-borderless mb-0" style="font-size: 0.85rem;">
+                                            <tbody>
+                                                <tr>
+                                                    <td class="text-end fw-bold py-0 pe-1">@game.TeamHome</td>
+                                                    <td class="text-center text-muted py-0 px-1">&rarr;</td>
+                                                    <td class="text-start text-success fw-bold py-0 ps-1">@game.ApiHomeTeam</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="text-end fw-bold py-0 pe-1">@game.TeamAway</td>
+                                                    <td class="text-center text-muted py-0 px-1">&rarr;</td>
+                                                    <td class="text-start text-success fw-bold py-0 ps-1">@game.ApiAwayTeam</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark">Unlinked</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-outline-primary btn-sm" @onclick="() => OpenLinkModal(game)">
+                                    @(IsLinked(game) ? "Edit Link" : "Link Game")
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 }
 
 @if (ShowModal)
@@ -184,7 +193,16 @@ else
         IsLoading = true;
         try
         {
-            LocalGames = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames") ?? new();
+            var seasons = await SeasonService.GetSeasonsAsync();
+            var currentSeason = seasons.FirstOrDefault(s => s.IsCurrent);
+
+            var url = "api/GetGames";
+            if (currentSeason != null)
+            {
+                url += $"?seasonId={currentSeason.Id}";
+            }
+
+            LocalGames = await Http.GetFromJsonAsync<List<BowlGame>>(url) ?? new();
             // Use the scoreboard source to get full names (e.g. "Oklahoma Sooners")
             ExternalGames = await Http.GetFromJsonAsync<List<CfbdGameDto>>("api/GetRawCfbdGames?source=scoreboard") ?? new();
 
