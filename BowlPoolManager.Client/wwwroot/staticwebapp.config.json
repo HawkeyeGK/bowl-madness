@@ -6,7 +6,7 @@
         {
             "route": "/admin/*",
             "allowedRoles": [
-                "administrator"
+                "authenticated"
             ]
         },
         {
