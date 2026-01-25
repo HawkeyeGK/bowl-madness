@@ -4,7 +4,16 @@
 @using Newtonsoft.Json
 @inject HttpClient Http
 
-<h3>Score Update Diagnostic Tool</h3>
+<PageTitle>Debug API</PageTitle>
+
+<div class="container-fluid mt-3 px-4">
+    <div class="d-flex justify-content-between align-items-end mb-3">
+        <div class="d-flex flex-column gap-2">
+            <div class="d-flex align-items-center gap-3">
+                <h1 class="h3 fw-bold mb-0"><i class="bi bi-bug-fill text-primary"></i> Score Diagnostics</h1>
+            </div>
+        </div>
+    </div>
 
 <div class="card mb-4">
     <div class="card-body">
@@ -25,6 +34,7 @@
                 <small>@log.Message</small>
             </div>
         }
+    </div>
     </div>
 }
 
