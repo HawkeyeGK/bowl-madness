@@ -137,7 +137,7 @@
         try
         {
             var response = await Http.PostAsync("api/admin/sync-teams", null);
-            if (response.IsSupportSuccess())
+            if (response.IsSuccessStatusCode)
             {
                await LoadStatus(); 
             }
