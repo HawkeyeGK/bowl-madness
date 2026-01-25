@@ -55,7 +55,8 @@ namespace BowlPoolManager.Api.Functions.Admin
                 return new OkObjectResult(new { 
                     Message = "Sync Successful", 
                     Count = config.Teams.Count, 
-                    LastUpdated = config.LastUpdated 
+                    LastUpdated = config.LastUpdated,
+                    DebugInfo = $"[DEBUG] BC Color: {bc?.Color}, Alt: '{bc?.AltColor}'"
                 });
             }
             catch (Exception ex)
