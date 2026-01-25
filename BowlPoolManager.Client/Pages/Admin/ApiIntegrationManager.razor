@@ -130,7 +130,7 @@
     {
         try
         {
-            Status = await Http.GetFromJsonAsync<IntegrationStatusDto>("api/admin/integration-status");
+            Status = await Http.GetFromJsonAsync<IntegrationStatusDto>("api/GetIntegrationStatus");
         }
         catch (Exception ex)
         {
@@ -143,7 +143,7 @@
         IsSyncing = true;
         try
         {
-            var response = await Http.PostAsync("api/admin/sync-teams", null);
+            var response = await Http.PostAsync("api/SyncTeams", null);
             if (response.IsSuccessStatusCode)
             {
                await LoadStatus(); 

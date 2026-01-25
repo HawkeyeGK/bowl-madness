@@ -24,7 +24,7 @@ namespace BowlPoolManager.Api.Functions.Admin
         }
 
         [Function("SyncTeams")]
-        public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/sync-teams")] HttpRequest req)
+        public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req)
         {
             _logger.LogInformation("Starting Team Sync...");
 
