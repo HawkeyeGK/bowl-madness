@@ -335,22 +335,26 @@
                 }
 
                 @* AUDIT LOG *@
-                @if (activeEntry.AuditLog != null && activeEntry.AuditLog.Any())
-                {
-                    <div class="card mb-4 shadow-sm mt-5">
-                        <div class="card-header bg-secondary text-white small py-1">
-                            <i class="bi bi-clock-history me-1"></i> Change History
-                        </div>
-                        <div class="card-body bg-light p-2" style="max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.85em;">
+                <div class="card mb-4 shadow-sm mt-5">
+                    <div class="card-header bg-secondary text-white small py-1">
+                        <i class="bi bi-clock-history me-1"></i> Change History
+                    </div>
+                    <div class="card-body bg-light p-2" style="max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.85em;">
+                        @if (activeEntry.AuditLog != null && activeEntry.AuditLog.Any())
+                        {
                             <ul class="list-unstyled mb-0">
                                 @foreach (var log in activeEntry.AuditLog.AsEnumerable().Reverse())
                                 {
                                     <li class="mb-1 border-bottom pb-1">@log</li>
                                 }
                             </ul>
-                        </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted fst-italic p-2">No changes recorded.</div>
+                        }
                     </div>
-                }
+                </div>
              </EditForm>
         }
     }
