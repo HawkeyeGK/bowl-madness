@@ -30,6 +30,9 @@ namespace BowlPoolManager.Api.Functions.Admin
                 IsApiKeyConfigured = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CfbdApiKey"))
             };
 
+            var key = Environment.GetEnvironmentVariable("CfbdApiKey");
+            _logger.LogInformation($"[Diagnose] Checking 'CfbdApiKey': Found? {!string.IsNullOrEmpty(key)}. Length: {key?.Length ?? 0}");
+
             try
             {
                 var response = await _container.ReadItemAsync<TeamConfig>("Config_Teams_FBS", new PartitionKey("Config_Teams_FBS"));
