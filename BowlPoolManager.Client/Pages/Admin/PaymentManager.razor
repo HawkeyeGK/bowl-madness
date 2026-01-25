@@ -217,7 +217,7 @@
 
     private string GetUserEmail(string userId)
     {
-        return UserEmailMap.TryGetValue(userId, out var email) ? email : "Unknown";
+        return UserEmailMap.TryGetValue(userId, out var email) ? email : "Admin Entered";
     }
 
     private void Sort(string column)
