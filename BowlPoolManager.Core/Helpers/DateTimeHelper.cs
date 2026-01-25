@@ -1,6 +1,6 @@
 using System;
 
-namespace BowlPoolManager.Client.Helpers
+namespace BowlPoolManager.Core.Helpers
 {
     public static class DateTimeHelper
     {
