@@ -516,6 +516,12 @@
              return;
         }
 
+        if (DateTime.UtcNow > targetPool.LockDate)
+        {
+            TriggerToast("This pool is locked for new entries.", false);
+            return;
+        }
+
         activeEntry = new BracketEntry(); 
         activeEntry.Picks = new Dictionary<string, string>(); // Safe Init
         activeEntry.Id = "";
