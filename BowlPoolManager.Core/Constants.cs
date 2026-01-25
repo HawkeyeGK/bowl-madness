@@ -11,6 +11,7 @@ namespace BowlPoolManager.Core
             public const string SeasonsContainer = "Seasons"; 
             public const string PicksContainer = "Picks";
             public const string ArchivesContainer = "PoolArchives";
+            public const string ConfigurationContainer = "Configuration";
 
             // Partition Keys
             public const string DefaultPartitionKey = "/id";
@@ -33,6 +34,7 @@ namespace BowlPoolManager.Core
             public const string BowlGame = "BowlGame";
             // NEW
             public const string BracketEntry = "BracketEntry";
+            public const string TeamConfig = "TeamConfig";
         }
     }
 }

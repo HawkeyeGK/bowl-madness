@@ -86,6 +86,23 @@ namespace BowlPoolManager.Api.Services
             return await ExecuteRequestAsync("/scoreboard?classification=fbs");
         }
 
+        public async Task<List<BowlPoolManager.Core.Domain.TeamInfo>> GetFbsTeamsAsync()
+        {
+            try
+            {
+                var json = await ExecuteRequestAsync("/teams/fbs");
+                if (string.IsNullOrEmpty(json) || json.StartsWith("Error")) return new List<BowlPoolManager.Core.Domain.TeamInfo>();
+
+                return JsonConvert.DeserializeObject<List<BowlPoolManager.Core.Domain.TeamInfo>>(json) 
+                       ?? new List<BowlPoolManager.Core.Domain.TeamInfo>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to fetch/deserialize FBS teams.");
+                return new List<BowlPoolManager.Core.Domain.TeamInfo>();
+            }
+        }
+
         // --- HELPER: Stateless Request Execution ---
         // This ensures the API Key is attached to the specific MESSAGE, not the shared Client.
         private async Task<string> ExecuteRequestAsync(string relativeUrl)

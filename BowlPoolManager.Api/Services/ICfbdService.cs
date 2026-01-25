@@ -10,5 +10,8 @@ namespace BowlPoolManager.Api.Services
         
         // NEW: Raw JSON for debugging
         Task<string> GetRawScoreboardJsonAsync();
+
+        // NEW: Master Data
+        Task<List<BowlPoolManager.Core.Domain.TeamInfo>> GetFbsTeamsAsync();
     }
 }

@@ -1,0 +1,229 @@
+@page "/admin/api-manager"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core.Dtos
+@using Newtonsoft.Json
+@inject HttpClient Http
+
+<PageTitle>API Integration Manager</PageTitle>
+
+<div class="container-fluid mt-3 px-4">
+    <div class="d-flex justify-content-between align-items-end mb-3">
+        <h1 class="h3 fw-bold mb-0">API Integrations</h1>
+    </div>
+
+    <!-- Status Cards -->
+    <div class="row g-3 mb-4">
+        <!-- CFBD API Status -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-light fw-bold">CollegeFootballData.com</div>
+                <div class="card-body d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="card-title">API Key Configured</h5>
+                        <p class="card-text text-muted">Required for fetching games and teams.</p>
+                    </div>
+                    @if (Status?.IsApiKeyConfigured == true)
+                    {
+                        <span class="text-success fs-1"><i class="bi bi-check-circle-fill"></i></span>
+                    }
+                    else
+                    {
+                        <span class="text-danger fs-1"><i class="bi bi-x-circle-fill"></i></span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Team Data Status -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-light fw-bold">Master Data: FBS Teams</div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Status:</span>
+                        <span class="fw-bold">@Status?.Message</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Teams Cached:</span>
+                        <span class="fw-bold @(Status?.TeamCount > 0 ? "text-success" : "text-danger")">@Status?.TeamCount</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted">Last Synced:</span>
+                        <span>@(Status?.LastSyncUtc?.ToLocalTime().ToString("g") ?? "Never")</span>
+                    </div>
+                </div>
+                 <div class="card-footer bg-transparent border-top-0 pb-3 text-end">
+                    <button class="btn btn-primary" @onclick="SyncTeams" disabled="@IsSyncing">
+                        @if (IsSyncing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Syncing...</span>
+                        }
+                        else
+                        {
+                            <span class="bi bi-arrow-repeat me-2"></span>
+                            <span>Sync FBS Teams</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Diagnostics Section -->
+    <div class="card mb-4">
+        <div class="card-header bg-warning bg-opacity-10 fw-bold border-warning text-warning-emphasis">
+            <i class="bi bi-bug-fill me-2"></i> Diagnostics
+        </div>
+        <div class="card-body">
+            <p class="card-text mb-3">Run this diagnostic to verify that the local game schedule matches the live data from the API provider.</p>
+            <button class="btn btn-warning" @onclick="RunDiagnostic" disabled="@IsRunningDiagnostic">
+                @if (IsRunningDiagnostic)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span>Running Diagnostic...</span>
+                }
+                else
+                {
+                    <span>Run Matching Diagnostic</span>
+                }
+            </button>
+        </div>
+    </div>
+
+     @if (Logs.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header">Diagnostic Results</div>
+            <div class="list-group list-group-flush">
+                @foreach (var log in Logs)
+                {
+                    <div class="list-group-item @(log.IsError ? "list-group-item-danger" : (log.IsMatch ? "list-group-item-success" : ""))">
+                        <strong>@log.Title</strong><br/>
+                        <small>@log.Message</small>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private IntegrationStatusDto? Status;
+    private bool IsSyncing = false;
+    private bool IsRunningDiagnostic = false;
+    private List<LogEntry> Logs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatus();
+    }
+
+    private async Task LoadStatus()
+    {
+        try
+        {
+            Status = await Http.GetFromJsonAsync<IntegrationStatusDto>("api/admin/integration-status");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading status: {ex.Message}");
+        }
+    }
+
+    private async Task SyncTeams()
+    {
+        IsSyncing = true;
+        try
+        {
+            var response = await Http.PostAsync("api/admin/sync-teams", null);
+            if (response.IsSupportSuccess())
+            {
+               await LoadStatus(); 
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error syncing teams: {ex.Message}");
+        }
+        finally
+        {
+            IsSyncing = false;
+        }
+    }
+
+    // --- Diagnostic Logic (Migrated from DebugRaw.razor) ---
+
+    private async Task RunDiagnostic()
+    {
+        IsRunningDiagnostic = true;
+        Logs.Clear();
+        try
+        {
+            // 1. Fetch Local Games
+            Logs.Add(new LogEntry("System", "Fetching local games from Cosmos DB..."));
+            var localGames = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
+            
+            // 2. Fetch API Games
+            Logs.Add(new LogEntry("System", "Fetching live scoreboard data..."));
+            var apiJson = await Http.GetStringAsync("api/GetRawCfbdGames?source=scoreboard");
+            var apiGames = JsonConvert.DeserializeObject<List<CfbdGameDto>>(apiJson);
+
+            if (localGames == null || apiGames == null)
+            {
+                Logs.Add(new LogEntry("Error", "Failed to retrieve one or both datasets.", true));
+                return;
+            }
+
+            // 3. Simulate PerformScoreUpdate logic (Swap-Aware)
+            foreach (var local in localGames.Where(g => !string.IsNullOrEmpty(g.ExternalId)))
+            {
+                var apiMatch = apiGames.FirstOrDefault(x => x.Id.ToString() == local.ExternalId);
+                
+                if (apiMatch == null)
+                {
+                    Logs.Add(new LogEntry(local.BowlName, $"❌ FAIL: ExternalId '{local.ExternalId}' not found in API results.", true));
+                    continue;
+                }
+
+                // Helper to check both slots
+                string CheckTeam(string? dbTeam, string? apiHome, string? apiAway)
+                {
+                    if (string.IsNullOrEmpty(dbTeam)) return "⚠️ SKIPPED (No DB Team)";
+                    
+                    if (string.Equals(dbTeam, apiHome, StringComparison.OrdinalIgnoreCase)) return "✅ MATCH (Direct)";
+                    if (string.Equals(dbTeam, apiAway, StringComparison.OrdinalIgnoreCase)) return "✅ MATCH (Swapped)";
+                    
+                    return $"❌ MISMATCH (DB: '{dbTeam}' not found in API Game)";
+                }
+
+                string homeStatus = CheckTeam(local.ApiHomeTeam, apiMatch.HomeTeam, apiMatch.AwayTeam);
+                string awayStatus = CheckTeam(local.ApiAwayTeam, apiMatch.HomeTeam, apiMatch.AwayTeam);
+
+                bool isMatch = homeStatus.Contains("MATCH") && awayStatus.Contains("MATCH");
+
+                Logs.Add(new LogEntry(local.BowlName, $"ID Found. Home: {homeStatus} | Away: {awayStatus}") 
+                { 
+                    IsMatch = isMatch 
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logs.Add(new LogEntry("Exception", ex.Message, true));
+        }
+        finally
+        {
+            IsRunningDiagnostic = false;
+        }
+    }
+
+    public class LogEntry
+    {
+        public string Title { get; set; }
+        public string Message { get; set; }
+        public bool IsError { get; set; }
+        public bool IsMatch { get; set; }
+        public LogEntry(string t, string m, bool e = false) { Title = t; Message = m; IsError = e; }
+    }
+}

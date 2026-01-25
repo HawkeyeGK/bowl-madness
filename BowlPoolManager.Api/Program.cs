@@ -75,6 +75,8 @@ using (var scope = host.Services.CreateScope())
             await db.Database.CreateContainerIfNotExistsAsync(Constants.Database.PicksContainer, Constants.Database.SeasonPartitionKey);
             // NEW: Archives Container
             await db.Database.CreateContainerIfNotExistsAsync(Constants.Database.ArchivesContainer, Constants.Database.SeasonPartitionKey);
+            // NEW: Configuration Container
+            await db.Database.CreateContainerIfNotExistsAsync(Constants.Database.ConfigurationContainer, Constants.Database.DefaultPartitionKey);
         }
         catch (Exception ex)
         {
