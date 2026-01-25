@@ -48,8 +48,8 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("color")]
         public string Color { get; set; } = string.Empty;
 
-        [JsonProperty("alt_color")]
-        [JsonPropertyName("alt_color")]
+        [JsonProperty("alternateColor")]
+        [JsonPropertyName("alternateColor")]
         public string AltColor { get; set; } = string.Empty;
 
         [JsonProperty("logos")]

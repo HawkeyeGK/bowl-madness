@@ -18,13 +18,6 @@
         </div>
     }
 
-    @if (!string.IsNullOrEmpty(SyncDebugInfo))
-    {
-        <div class="alert alert-warning small font-monospace" role="alert">
-            <i class="bi bi-bug-fill me-2"></i> <strong>Sync Debug:</strong> @SyncDebugInfo
-        </div>
-    }
-
     <!-- Status Cards -->
     <div class="row g-3 mb-4">
         <!-- CFBD API Status -->
@@ -145,42 +138,25 @@
         }
     }
 
-    private string? SyncDebugInfo;
-
     private async Task SyncTeams()
     {
         IsSyncing = true;
-        SyncDebugInfo = null;
         try
         {
             var response = await Http.PostAsync("api/SyncTeams", null);
             if (response.IsSuccessStatusCode)
             {
-               var result = await response.Content.ReadFromJsonAsync<SyncResponse>();
-               if (result != null)
-               {
-                   SyncDebugInfo = result.DebugInfo;
-               }
                await LoadStatus(); 
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error syncing teams: {ex.Message}");
-            SyncDebugInfo = $"Error: {ex.Message}";
         }
         finally
         {
             IsSyncing = false;
         }
-    }
-
-    public class SyncResponse
-    {
-        public string Message { get; set; }
-        public int Count { get; set; }
-        public DateTime LastUpdated { get; set; }
-        public string DebugInfo { get; set; }
     }
 
     // --- Diagnostic Logic (Migrated from DebugRaw.razor) ---

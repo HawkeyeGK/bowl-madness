@@ -35,11 +35,7 @@ namespace BowlPoolManager.Api.Functions.Admin
                 return new BadRequestObjectResult("No teams found from CFBD API.");
             }
 
-
             // 2. Create Config Object with Sorted Teams
-            var bc = teams.FirstOrDefault(t => t.School == "Boston College");
-            _logger.LogInformation($"[DEBUG] BC Color: {bc?.Color}, Alt: '{bc?.AltColor}'");
-
             var config = new TeamConfig
             {
                 Teams = teams.OrderBy(t => t.Conference).ThenBy(t => t.School).ToList(),
@@ -55,8 +51,7 @@ namespace BowlPoolManager.Api.Functions.Admin
                 return new OkObjectResult(new { 
                     Message = "Sync Successful", 
                     Count = config.Teams.Count, 
-                    LastUpdated = config.LastUpdated,
-                    DebugInfo = $"[DEBUG] BC Color: {bc?.Color}, Alt: '{bc?.AltColor}'"
+                    LastUpdated = config.LastUpdated 
                 });
             }
             catch (Exception ex)
