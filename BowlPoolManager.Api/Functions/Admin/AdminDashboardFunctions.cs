@@ -27,7 +27,7 @@ namespace BowlPoolManager.Api.Functions.Admin
 
             var status = new IntegrationStatusDto
             {
-                IsApiKeyConfigured = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CFBD_API_KEY"))
+                IsApiKeyConfigured = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CfbdApiKey"))
             };
 
             try
