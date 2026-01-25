@@ -30,8 +30,8 @@
                 <div class="row g-3 mb-3">
                     <div class="col-md-3">
                         <label for="seasonId" class="form-label">Season ID (Year)</label>
-                        <InputText id="seasonId" class="form-control" @bind-Value="currentSeason.Id" placeholder="e.g. 2025" disabled="@isEditing" />
-                        <div class="form-text">Acts as the unique key.</div>
+                        <InputText id="seasonId" class="form-control" @bind-Value="currentSeason.SeasonId" placeholder="e.g. 2025" disabled="@isEditing" />
+                        <div class="form-text">Acts as the business key (Year).</div>
                     </div>
                     
                     <div class="col-md-6">
@@ -76,17 +76,17 @@
             <table class="table table-striped table-hover border align-middle">
                 <thead class="table-light">
                     <tr>
-                        <th>ID</th>
+                        <th>Year (ID)</th>
                         <th>Name</th>
                         <th>Is Current</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var season in seasons.OrderByDescending(s => s.Id))
+                    @foreach (var season in seasons.OrderByDescending(s => s.SeasonId))
                     {
                         <tr class="@(season.IsCurrent ? "table-success" : "")">
-                            <td><code>@season.Id</code></td>
+                            <td><code>@season.SeasonId</code></td>
                             <td>@season.Name</td>
                             <td>
                                 @if (season.IsCurrent)
@@ -135,18 +135,18 @@
     private void ResetForm()
     {
         currentSeason = new Season();
+        // Since we are resetting, we need a new GUID for the implicit Id, 
+        // though the constructor of Season now handles that.
         isEditing = false;
     }
 
     private async Task HandleSaveSeason()
     {
-        if (string.IsNullOrWhiteSpace(currentSeason.Id))
+        if (string.IsNullOrWhiteSpace(currentSeason.SeasonId))
             return;
 
-        // Ensure SeasonId matches Id if it's not automatically handled (Getter handles it but setters might need it)
-        // With Getter-only property in Season.cs, deserialization might fail if it tries to set it?
-        // Actually, I made SeasonId have a setter { } in Season.cs but it does nothing?
-        // Wait, if SeasonId mirrors Id, and deserialization sets Id, then accessing SeasonId gets Id. That's fine.
+        // Id is already a GUID from the constructor or loaded from DB.
+        // We just need to make sure SeasonId is set (which is bound to the form).
         
         await SeasonService.UpsertSeasonAsync(currentSeason);
         ResetForm();

@@ -35,9 +35,15 @@ namespace BowlPoolManager.Api.Functions
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             var season = JsonSerializer.Deserialize<Season>(requestBody, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-            if (season == null || string.IsNullOrEmpty(season.Id))
+            if (season == null)
             {
                 return new BadRequestObjectResult("Invalid season data.");
+            }
+
+            // Ensure SeasonId (Year) is provided
+            if (string.IsNullOrEmpty(season.SeasonId))
+            {
+                return new BadRequestObjectResult("Season ID (Year) is required.");
             }
 
             // Ensure type is set correctly

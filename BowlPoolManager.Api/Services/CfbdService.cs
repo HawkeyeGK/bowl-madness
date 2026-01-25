@@ -99,13 +99,13 @@ namespace BowlPoolManager.Api.Services
                 return rawTeams.Select(r => new BowlPoolManager.Core.Domain.TeamInfo
                 {
                     SchoolId = r.Id,
-                    School = r.School,
-                    Mascot = r.Mascot,
-                    Abbreviation = r.Abbreviation,
-                    Conference = r.Conference,
-                    Color = r.Color,
-                    AltColor = r.AlternateColor,
-                    Logos = r.Logos
+                    School = r.School ?? string.Empty,
+                    Mascot = r.Mascot ?? string.Empty,
+                    Abbreviation = r.Abbreviation ?? string.Empty,
+                    Conference = r.Conference ?? string.Empty,
+                    Color = r.Color ?? string.Empty,
+                    AltColor = r.AlternateColor ?? string.Empty,
+                    Logos = r.Logos ?? new List<string>()
                 }).ToList();
             }
             catch (Exception ex)
@@ -121,19 +121,19 @@ namespace BowlPoolManager.Api.Services
             [JsonProperty("id")]
             public int Id { get; set; }
             [JsonProperty("school")]
-            public string School { get; set; }
+            public string? School { get; set; }
             [JsonProperty("mascot")]
-            public string Mascot { get; set; }
+            public string? Mascot { get; set; }
             [JsonProperty("abbreviation")]
-            public string Abbreviation { get; set; }
+            public string? Abbreviation { get; set; }
             [JsonProperty("conference")]
-            public string Conference { get; set; }
+            public string? Conference { get; set; }
             [JsonProperty("color")]
-            public string Color { get; set; }
+            public string? Color { get; set; }
             [JsonProperty("alternateColor")]
-            public string AlternateColor { get; set; }
+            public string? AlternateColor { get; set; }
             [JsonProperty("logos")]
-            public List<string> Logos { get; set; }
+            public List<string>? Logos { get; set; }
         }
 
         // --- HELPER: Stateless Request Execution ---
