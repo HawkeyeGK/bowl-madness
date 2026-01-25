@@ -119,7 +119,7 @@ namespace BowlPoolManager.Api.Functions
                     return badReq;
                 }
 
-                if (DateTime.UtcNow > pool.LockDate)
+                if (DateTime.UtcNow > pool.LockDate && !isAdmin)
                 {
                     var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
                     await badReq.WriteStringAsync("This pool is locked. No new picks or changes allowed.");
