@@ -31,7 +31,12 @@ namespace BowlPoolManager.Api.Functions.Admin
             };
 
             var key = Environment.GetEnvironmentVariable("CfbdApiKey");
-            _logger.LogInformation($"[Diagnose] Checking 'CfbdApiKey': Found? {!string.IsNullOrEmpty(key)}. Length: {key?.Length ?? 0}");
+            var keyStatus = string.IsNullOrEmpty(key) ? "NULL/EMPTY" : $"Present (Len: {key.Length})";
+            var allKeys = string.Join(", ", Environment.GetEnvironmentVariables().Keys.Cast<string>().Where(k => k.StartsWith("CFBD", StringComparison.OrdinalIgnoreCase) || k.Contains("Key", StringComparison.OrdinalIgnoreCase)));
+
+            status.DebugDetails = $"Target Var: 'CfbdApiKey'. Status: {keyStatus}. \nRelevant Env Vars Found: [{allKeys}]";
+            
+            _logger.LogInformation($"[Diagnose] {status.DebugDetails}");
 
             try
             {

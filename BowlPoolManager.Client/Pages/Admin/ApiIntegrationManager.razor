@@ -11,6 +11,13 @@
         <h1 class="h3 fw-bold mb-0">API Integrations</h1>
     </div>
 
+    @if (!string.IsNullOrEmpty(Status?.DebugDetails))
+    {
+        <div class="alert alert-info small font-monospace" role="alert">
+            <i class="bi bi-info-circle-fill me-2"></i> <strong>Server Debug:</strong> @Status.DebugDetails
+        </div>
+    }
+
     <!-- Status Cards -->
     <div class="row g-3 mb-4">
         <!-- CFBD API Status -->

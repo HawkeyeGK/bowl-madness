@@ -13,5 +13,8 @@ namespace BowlPoolManager.Core.Dtos
 
         [System.Text.Json.Serialization.JsonPropertyName("message")]
         public string Message { get; set; } = string.Empty;
+
+        [System.Text.Json.Serialization.JsonPropertyName("debugDetails")]
+        public string DebugDetails { get; set; } = string.Empty;
     }
 }
