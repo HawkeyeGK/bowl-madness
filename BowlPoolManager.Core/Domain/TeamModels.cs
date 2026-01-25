@@ -24,8 +24,8 @@ namespace BowlPoolManager.Core.Domain
 
     public class TeamInfo
     {
-        [JsonProperty("id")]
-        [JsonPropertyName("id")]
+        [JsonProperty("schoolId")]
+        [JsonPropertyName("schoolId")]
         public int SchoolId { get; set; }
 
         [JsonProperty("school")]

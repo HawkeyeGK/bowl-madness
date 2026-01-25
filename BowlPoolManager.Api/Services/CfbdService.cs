@@ -93,14 +93,47 @@ namespace BowlPoolManager.Api.Services
                 var json = await ExecuteRequestAsync("/teams/fbs");
                 if (string.IsNullOrEmpty(json) || json.StartsWith("Error")) return new List<BowlPoolManager.Core.Domain.TeamInfo>();
 
-                return JsonConvert.DeserializeObject<List<BowlPoolManager.Core.Domain.TeamInfo>>(json) 
-                       ?? new List<BowlPoolManager.Core.Domain.TeamInfo>();
+                var rawTeams = JsonConvert.DeserializeObject<List<RawTeamDto>>(json);
+                if (rawTeams == null) return new List<BowlPoolManager.Core.Domain.TeamInfo>();
+
+                return rawTeams.Select(r => new BowlPoolManager.Core.Domain.TeamInfo
+                {
+                    SchoolId = r.Id,
+                    School = r.School,
+                    Mascot = r.Mascot,
+                    Abbreviation = r.Abbreviation,
+                    Conference = r.Conference,
+                    Color = r.Color,
+                    AltColor = r.AlternateColor,
+                    Logos = r.Logos
+                }).ToList();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to fetch/deserialize FBS teams.");
                 return new List<BowlPoolManager.Core.Domain.TeamInfo>();
             }
+        }
+
+        // Private DTO to match CFBD API structure
+        private class RawTeamDto
+        {
+            [JsonProperty("id")]
+            public int Id { get; set; }
+            [JsonProperty("school")]
+            public string School { get; set; }
+            [JsonProperty("mascot")]
+            public string Mascot { get; set; }
+            [JsonProperty("abbreviation")]
+            public string Abbreviation { get; set; }
+            [JsonProperty("conference")]
+            public string Conference { get; set; }
+            [JsonProperty("color")]
+            public string Color { get; set; }
+            [JsonProperty("alternateColor")]
+            public string AlternateColor { get; set; }
+            [JsonProperty("logos")]
+            public List<string> Logos { get; set; }
         }
 
         // --- HELPER: Stateless Request Execution ---
