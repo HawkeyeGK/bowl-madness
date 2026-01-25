@@ -21,7 +21,7 @@ namespace BowlPoolManager.Api.Functions.Admin
         }
 
         [Function("GetIntegrationStatus")]
-        public async Task<IActionResult> GetIntegrationStatus([HttpTrigger(AuthorizationLevel.Function, "get", Route = "admin/integration-status")] HttpRequest req)
+        public async Task<IActionResult> GetIntegrationStatus([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "admin/integration-status")] HttpRequest req)
         {
             _logger.LogInformation("Getting Integration Status...");
 
