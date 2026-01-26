@@ -63,6 +63,44 @@ namespace BowlPoolManager.Core.Dtos
         [Newtonsoft.Json.JsonIgnore]
         public int? AwayPoints => GetInt(AwayRaw, "points") ?? AwayPointsRoot;
 
+        // --- TEAM ID EXTRACTION ---
+        // Direct Mapping for Root Level IDs (Games Endpoint)
+        [JsonProperty("home_id")]
+        [JsonPropertyName("home_id")]
+        public int? HomeIdRaw { get; set; }
+
+        [JsonProperty("away_id")]
+        [JsonPropertyName("away_id")]
+        public int? AwayIdRaw { get; set; }
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
+        public int? HomeId 
+        {
+            get
+            {
+                // Source 1: "home_id" at root (Games Endpoint)
+                if (HomeIdRaw.HasValue) return HomeIdRaw.Value;
+
+                // Source 2: "id" inside homeTeam object (Scoreboard Endpoint)
+                return GetInt(HomeRaw, "id");
+            }
+        }
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
+        public int? AwayId 
+        {
+            get
+            {
+                // Source 1: "away_id" at root (Games Endpoint)
+                if (AwayIdRaw.HasValue) return AwayIdRaw.Value;
+
+                // Source 2: "id" inside awayTeam object (Scoreboard Endpoint)
+                 return GetInt(AwayRaw, "id");
+            }
+        }
+
         // --- BILINGUAL EXTRACTION LOGIC ---
         private string? GetValue(object? raw, string key)
         {
@@ -100,6 +138,17 @@ namespace BowlPoolManager.Core.Dtos
 
         private int? GetInt(object? raw, string key)
         {
+            if (raw == null) return null;
+
+            // SPECIAL CASE: Checking "this" for root properties (reflection/dynamic check not ideal but keeping consistent with pattern)
+            // However, 'this' is CfbdGameDto, not a dynamic object. 
+            // The helper 'GetInt' expects dynamic/dictionary/json objects. 
+            // Validating if 'raw' is the DTO itself is tricky without reflection.
+            // BETTER APPROACH for Root properties: use the JSON extension data or similar if we had it.
+            // BUT, since we are using 'raw' passed from the property which might be 'this'?? 
+            // No, I can't pass 'this' to GetInt easily if GetInt expects specific types.
+            // Let's rely on standard JObject/Dictionary parsing logic.
+            
             // 1. Dictionary (Fix for CfbdService manual mapping)
             if (raw is IDictionary<string, object> dict)
             {

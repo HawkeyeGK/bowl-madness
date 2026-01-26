@@ -3,6 +3,7 @@
 @using BowlPoolManager.Core.Dtos
 @using BowlPoolManager.Client.Services
 @inject ISeasonService SeasonService
+@inject IConfigurationService ConfigurationService
 @inject HttpClient Http
 @inject NavigationManager Nav
 
@@ -194,6 +195,9 @@ else
 
     private List<BowlGame> LocalGames = new();
     private List<CfbdGameDto> ExternalGames = new();
+    
+    // Packet 2: Team Data
+    private List<TeamInfo> AllTeams = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -214,9 +218,16 @@ else
                 url += $"?seasonId={currentSeason.Id}";
             }
 
-            LocalGames = await Http.GetFromJsonAsync<List<BowlGame>>(url) ?? new();
-            // Use the scoreboard source to get full names (e.g. "Oklahoma Sooners")
-            ExternalGames = await Http.GetFromJsonAsync<List<CfbdGameDto>>("api/GetRawCfbdGames?source=scoreboard") ?? new();
+            // Parallel load
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>(url);
+            var cfbdTask = Http.GetFromJsonAsync<List<CfbdGameDto>>("api/GetRawCfbdGames?source=scoreboard");
+            var teamsTask = ConfigurationService.GetTeamsAsync();
+
+            await Task.WhenAll(gamesTask, cfbdTask, teamsTask);
+
+            LocalGames = await gamesTask ?? new();
+            ExternalGames = await cfbdTask ?? new();
+            AllTeams = await teamsTask ?? new();
 
             // Populate empty bracket slots with winners from previous rounds
             ResolveAdvancingTeams();
@@ -332,6 +343,33 @@ else
 
         IsSaving = true;
         SelectedLocalGame.ExternalId = SelectedApiGame.Id.ToString();
+        
+        // --- RICH TEAM DATA DENORMALIZATION ---
+        // 1. Home Team
+        var homeTeam = AllTeams.FirstOrDefault(t => t.SchoolId == SelectedApiGame.HomeId);
+        if (homeTeam == null) 
+            homeTeam = AllTeams.FirstOrDefault(t => t.School == ProposedApiHome || t.School == SelectedApiGame.HomeTeam);
+
+        if (homeTeam != null)
+        {
+            SelectedLocalGame.TeamHomeId = homeTeam.SchoolId;
+            SelectedLocalGame.HomeTeamInfo = homeTeam;
+            // Ensure name matches exactly if we found a rich object (optional, but keeps data clean)
+            // SelectedLocalGame.ApiHomeTeam = homeTeam.School; // Use ProposedApiHome instead to respect user choice
+        }
+
+        // 2. Away Team
+        var awayTeam = AllTeams.FirstOrDefault(t => t.SchoolId == SelectedApiGame.AwayId);
+        if (awayTeam == null) 
+             awayTeam = AllTeams.FirstOrDefault(t => t.School == ProposedApiAway || t.School == SelectedApiGame.AwayTeam);
+
+        if (awayTeam != null)
+        {
+            SelectedLocalGame.TeamAwayId = awayTeam.SchoolId;
+            SelectedLocalGame.AwayTeamInfo = awayTeam;
+        }
+        // --------------------------------------
+
         SelectedLocalGame.ApiHomeTeam = ProposedApiHome;
         SelectedLocalGame.ApiAwayTeam = ProposedApiAway;
 

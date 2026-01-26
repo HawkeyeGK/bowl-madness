@@ -53,9 +53,25 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("teamHome")]
         public string TeamHome { get; set; } = string.Empty;
 
+        [JsonProperty("teamHomeId")]
+        [JsonPropertyName("teamHomeId")]
+        public int? TeamHomeId { get; set; }
+
+        [JsonProperty("homeTeamInfo")]
+        [JsonPropertyName("homeTeamInfo")]
+        public TeamInfo? HomeTeamInfo { get; set; }
+
         [JsonProperty("teamAway")]
         [JsonPropertyName("teamAway")]
         public string TeamAway { get; set; } = string.Empty;
+
+        [JsonProperty("teamAwayId")]
+        [JsonPropertyName("teamAwayId")]
+        public int? TeamAwayId { get; set; }
+
+        [JsonProperty("awayTeamInfo")]
+        [JsonPropertyName("awayTeamInfo")]
+        public TeamInfo? AwayTeamInfo { get; set; }
 
         // SEEDS
         [JsonProperty("teamHomeSeed")]
