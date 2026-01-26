@@ -197,7 +197,10 @@ namespace BowlPoolManager.Api.Functions
                     }
                 }
 
-                if (!isAdmin)
+                var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+                bool assignToMe = string.Equals(queryParams["assignToMe"], "true", StringComparison.OrdinalIgnoreCase);
+
+                if (!isAdmin || assignToMe)
                 {
                     entry.UserId = principal.UserId;
                 }

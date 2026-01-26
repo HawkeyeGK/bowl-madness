@@ -704,11 +704,11 @@
 
         try
         {
-            string url = "api/CreateEntry";
+            string url = "api/CreateEntry?assignToMe=true";
             if (!string.IsNullOrEmpty(joinModel.InviteCode) && string.IsNullOrEmpty(activeEntry.PoolId))
             {
                 activeEntry.Id = "";
-                url += $"?inviteCode={joinModel.InviteCode}";
+                url += $"&inviteCode={joinModel.InviteCode}";
             }
 
             var response = await Http.PostAsJsonAsync(url, activeEntry);
