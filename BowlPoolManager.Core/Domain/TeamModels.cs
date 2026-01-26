@@ -63,6 +63,26 @@ namespace BowlPoolManager.Core.Domain
 
         [System.Text.Json.Serialization.JsonIgnore]
         [Newtonsoft.Json.JsonIgnore]
-        public string PrimaryLogoUrl => Logos != null && Logos.Any() ? Logos.First() : string.Empty;
+        public string PrimaryLogoUrl 
+        {
+            get
+            {
+                if (Logos == null || !Logos.Any()) return string.Empty;
+                // Return the first logo that doesn't have "dark" in the path, or fallback to the first one available.
+                return Logos.FirstOrDefault(l => !l.Contains("dark", StringComparison.OrdinalIgnoreCase)) ?? Logos.First();
+            }
+        }
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
+        public string? DarkLogoUrl
+        {
+            get
+            {
+                if (Logos == null || !Logos.Any()) return null;
+                // Return the first logo that DOES have "dark" in the path.
+                return Logos.FirstOrDefault(l => l.Contains("dark", StringComparison.OrdinalIgnoreCase));
+            }
+        }
     }
 }
