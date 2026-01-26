@@ -4,7 +4,7 @@
 @using BowlPoolManager.Core.Helpers
 @inject HttpClient Http
 
-<div class="container-fluid mt-3 px-4">
+<div class="container-fluid mt-3 px-4 pb-5">
     <div class="mb-4">
         <a href="/" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left"></i> Back to Leaderboard
@@ -75,99 +75,187 @@
             </div>
         </div>
 
-        <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Date</th>
-                        <th>Bowl</th>
-                        <th>Matchup</th>
-                        <th>Your Pick</th>
-                        <th class="text-center">Pts</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var game in games.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
-                    {
-                        string? pick = null;
-                        // SAFE ACCESS: Check if Picks is null before TryGetValue
-                        bool hasPick = entry.Picks != null && entry.Picks.TryGetValue(game.Id, out pick);
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+            @foreach (var game in games.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
+            {
+                string? pick = null;
+                bool hasPick = entry.Picks != null && entry.Picks.TryGetValue(game.Id, out pick);
+                
+                // Resolve display names
+                var (homeTeamName, awayTeamName) = GetDisplayTeams(game, entry);
+                
+                // Determine Visual State for the Card/Pick
+                bool isCorrect = false;
+                bool isIncorrect = false;
+                bool isEliminated = false;
 
-                        string rowClass = "";
-                        string pickStatusIcon = "";
+                if (game.IsFinal && hasPick)
+                {
+                    isCorrect = string.Equals(pick, game.WinningTeamName, StringComparison.OrdinalIgnoreCase);
+                    isIncorrect = !isCorrect;
+                }
+                else if (!game.IsFinal && hasPick && !string.IsNullOrEmpty(pick) && eliminatedTeams.Contains(pick))
+                {
+                    isEliminated = true;
+                }
 
-                        // Logic Consolidation: Use Domain Model properties
-                        if (game.IsFinal)
-                        {
-                            if (hasPick)
-                            {
-                                // Clean Domain Check
-                                bool isCorrect = string.Equals(pick, game.WinningTeamName, StringComparison.OrdinalIgnoreCase);
-
-                                if (isCorrect) 
-                                {
-                                    rowClass = "table-success";
-                                    pickStatusIcon = "<i class='bi bi-check-circle-fill text-success'></i>";
-                                }
-                                else 
-                                {
-                                    rowClass = "table-danger";
-                                    pickStatusIcon = "<i class='bi bi-x-circle-fill text-danger'></i>";
-                                }
-                            }
-                        }
-                        else
-                        {
-                            // SAFE ACCESS: eliminatedTeams is initialized in code block
-                            if (hasPick && !string.IsNullOrEmpty(pick) && eliminatedTeams.Contains(pick))
-                            {
-                               rowClass = "table-danger";
-                               pickStatusIcon = "<i class='bi bi-x-circle-fill text-danger' title='Team Eliminated'></i> <span class='badge bg-danger'>Eliminated</span>";
-                            }
-                        }
-
-                        var (homeTeamName, awayTeamName) = GetDisplayTeams(game, entry);
-                        <tr class="@rowClass">
-                            <td>
-                                @DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d")
-                                <div class="small text-muted">@DateTimeHelper.ToCentral(game.StartTime).ToString("h:mm tt") CT</div>
-                            </td>
-                            <td>
-                                <strong>@game.BowlName</strong>
+                <div class="col">
+                    <div class="card h-100 shadow-sm scoreboard-card @(isCorrect ? "border-success" : (isIncorrect || isEliminated ? "border-danger" : ""))">
+                        
+                        @* CARD HEADER *@
+                        <div class="card-header bg-white border-bottom-0 pt-3 pb-2 d-flex justify-content-between align-items-center">
+                            <div class="text-truncate pe-2">
+                                <span class="small text-uppercase fw-bold text-muted" title="@game.BowlName">@game.BowlName</span>
                                 @if (game.IsPlayoff)
                                 {
-                                    <span class="badge bg-warning text-dark ms-1">Playoff</span>
+                                    <span class="badge bg-warning text-dark ms-2">Playoff</span>
                                 }
-                            </td>
-                            <td>
-                                <div class="@((game.TeamHomeScore ?? 0) > (game.TeamAwayScore ?? 0) ? "fw-bold" : "")">
-                                    @homeTeamName <span class="small text-muted">@(game.TeamHomeScore?.ToString() ?? "")</span>
+                            </div>
+                            
+                            @if (game.Status == GameStatus.InProgress)
+                            {
+                                <span class="badge bg-danger animate-pulse">LIVE</span>
+                            }
+                            else if (game.Status == GameStatus.Final)
+                            {
+                                <span class="badge bg-secondary">FINAL</span>
+                            }
+                            else
+                            {
+                                <div class="text-end small text-muted">
+                                    @DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d, h:mm tt")
                                 </div>
-                                <div class="@((game.TeamAwayScore ?? 0) > (game.TeamHomeScore ?? 0) ? "fw-bold" : "")">
-                                    @awayTeamName <span class="small text-muted">@(game.TeamAwayScore?.ToString() ?? "")</span>
-                                </div>
-                            </td>
-                            <td class="fw-bold position-relative">
-                                @if(hasPick)
+                            }
+                        </div>
+
+                        <div class="card-body pt-0 pb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <small class="text-muted text-truncate">@game.Location</small>
+                                @if (!string.IsNullOrEmpty(game.Television))
                                 {
-                                    @pick
-                                    <span class="ms-2">@((MarkupString)pickStatusIcon)</span>
+                                    <span class="badge bg-light text-dark border">@game.Television</span>
+                                }
+                            </div>
+
+                            @* AWAY TEAM *@
+                            @{
+                                bool pickedAway = hasPick && pick == awayTeamName;
+                                // If game logic resolved "TBD", use that, otherwise use our calculated display name
+                                var awayInfo = GetTeamInfo(awayTeamName, false, game);
+                                bool isAwayWinner = game.IsFinal && game.WinningTeamName == awayTeamName;
+                            }
+                            <div class="d-flex align-items-center mb-2 team-row p-2 position-relative @(isAwayWinner ? "fw-bold" : "") @(pickedAway ? "bg-light" : "")"
+                                 style="border-left: 5px solid @(GetColor(awayInfo, awayTeamName)); border-radius: 4px;">
+                                
+                                @if (IsTBD(awayTeamName) || string.IsNullOrEmpty(awayInfo?.PrimaryLogoUrl))
+                                {
+                                    <i class="bi bi-shield-shaded me-3 text-secondary" style="font-size: 32px; width: 32px; text-align: center;"></i>
                                 }
                                 else
                                 {
-                                    <span class="text-muted fst-italic">No Pick</span>
+                                    <img src="@awayInfo.PrimaryLogoUrl" alt="@awayTeamName" class="me-3 team-logo" 
+                                         width="32" height="32" style="object-fit: contain;"
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                                    <i class="bi bi-shield-shaded me-3 text-secondary" style="font-size: 32px; width: 32px; text-align: center; display: none;"></i>
                                 }
-                            </td>
-                            <td class="text-center fw-bold">
-                                @game.PointValue
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+
+                                <div class="flex-grow-1 text-truncate">
+                                    <div class="@(pickedAway ? "fw-bold text-dark" : "")">
+                                        @awayTeamName
+                                        @if(game.TeamAwaySeed.HasValue && !IsTBD(awayTeamName))
+                                        {
+                                            <span class="small text-muted fw-normal ms-1">(@game.TeamAwaySeed)</span>
+                                        }
+                                    </div>
+                                    @if (pickedAway)
+                                    {
+                                        <div class="small fst-italic text-primary">
+                                            <i class="bi bi-check-circle-fill me-1"></i> Your Pick
+                                            @if (isCorrect) { <span class="badge bg-success ms-1">CORRECT</span> }
+                                            else if (isIncorrect) { <span class="badge bg-danger ms-1">INCORRECT</span> }
+                                            else if (isEliminated) { <span class="badge bg-danger ms-1">ELIMINATED</span> }
+                                        </div>
+                                    }
+                                </div>
+                                <div class="fs-5 @(isAwayWinner ? "fw-bold" : "")">@(game.TeamAwayScore?.ToString() ?? "")</div>
+                            </div>
+
+                            @* HOME TEAM *@
+                            @{
+                                bool pickedHome = hasPick && pick == homeTeamName;
+                                var homeInfo = GetTeamInfo(homeTeamName, true, game);
+                                bool isHomeWinner = game.IsFinal && game.WinningTeamName == homeTeamName;
+                            }
+                            <div class="d-flex align-items-center team-row p-2 position-relative @(isHomeWinner ? "fw-bold" : "") @(pickedHome ? "bg-light" : "")"
+                                 style="border-left: 5px solid @(GetColor(homeInfo, homeTeamName)); border-radius: 4px;">
+                                
+                                @if (IsTBD(homeTeamName) || string.IsNullOrEmpty(homeInfo?.PrimaryLogoUrl))
+                                {
+                                    <i class="bi bi-shield-shaded me-3 text-secondary" style="font-size: 32px; width: 32px; text-align: center;"></i>
+                                }
+                                else
+                                {
+                                    <img src="@homeInfo.PrimaryLogoUrl" alt="@homeTeamName" class="me-3 team-logo" 
+                                         width="32" height="32" style="object-fit: contain;"
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                                    <i class="bi bi-shield-shaded me-3 text-secondary" style="font-size: 32px; width: 32px; text-align: center; display: none;"></i>
+                                }
+
+                                <div class="flex-grow-1 text-truncate">
+                                    <div class="@(pickedHome ? "fw-bold text-dark" : "")">
+                                        @homeTeamName
+                                        @if(game.TeamHomeSeed.HasValue && !IsTBD(homeTeamName))
+                                        {
+                                            <span class="small text-muted fw-normal ms-1">(@game.TeamHomeSeed)</span>
+                                        }
+                                    </div>
+                                    @if (pickedHome)
+                                    {
+                                        <div class="small fst-italic text-primary">
+                                            <i class="bi bi-check-circle-fill me-1"></i> Your Pick
+                                            @if (isCorrect) { <span class="badge bg-success ms-1">CORRECT</span> }
+                                            else if (isIncorrect) { <span class="badge bg-danger ms-1">INCORRECT</span> }
+                                            else if (isEliminated) { <span class="badge bg-danger ms-1">ELIMINATED</span> }
+                                        </div>
+                                    }
+                                </div>
+                                <div class="fs-5 @(isHomeWinner ? "fw-bold" : "")">@(game.TeamHomeScore?.ToString() ?? "")</div>
+                            </div>
+                            
+                            @if (!hasPick)
+                            {
+                                <div class="mt-2 text-center">
+                                    <span class="badge bg-secondary opacity-50 fst-italic">No Pick Made</span>
+                                </div>
+                            }
+                            
+                            <div class="mt-2 text-end border-top pt-2">
+                                <small class="text-muted">
+                                    Pot. Pts: <strong>@game.PointValue</strong>
+                                </small>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
     }
 </div>
+
+<style>
+    .animate-pulse {
+        animation: pulse 2s infinite;
+    }
+    @@keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+    .team-row {
+        transition: background-color 0.2s;
+    }
+</style>
 
 @code {
     [Parameter] public string EntryId { get; set; } = string.Empty;
@@ -208,8 +296,7 @@
                 }
                 else
                 {
-                    // Fallback: If no pool found or no specific games linked, show all (or could filter by season if we had that)
-                    // For now, default to all to avoid breaking legacy views
+                    // Fallback
                     games = allGames.ToList();
                 }
 
@@ -264,5 +351,29 @@
         if (string.IsNullOrEmpty(home)) home = "TBD";
         if (string.IsNullOrEmpty(away)) away = "TBD";
         return (home, away);
+    }
+    
+    // --- Visual Helpers ---
+    private TeamInfo? GetTeamInfo(string teamName, bool isHome, BowlGame game)
+    {
+        // Try to match strict name first
+        if (isHome && game.TeamHome == teamName) return game.HomeTeamInfo;
+        if (!isHome && game.TeamAway == teamName) return game.AwayTeamInfo;
+
+        return null; // Logic for TBD or advanced lookup could go here, but usually strict match is enough for colors/logos
+    }
+
+    private string GetColor(TeamInfo? info, string resolvedName)
+    {
+        if (IsTBD(resolvedName)) return "#e9ecef";
+        return !string.IsNullOrEmpty(info?.Color) ? info.Color : "#ccc";
+    }
+
+    private bool IsTBD(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return true;
+        if (name.Equals("TBD", StringComparison.OrdinalIgnoreCase)) return true;
+        if (name.StartsWith("Winner of", StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
     }
 }
