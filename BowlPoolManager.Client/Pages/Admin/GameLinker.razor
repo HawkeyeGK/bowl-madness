@@ -353,7 +353,7 @@ else
         if (homeTeam != null)
         {
             SelectedLocalGame.TeamHomeId = homeTeam.SchoolId;
-            SelectedLocalGame.HomeTeamInfo = homeTeam;
+            SelectedLocalGame.HomeTeamInfo = homeTeam.ToDenormalized();
             // Ensure name matches exactly if we found a rich object (optional, but keeps data clean)
             // SelectedLocalGame.ApiHomeTeam = homeTeam.School; // Use ProposedApiHome instead to respect user choice
         }
@@ -366,7 +366,7 @@ else
         if (awayTeam != null)
         {
             SelectedLocalGame.TeamAwayId = awayTeam.SchoolId;
-            SelectedLocalGame.AwayTeamInfo = awayTeam;
+            SelectedLocalGame.AwayTeamInfo = awayTeam.ToDenormalized();
         }
         // --------------------------------------
 

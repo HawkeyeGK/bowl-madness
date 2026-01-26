@@ -361,7 +361,7 @@
             {
                 newGame.TeamHomeId = team.SchoolId;
                 newGame.TeamHome = team.School;
-                newGame.HomeTeamInfo = team;
+                newGame.HomeTeamInfo = team.ToDenormalized();
             }
         }
         else
@@ -382,7 +382,7 @@
             {
                 newGame.TeamAwayId = team.SchoolId;
                 newGame.TeamAway = team.School;
-                newGame.AwayTeamInfo = team;
+                newGame.AwayTeamInfo = team.ToDenormalized();
             }
         }
         else
