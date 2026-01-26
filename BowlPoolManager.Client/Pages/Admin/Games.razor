@@ -11,6 +11,8 @@
 @inject HttpClient Http
 @inject IJSRuntime JS
 @inject ISeasonService SeasonService
+@inject IConfigurationService ConfigurationService
+
 
 <PageTitle>Game Management</PageTitle>
 
@@ -69,11 +71,30 @@
                 <div class="row g-3 mb-3">
                     <div class="col-md-3">
                         <label for="teamHome" class="form-label">Home Team</label>
-                        <InputText id="teamHome" class="form-control" @bind-Value="newGame.TeamHome" placeholder="Home Team" />
+                        <select id="teamHome" class="form-select" value="@newGame.TeamHomeId" @onchange="OnHomeTeamChanged">
+                            <option value="">-- Select Team --</option>
+                            @foreach (var team in AllTeams)
+                            {
+                                <option value="@team.SchoolId">@team.School</option>
+                            }
+                        </select>
+                        @* Fallback/Display for verification *@
+                        <div class="form-text text-muted small">
+                            Selected: @(string.IsNullOrEmpty(newGame.TeamHome) ? "None" : newGame.TeamHome)
+                        </div>
                     </div>
                     <div class="col-md-3">
                         <label for="teamAway" class="form-label">Away Team</label>
-                        <InputText id="teamAway" class="form-control" @bind-Value="newGame.TeamAway" placeholder="Away Team" />
+                        <select id="teamAway" class="form-select" value="@newGame.TeamAwayId" @onchange="OnAwayTeamChanged">
+                            <option value="">-- Select Team --</option>
+                            @foreach (var team in AllTeams)
+                            {
+                                <option value="@team.SchoolId">@team.School</option>
+                            }
+                        </select>
+                         <div class="form-text text-muted small">
+                            Selected: @(string.IsNullOrEmpty(newGame.TeamAway) ? "None" : newGame.TeamAway)
+                        </div>
                     </div>
                     <div class="col-md-3">
                         <label for="location" class="form-label">Location</label>
@@ -241,6 +262,8 @@
 @code {
     private List<BowlGame>? games;
     private List<Season>? seasons;
+    private List<TeamInfo> AllTeams = new(); // Packet 3
+    private List<Season>? seasons;
     private string selectedSeasonId = "";
     private BowlGame newGame = new BowlGame { PointValue = 1 };
     
@@ -250,7 +273,12 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadSeasons();
-        await LoadGames();
+        
+        // Parallel load
+        var gamesTask = LoadGames();
+        var teamsTask = LoadTeams();
+        await Task.WhenAll(gamesTask, teamsTask);
+
         ResetForm();
     }
 
@@ -284,6 +312,19 @@
         }
     }
 
+    private async Task LoadTeams()
+    {
+        try
+        {
+            AllTeams = await ConfigurationService.GetTeamsAsync() ?? new();
+            AllTeams = AllTeams.OrderBy(t => t.School).ToList();
+        }
+        catch(Exception ex) 
+        {
+             Console.WriteLine($"[Game Admin] Error loading teams: {ex.Message}");
+        }
+    }
+
     private async Task LoadSeasons()
     {
         try
@@ -310,6 +351,48 @@
         selectedSeasonId = e.Value?.ToString() ?? "";
         await LoadGames();
         ResetForm(); // Update the new game SeasonId default
+    }
+
+    private void OnHomeTeamChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int id))
+        {
+            var team = AllTeams.FirstOrDefault(t => t.SchoolId == id);
+            if (team != null)
+            {
+                newGame.TeamHomeId = team.SchoolId;
+                newGame.TeamHome = team.School;
+                newGame.HomeTeamInfo = team;
+            }
+        }
+        else
+        {
+            // Reset if empty
+            newGame.TeamHomeId = null;
+            newGame.TeamHome = "";
+            newGame.HomeTeamInfo = null;
+        }
+    }
+
+    private void OnAwayTeamChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int id))
+        {
+            var team = AllTeams.FirstOrDefault(t => t.SchoolId == id);
+            if (team != null)
+            {
+                newGame.TeamAwayId = team.SchoolId;
+                newGame.TeamAway = team.School;
+                newGame.AwayTeamInfo = team;
+            }
+        }
+        else
+        {
+             // Reset if empty
+            newGame.TeamAwayId = null;
+            newGame.TeamAway = "";
+            newGame.AwayTeamInfo = null;
+        }
     }
 
     private async Task EditGame(BowlGame game)
