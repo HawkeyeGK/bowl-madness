@@ -61,8 +61,8 @@ namespace BowlPoolManager.Core.Domain
         [Newtonsoft.Json.JsonIgnore]
         public string DisplayName => $"{School} {Mascot}";
 
-        [System.Text.Json.Serialization.JsonIgnore]
-        [Newtonsoft.Json.JsonIgnore]
+        [JsonProperty("primaryLogoUrl")]
+        [JsonPropertyName("primaryLogoUrl")]
         public string PrimaryLogoUrl 
         {
             get
@@ -73,8 +73,8 @@ namespace BowlPoolManager.Core.Domain
             }
         }
 
-        [System.Text.Json.Serialization.JsonIgnore]
-        [Newtonsoft.Json.JsonIgnore]
+        [JsonProperty("darkLogoUrl")]
+        [JsonPropertyName("darkLogoUrl")]
         public string? DarkLogoUrl
         {
             get
