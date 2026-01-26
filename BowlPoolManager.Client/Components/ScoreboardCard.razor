@@ -19,13 +19,13 @@
     </div>
     <div class="card-body pt-0 pb-3">
         <!-- Away Team -->
-        @{ var awayName = GetTeamName(false); }
+        @{ var awayName = GetTeamName(false); var isAwayTbd = IsTBD(awayName); }
         <div class="d-flex align-items-center mb-2 team-row @(IsWinner(Game.TeamAway) ? "fw-bold" : "")" 
              style="border-left: 5px solid @(GetColor(Game.AwayTeamInfo, awayName)); padding-left: 10px;">
             <img src="@GetLogo(Game.AwayTeamInfo, awayName)" alt="@awayName" class="me-2 team-logo" 
                  width="32" height="32" style="object-fit: contain;"
                  onerror="this.src='/images/ncaa-logo.png'" />
-            <div class="flex-grow-1 text-truncate">
+            <div class="flex-grow-1 text-truncate @(isAwayTbd ? "fst-italic text-muted" : "")">
                 @awayName
                 @if (Game.TeamAwaySeed.HasValue)
                 {
@@ -36,13 +36,13 @@
         </div>
 
         <!-- Home Team -->
-        @{ var homeName = GetTeamName(true); }
+        @{ var homeName = GetTeamName(true); var isHomeTbd = IsTBD(homeName); }
         <div class="d-flex align-items-center team-row @(IsWinner(Game.TeamHome) ? "fw-bold" : "")" 
              style="border-left: 5px solid @(GetColor(Game.HomeTeamInfo, homeName)); padding-left: 10px;">
             <img src="@GetLogo(Game.HomeTeamInfo, homeName)" alt="@homeName" class="me-2 team-logo" 
                  width="32" height="32" style="object-fit: contain;"
                  onerror="this.src='/images/ncaa-logo.png'" />
-            <div class="flex-grow-1 text-truncate">
+            <div class="flex-grow-1 text-truncate @(isHomeTbd ? "fst-italic text-muted" : "")">
                 @homeName
                 @if (Game.TeamHomeSeed.HasValue)
                 {
@@ -113,7 +113,7 @@
     {
         if (string.IsNullOrEmpty(name)) return true;
         if (name.Equals("TBD", StringComparison.OrdinalIgnoreCase)) return true;
-        if (name.StartsWith("Winner of")) return true;
+        if (name.StartsWith("Winner of", StringComparison.OrdinalIgnoreCase)) return true;
         return false;
     }
 
