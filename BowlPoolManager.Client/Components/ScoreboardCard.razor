@@ -22,9 +22,18 @@
         @{ var awayName = GetTeamName(false); var isAwayTbd = IsTBD(awayName); }
         <div class="d-flex align-items-center mb-2 team-row @(IsWinner(Game.TeamAway) ? "fw-bold" : "")" 
              style="border-left: 5px solid @(GetColor(Game.AwayTeamInfo, awayName)); padding-left: 10px;">
-            <img src="@GetLogo(Game.AwayTeamInfo, awayName)" alt="@awayName" class="me-2 team-logo" 
-                 width="32" height="32" style="object-fit: contain;"
-                 onerror="this.src='/images/ncaa-logo.png'" />
+            @if (isAwayTbd || string.IsNullOrEmpty(GetLogo(Game.AwayTeamInfo)))
+            {
+                <i class="bi bi-shield-shaded me-2 text-secondary" style="font-size: 32px; width: 32px; text-align: center;"></i>
+            }
+            else
+            {
+                <img src="@GetLogo(Game.AwayTeamInfo)" alt="@awayName" class="me-2 team-logo" 
+                     width="32" height="32" style="object-fit: contain;"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" />
+                <i class="bi bi-shield-shaded me-2 text-secondary" style="font-size: 32px; width: 32px; text-align: center; display: none;"></i>
+            }
+            
             <div class="flex-grow-1 text-truncate @(isAwayTbd ? "fst-italic text-muted" : "")">
                 @awayName
                 @if (Game.TeamAwaySeed.HasValue)
@@ -39,9 +48,18 @@
         @{ var homeName = GetTeamName(true); var isHomeTbd = IsTBD(homeName); }
         <div class="d-flex align-items-center team-row @(IsWinner(Game.TeamHome) ? "fw-bold" : "")" 
              style="border-left: 5px solid @(GetColor(Game.HomeTeamInfo, homeName)); padding-left: 10px;">
-            <img src="@GetLogo(Game.HomeTeamInfo, homeName)" alt="@homeName" class="me-2 team-logo" 
-                 width="32" height="32" style="object-fit: contain;"
-                 onerror="this.src='/images/ncaa-logo.png'" />
+            @if (isHomeTbd || string.IsNullOrEmpty(GetLogo(Game.HomeTeamInfo)))
+            {
+                 <i class="bi bi-shield-shaded me-2 text-secondary" style="font-size: 32px; width: 32px; text-align: center;"></i>
+            }
+            else
+            {
+                <img src="@GetLogo(Game.HomeTeamInfo)" alt="@homeName" class="me-2 team-logo" 
+                     width="32" height="32" style="object-fit: contain;"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" />
+                <i class="bi bi-shield-shaded me-2 text-secondary" style="font-size: 32px; width: 32px; text-align: center; display: none;"></i>
+            }
+            
             <div class="flex-grow-1 text-truncate @(isHomeTbd ? "fst-italic text-muted" : "")">
                 @homeName
                 @if (Game.TeamHomeSeed.HasValue)
@@ -91,10 +109,9 @@
         return !string.IsNullOrEmpty(info?.Color) ? info.Color : "#ccc";
     }
 
-    private string GetLogo(TeamInfo? info, string resolvedName)
+    private string GetLogo(TeamInfo? info)
     {
-        if (IsTBD(resolvedName)) return "/images/ncaa-logo.png";
-        return !string.IsNullOrEmpty(info?.PrimaryLogoUrl) ? info.PrimaryLogoUrl : "/images/ncaa-logo.png";
+        return !string.IsNullOrEmpty(info?.PrimaryLogoUrl) ? info.PrimaryLogoUrl : "";
     }
     
     // Helper since score can be null
