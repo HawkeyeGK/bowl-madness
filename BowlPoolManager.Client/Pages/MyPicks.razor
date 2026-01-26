@@ -37,7 +37,7 @@
             @* CURRENT SEASON SECTION *@
             <div class="mb-5">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h2 class="h4 text-secondary mb-0">Current Season (@currentSeasonId)</h2>
+                    <h2 class="h4 text-secondary mb-0">Current Season (@currentSeasonDisplay)</h2>
                     <button class="btn btn-primary" @onclick="CreateAdditionalEntry">
                          <i class="bi bi-plus-lg"></i> New Entry
                     </button>
@@ -48,7 +48,7 @@
                      <div class="card shadow-sm border-0 bg-light mb-5">
                         <div class="card-body p-4 text-center">
                             <i class="bi bi-ticket-perforated display-4 text-primary mb-3"></i>
-                            <h4 class="card-title fw-bold">Join the Action for @currentSeasonId!</h4>
+                            <h4 class="card-title fw-bold">Join the Action for @currentSeasonDisplay!</h4>
                             <p class="text-muted mb-4">You don't have any brackets yet. Enter an invite code below to get started.</p>
                             
                             <div class="mx-auto" style="max-width: 400px;">
@@ -135,7 +135,7 @@
                                         <div class="d-flex justify-content-between align-items-start mb-2">
                                             <div>
                                                  <h5 class="card-title text-dark mb-1">@poolName</h5>
-                                                 <h6 class="card-subtitle text-muted small">Season @entry.SeasonId</h6>
+                                                 <h6 class="card-subtitle text-muted small">Season @(seasonNameMap.TryGetValue(entry.SeasonId, out var sName) ? sName : entry.SeasonId)</h6>
                                             </div>
                                             <span class="badge bg-secondary">Archived</span>
                                         </div>
@@ -438,6 +438,8 @@
     private BracketEntry activeEntry = new() { Picks = new Dictionary<string, string>() };
 
     private string currentSeasonId = "";
+    private string currentSeasonDisplay = "";
+    private Dictionary<string, string> seasonNameMap = new();
     
     // Helpers for Editor
     private BowlPool? EntryPool => pools.FirstOrDefault(p => p.Id == activeEntry.PoolId);
@@ -452,11 +454,13 @@
             // 0. Fetch Seasons (Dynamic Source of Truth)
             // Fetch seasons first to determine the current one
             var seasons = await SeasonService.GetSeasonsAsync();
+            seasonNameMap = seasons.ToDictionary(s => s.Id, s => s.SeasonId); // GUID -> Year/Name
             var activeSeason = seasons.FirstOrDefault(s => s.IsCurrent) ?? seasons.OrderByDescending(s => s.Id).FirstOrDefault();
             
             if (activeSeason != null)
             {
                 currentSeasonId = activeSeason.Id;
+                currentSeasonDisplay = activeSeason.SeasonId;
             }
             
             // 1. Fetch Global Data
