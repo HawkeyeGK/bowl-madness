@@ -259,35 +259,73 @@
                             var awayTeamInfo = GetTeamInfo(slots.Away, false, game);
                             
                             <div class="col">
-                                <div class="card h-100 shadow-sm scoreboard-card @(isSelected ? "border-primary" : "")">
-                                    <div class="card-header bg-white border-bottom-0 pt-3 pb-2 d-flex justify-content-between align-items-center">
-                                        <div class="text-truncate pe-2">
-                                            <span class="small text-uppercase fw-bold text-muted" title="@game.BowlName">@game.BowlName</span>
-                                            @if (game.IsPlayoff)
+                                @if (IsEntryLocked)
+                                {
+                                    // LOCKED VIEW (Rich Card Style)
+                                    bool hasPick = !string.IsNullOrEmpty(pick);
+                                    
+                                    // Visual State
+                                    bool isCorrect = false;
+                                    bool isIncorrect = false;
+                                    bool isEliminated = false;
+
+                                    if (game.IsFinal && hasPick)
+                                    {
+                                        isCorrect = string.Equals(pick, game.WinningTeamName, StringComparison.OrdinalIgnoreCase);
+                                        isIncorrect = !isCorrect;
+                                    }
+                                    else if (!game.IsFinal && hasPick && eliminatedTeams.Contains(pick))
+                                    {
+                                        isEliminated = true;
+                                    }
+
+                                    string cardBgClass = isCorrect ? "bg-success-subtle" : ((isIncorrect || isEliminated) ? "bg-danger-subtle" : "bg-white");
+                                    string cardBorderClass = isCorrect ? "border-success" : ((isIncorrect || isEliminated) ? "border-danger" : "");
+
+                                    <div class="card h-100 shadow-sm scoreboard-card @cardBgClass @cardBorderClass">
+                                        
+                                        @* CARD HEADER *@
+                                        <div class="card-header border-bottom-0 pt-3 pb-2 d-flex justify-content-between align-items-center bg-transparent">
+                                            <div class="text-truncate pe-2">
+                                                <span class="small text-uppercase fw-bold text-muted" title="@game.BowlName">@game.BowlName</span>
+                                                @if (game.IsPlayoff)
+                                                {
+                                                    <span class="badge bg-warning text-dark ms-2">Playoff</span>
+                                                }
+                                            </div>
+                                            
+                                            @if (game.Status == GameStatus.InProgress)
                                             {
-                                                <span class="badge bg-warning text-dark ms-2">Playoff</span>
+                                                <span class="badge bg-danger animate-pulse">LIVE</span>
+                                            }
+                                            else if (game.Status == GameStatus.Final)
+                                            {
+                                                <span class="badge bg-secondary">FINAL</span>
+                                            }
+                                            else
+                                            {
+                                                <div class="text-end small text-muted">
+                                                    @DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d, h:mm tt")
+                                                </div>
                                             }
                                         </div>
-                                        <div class="text-end small text-muted">
-                                            <div>@DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d, h:mm tt")</div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="card-body pt-0">
-                                        <div class="d-flex justify-content-end mb-2">
-                                            <small class="text-muted text-truncate">@game.Location</small>
-                                        </div>
 
-                                        @* AWAY TEAM SELECTION *@
-                                        <div class="mb-2">
-                                            <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_away")" 
-                                                    checked="@(pick == slots.Away && slots.Away != "TBD")" 
-                                                    disabled="@isDisabled"
-                                                    @onchange="@(() => UpdatePick(game.Id, slots.Away))" autocomplete="off">
-                                            
-                                            <label class="d-flex align-items-center team-row p-2 w-100 position-relative @(pick == slots.Away && slots.Away != "TBD" ? "selected-pick" : "unselected-pick") @(isDisabled ? "opacity-50" : "cursor-pointer")" 
-                                                    for="@($"{game.Id}_away")"
-                                                    style="border-left: 5px solid @(GetColor(awayTeamInfo, slots.Away));">
+                                        <div class="card-body pt-0 pb-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <small class="text-muted text-truncate">@game.Location</small>
+                                                @if (!string.IsNullOrEmpty(game.Television))
+                                                {
+                                                    <span class="badge bg-light text-dark border">@game.Television</span>
+                                                }
+                                            </div>
+
+                                            @* AWAY TEAM *@
+                                            @{
+                                                bool pickedAway = hasPick && pick == slots.Away;
+                                                bool isAwayWinner = game.IsFinal && game.WinningTeamName == slots.Away;
+                                            }
+                                            <div class="d-flex align-items-center mb-2 team-row p-2 position-relative @(isAwayWinner ? "fw-bold" : "") @(pickedAway ? "bg-light" : "bg-white")"
+                                                 style="border-left: 5px solid @(GetColor(awayTeamInfo, slots.Away)); border-radius: 4px;">
                                                 
                                                 @if (IsTBD(slots.Away) || string.IsNullOrEmpty(GetLogo(awayTeamInfo)))
                                                 {
@@ -296,41 +334,42 @@
                                                 else
                                                 {
                                                     <img src="@GetLogo(awayTeamInfo)" alt="@slots.Away" class="me-3 team-logo" 
-                                                            width="32" height="32" style="object-fit: contain;"
-                                                            onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                                                         width="32" height="32" style="object-fit: contain;"
+                                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
                                                     <i class="bi bi-shield-shaded me-3 text-secondary" style="font-size: 32px; width: 32px; text-align: center; display: none;"></i>
                                                 }
-                                                
-                                                <div class="flex-grow-1">
-                                                    <div class="fw-bold text-dark">
-                                                        @slots.Away
-                                                        @if (game.TeamAwaySeed.HasValue && !IsTBD(slots.Away)) 
-                                                        { 
-                                                            <span class="small text-muted fw-normal">(@game.TeamAwaySeed)</span> 
+
+                                                <div class="flex-grow-1 text-truncate">
+                                                    <div class="d-flex align-items-center @(pickedAway ? "fw-bold text-dark" : "")">
+                                                        <span class="me-2 text-truncate">@slots.Away</span>
+                                                        @if(game.TeamAwaySeed.HasValue && !IsTBD(slots.Away))
+                                                        {
+                                                            <span class="small text-muted fw-normal me-2">(@game.TeamAwaySeed)</span>
+                                                        }
+                                                        
+                                                        @if (pickedAway)
+                                                        {
+                                                             @if (isCorrect) { <i class="bi bi-check-circle-fill text-success fs-5"></i> }
+                                                             else if (isIncorrect) { <i class="bi bi-x-circle-fill text-danger fs-5"></i> }
+                                                             else if (isEliminated) { <i class="bi bi-x-circle-fill text-danger fs-5"></i> }
+                                                             else { <i class="bi bi-check-circle-fill text-primary fs-5"></i> }
                                                         }
                                                     </div>
+                                                    @if (pickedAway && isEliminated)
+                                                    {
+                                                        <div class="small text-danger fst-italic lh-1">Eliminated</div>
+                                                    }
                                                 </div>
-                                                
-                                                @if (pick == slots.Away && slots.Away != "TBD")
-                                                {
-                                                    <i class="bi bi-check-circle-fill text-primary fs-4"></i>
-                                                }
-                                                else {
-                                                     <i class="bi bi-circle text-muted fs-4 checkbox-circle"></i>
-                                                }
-                                            </label>
-                                        </div>
+                                                <div class="fs-5 @(isAwayWinner ? "fw-bold" : "")">@(game.TeamAwayScore?.ToString() ?? "")</div>
+                                            </div>
 
-                                        @* HOME TEAM SELECTION *@
-                                        <div>
-                                            <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_home")" 
-                                                    checked="@(pick == slots.Home && slots.Home != "TBD")" 
-                                                    disabled="@isDisabled"
-                                                    @onchange="@(() => UpdatePick(game.Id, slots.Home))" autocomplete="off">
-                                            
-                                            <label class="d-flex align-items-center team-row p-2 w-100 position-relative @(pick == slots.Home && slots.Home != "TBD" ? "selected-pick" : "unselected-pick") @(isDisabled ? "opacity-50" : "cursor-pointer")" 
-                                                    for="@($"{game.Id}_home")"
-                                                    style="border-left: 5px solid @(GetColor(homeTeamInfo, slots.Home));">
+                                            @* HOME TEAM *@
+                                            @{
+                                                bool pickedHome = hasPick && pick == slots.Home;
+                                                bool isHomeWinner = game.IsFinal && game.WinningTeamName == slots.Home;
+                                            }
+                                            <div class="d-flex align-items-center team-row p-2 position-relative @(isHomeWinner ? "fw-bold" : "") @(pickedHome ? "bg-light" : "bg-white")"
+                                                 style="border-left: 5px solid @(GetColor(homeTeamInfo, slots.Home)); border-radius: 4px;">
                                                 
                                                 @if (IsTBD(slots.Home) || string.IsNullOrEmpty(GetLogo(homeTeamInfo)))
                                                 {
@@ -339,32 +378,153 @@
                                                 else
                                                 {
                                                     <img src="@GetLogo(homeTeamInfo)" alt="@slots.Home" class="me-3 team-logo" 
-                                                            width="32" height="32" style="object-fit: contain;"
-                                                            onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                                                         width="32" height="32" style="object-fit: contain;"
+                                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
                                                     <i class="bi bi-shield-shaded me-3 text-secondary" style="font-size: 32px; width: 32px; text-align: center; display: none;"></i>
                                                 }
-                                                
-                                                <div class="flex-grow-1">
-                                                    <div class="fw-bold text-dark">
-                                                        @slots.Home
-                                                        @if (game.TeamHomeSeed.HasValue && !IsTBD(slots.Home)) 
-                                                        { 
-                                                            <span class="small text-muted fw-normal">(@game.TeamHomeSeed)</span> 
+
+                                                <div class="flex-grow-1 text-truncate">
+                                                    <div class="d-flex align-items-center @(pickedHome ? "fw-bold text-dark" : "")">
+                                                        <span class="me-2 text-truncate">@slots.Home</span>
+                                                        @if(game.TeamHomeSeed.HasValue && !IsTBD(slots.Home))
+                                                        {
+                                                            <span class="small text-muted fw-normal me-2">(@game.TeamHomeSeed)</span>
+                                                        }
+                                                        
+                                                        @if (pickedHome)
+                                                        {
+                                                             @if (isCorrect) { <i class="bi bi-check-circle-fill text-success fs-5"></i> }
+                                                             else if (isIncorrect) { <i class="bi bi-x-circle-fill text-danger fs-5"></i> }
+                                                             else if (isEliminated) { <i class="bi bi-x-circle-fill text-danger fs-5"></i> }
+                                                             else { <i class="bi bi-check-circle-fill text-primary fs-5"></i> }
                                                         }
                                                     </div>
+                                                    @if (pickedHome && isEliminated)
+                                                    {
+                                                        <div class="small text-danger fst-italic lh-1">Eliminated</div>
+                                                    }
                                                 </div>
+                                                <div class="fs-5 @(isHomeWinner ? "fw-bold" : "")">@(game.TeamHomeScore?.ToString() ?? "")</div>
+                                            </div>
+                                            
+                                            <div class="mt-2 text-end border-top pt-2">
+                                                <small class="text-muted">
+                                                    Pool Points: <strong>@game.PointValue</strong>
+                                                </small>
+                                            </div>
 
-                                                @if (pick == slots.Home && slots.Home != "TBD")
-                                                {
-                                                    <i class="bi bi-check-circle-fill text-primary fs-4"></i>
-                                                }
-                                                 else {
-                                                     <i class="bi bi-circle text-muted fs-4 checkbox-circle"></i>
-                                                }
-                                            </label>
                                         </div>
                                     </div>
-                                </div>
+                                }
+                                else
+                                {
+                                    <div class="card h-100 shadow-sm scoreboard-card @(isSelected ? "border-primary" : "")">
+                                        <div class="card-header bg-white border-bottom-0 pt-3 pb-2 d-flex justify-content-between align-items-center">
+                                            <div class="text-truncate pe-2">
+                                                <span class="small text-uppercase fw-bold text-muted" title="@game.BowlName">@game.BowlName</span>
+                                                @if (game.IsPlayoff)
+                                                {
+                                                    <span class="badge bg-warning text-dark ms-2">Playoff</span>
+                                                }
+                                            </div>
+                                            <div class="text-end small text-muted">
+                                                <div>@DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d, h:mm tt")</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="card-body pt-0">
+                                            <div class="d-flex justify-content-end mb-2">
+                                                <small class="text-muted text-truncate">@game.Location</small>
+                                            </div>
+
+                                            @* AWAY TEAM SELECTION *@
+                                            <div class="mb-2">
+                                                <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_away")" 
+                                                        checked="@(pick == slots.Away && slots.Away != "TBD")" 
+                                                        disabled="@isDisabled"
+                                                        @onchange="@(() => UpdatePick(game.Id, slots.Away))" autocomplete="off">
+                                                
+                                                <label class="d-flex align-items-center team-row p-2 w-100 position-relative @(pick == slots.Away && slots.Away != "TBD" ? "selected-pick" : "unselected-pick") @(isDisabled ? "opacity-50" : "cursor-pointer")" 
+                                                        for="@($"{game.Id}_away")"
+                                                        style="border-left: 5px solid @(GetColor(awayTeamInfo, slots.Away));">
+                                                    
+                                                    @if (IsTBD(slots.Away) || string.IsNullOrEmpty(GetLogo(awayTeamInfo)))
+                                                    {
+                                                        <i class="bi bi-shield-shaded me-3 text-secondary" style="font-size: 32px; width: 32px; text-align: center;"></i>
+                                                    }
+                                                    else
+                                                    {
+                                                        <img src="@GetLogo(awayTeamInfo)" alt="@slots.Away" class="me-3 team-logo" 
+                                                                width="32" height="32" style="object-fit: contain;"
+                                                                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                                                        <i class="bi bi-shield-shaded me-3 text-secondary" style="font-size: 32px; width: 32px; text-align: center; display: none;"></i>
+                                                    }
+                                                    
+                                                    <div class="flex-grow-1">
+                                                        <div class="fw-bold text-dark">
+                                                            @slots.Away
+                                                            @if (game.TeamAwaySeed.HasValue && !IsTBD(slots.Away)) 
+                                                            { 
+                                                                <span class="small text-muted fw-normal">(@game.TeamAwaySeed)</span> 
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    @if (pick == slots.Away && slots.Away != "TBD")
+                                                    {
+                                                        <i class="bi bi-check-circle-fill text-primary fs-4"></i>
+                                                    }
+                                                    else {
+                                                         <i class="bi bi-circle text-muted fs-4 checkbox-circle"></i>
+                                                    }
+                                                </label>
+                                            </div>
+
+                                            @* HOME TEAM SELECTION *@
+                                            <div>
+                                                <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_home")" 
+                                                        checked="@(pick == slots.Home && slots.Home != "TBD")" 
+                                                        disabled="@isDisabled"
+                                                        @onchange="@(() => UpdatePick(game.Id, slots.Home))" autocomplete="off">
+                                                
+                                                <label class="d-flex align-items-center team-row p-2 w-100 position-relative @(pick == slots.Home && slots.Home != "TBD" ? "selected-pick" : "unselected-pick") @(isDisabled ? "opacity-50" : "cursor-pointer")" 
+                                                        for="@($"{game.Id}_home")"
+                                                        style="border-left: 5px solid @(GetColor(homeTeamInfo, slots.Home));">
+                                                    
+                                                    @if (IsTBD(slots.Home) || string.IsNullOrEmpty(GetLogo(homeTeamInfo)))
+                                                    {
+                                                        <i class="bi bi-shield-shaded me-3 text-secondary" style="font-size: 32px; width: 32px; text-align: center;"></i>
+                                                    }
+                                                    else
+                                                    {
+                                                        <img src="@GetLogo(homeTeamInfo)" alt="@slots.Home" class="me-3 team-logo" 
+                                                                width="32" height="32" style="object-fit: contain;"
+                                                                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                                                        <i class="bi bi-shield-shaded me-3 text-secondary" style="font-size: 32px; width: 32px; text-align: center; display: none;"></i>
+                                                    }
+                                                    
+                                                    <div class="flex-grow-1">
+                                                        <div class="fw-bold text-dark">
+                                                            @slots.Home
+                                                            @if (game.TeamHomeSeed.HasValue && !IsTBD(slots.Home)) 
+                                                            { 
+                                                                <span class="small text-muted fw-normal">(@game.TeamHomeSeed)</span> 
+                                                            }
+                                                        </div>
+                                                    </div>
+
+                                                    @if (pick == slots.Home && slots.Home != "TBD")
+                                                    {
+                                                        <i class="bi bi-check-circle-fill text-primary fs-4"></i>
+                                                    }
+                                                     else {
+                                                         <i class="bi bi-circle text-muted fs-4 checkbox-circle"></i>
+                                                    }
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
                             </div>
                         }
                     </div>
@@ -504,6 +664,8 @@
     private List<BracketEntry> pastEntries = new();
     private BracketEntry activeEntry = new() { Picks = new Dictionary<string, string>() };
 
+    private HashSet<string> eliminatedTeams = new(StringComparer.OrdinalIgnoreCase);
+
     private string currentSeasonId = "";
     private string currentSeasonDisplay = "";
     private Dictionary<string, string> seasonNameMap = new();
@@ -544,6 +706,16 @@
             // Separation of Church and State (Current vs Past)
             currentEntries = allEntries.Where(e => e.SeasonId == currentSeasonId).ToList();
             pastEntries = allEntries.Where(e => e.SeasonId != currentSeasonId).ToList();
+            
+            // Calculate Eliminated Teams
+            eliminatedTeams = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var g in allSeasonGames.Where(x => x.IsFinal))
+            {
+                if (!string.IsNullOrEmpty(g.LosingTeamName))
+                {
+                    eliminatedTeams.Add(g.LosingTeamName);
+                }
+            }
             
             // Keep myEntries for delete logic or other ops?
             myEntries = allEntries;
@@ -894,4 +1066,16 @@
     .team-row:hover .checkbox-circle {
         opacity: 0.7;
     }
+    
+    /* New Styles from EntryDetails */
+    .animate-pulse {
+        animation: pulse 2s infinite;
+    }
+    @@keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+    .bg-success-subtle { background-color: #d1e7dd !important; }
+    .bg-danger-subtle { background-color: #f8d7da !important; }
 </style>
