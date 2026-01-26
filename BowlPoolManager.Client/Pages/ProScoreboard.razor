@@ -1,0 +1,78 @@
+@page "/pro-scoreboard"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Client.Components
+@using BowlPoolManager.Client.Services
+@inject IPoolService PoolService
+@inject ISeasonService SeasonService
+
+<PageTitle>Pro Scoreboard</PageTitle>
+
+<div class="container-fluid mt-3 px-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 fw-bold mb-0 text-white"><i class="bi bi-grid-3x3-gap-fill text-warning me-2"></i>Scoreboard</h1>
+            <div class="text-white-50 small">Live updates and results</div>
+        </div>
+        
+         @if (isLoading)
+         {
+             <div class="spinner-border text-light spinner-border-sm" role="status">
+                 <span class="visually-hidden">Loading...</span>
+             </div>
+         }
+    </div>
+
+    @if (Games == null)
+    {
+        <div class="text-center text-white-50 mt-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2">Loading Games...</p>
+        </div>
+    }
+    else if (!Games.Any())
+    {
+         <div class="alert alert-info">No games found for the current season.</div>
+    }
+    else
+    {
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4 pb-5">
+            @foreach (var game in Games)
+            {
+                <div class="col">
+                    <ScoreboardCard Game="@game" />
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<BowlGame>? Games;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+            // 1. Get Current Season
+            var seasons = await SeasonService.GetSeasonsAsync();
+            var currentSeason = seasons.FirstOrDefault(s => s.IsCurrent);
+            string? seasonId = currentSeason?.Id;
+
+            // 2. Get Games
+            var allGames = await PoolService.GetGamesAsync(seasonId);
+            
+            // 3. Sort
+            Games = allGames.OrderBy(g => g.StartTime).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading scoreboard: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

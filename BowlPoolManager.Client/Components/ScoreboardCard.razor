@@ -1,0 +1,106 @@
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+
+<div class="card h-100 shadow-sm scoreboard-card">
+    <div class="card-header bg-white border-bottom-0 pt-3 pb-2 d-flex justify-content-between align-items-center">
+        <span class="small text-uppercase fw-bold text-muted text-truncate" title="@Game.BowlName">@Game.BowlName</span>
+        @if (Game.Status == GameStatus.InProgress)
+        {
+            <span class="badge bg-danger animate-pulse">LIVE</span>
+        }
+        else if (Game.Status == GameStatus.Final)
+        {
+            <span class="badge bg-secondary">FINAL</span>
+        }
+        else
+        {
+            <span class="small text-muted">@GetFormattedTime()</span>
+        }
+    </div>
+    <div class="card-body pt-0 pb-3">
+        <!-- Away Team -->
+        <div class="d-flex align-items-center mb-2 team-row @(IsWinner(Game.TeamAway) ? "fw-bold" : "")" 
+             style="border-left: 5px solid @(GetColor(Game.AwayTeamInfo)); padding-left: 10px;">
+            <img src="@GetLogo(Game.AwayTeamInfo)" alt="@Game.TeamAway" class="me-2 team-logo" 
+                 width="32" height="32" style="object-fit: contain;"
+                 onerror="this.src='/images/ncaa-logo.png'" />
+            <div class="flex-grow-1 text-truncate">
+                @Game.TeamAway
+                @if (Game.TeamAwaySeed.HasValue)
+                {
+                    <span class="small text-muted ms-1">(@Game.TeamAwaySeed)</span>
+                }
+            </div>
+            <div class="fs-5">@GetScore(Game.TeamAwayScore)</div>
+        </div>
+
+        <!-- Home Team -->
+        <div class="d-flex align-items-center team-row @(IsWinner(Game.TeamHome) ? "fw-bold" : "")" 
+             style="border-left: 5px solid @(GetColor(Game.HomeTeamInfo)); padding-left: 10px;">
+            <img src="@GetLogo(Game.HomeTeamInfo)" alt="@Game.TeamHome" class="me-2 team-logo" 
+                 width="32" height="32" style="object-fit: contain;"
+                 onerror="this.src='/images/ncaa-logo.png'" />
+            <div class="flex-grow-1 text-truncate">
+                @Game.TeamHome
+                @if (Game.TeamHomeSeed.HasValue)
+                {
+                    <span class="small text-muted ms-1">(@Game.TeamHomeSeed)</span>
+                }
+            </div>
+            <div class="fs-5">@GetScore(Game.TeamHomeScore)</div>
+        </div>
+        
+        @if (!string.IsNullOrEmpty(Game.Television))
+        {
+             <div class="mt-2 text-end">
+                 <span class="badge bg-light text-dark border">@Game.Television</span>
+             </div>
+        }
+    </div>
+</div>
+
+<style>
+    .team-row {
+        transition: background-color 0.2s;
+        border-radius: 4px;
+    }
+    .animate-pulse {
+        animation: pulse 2s infinite;
+    }
+    @@keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+</style>
+
+@code {
+    [Parameter] public BowlGame Game { get; set; } = default!;
+
+    private string GetFormattedTime()
+    {
+        return DateTimeHelper.ToCentral(Game.StartTime).ToString("MMM d • h:mm tt");
+    }
+
+    private string GetColor(TeamInfo? info)
+    {
+        return !string.IsNullOrEmpty(info?.Color) ? info.Color : "#ccc";
+    }
+
+    private string GetLogo(TeamInfo? info)
+    {
+        return !string.IsNullOrEmpty(info?.PrimaryLogoUrl) ? info.PrimaryLogoUrl : "/images/ncaa-logo.png";
+    }
+    
+    // Helper since score can be null
+    private string GetScore(int? score)
+    {
+        return score.HasValue ? score.Value.ToString() : "";
+    }
+
+    private bool IsWinner(string teamName)
+    {
+        if (!Game.IsFinal) return false;
+        return Game.WinningTeamName == teamName;
+    }
+}

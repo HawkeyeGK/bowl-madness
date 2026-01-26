@@ -13,5 +13,6 @@ namespace BowlPoolManager.Client.Services
         Task<BowlPool?> ToggleConclusionAsync(string poolId); 
         Task<bool> ArchivePoolAsync(string poolId);
         Task<PoolArchive?> GetArchiveAsync(string poolId);
+        Task<List<BowlGame>> GetGamesAsync(string? seasonId = null);
     }
 }

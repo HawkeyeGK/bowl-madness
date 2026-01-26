@@ -97,5 +97,16 @@ namespace BowlPoolManager.Client.Services
                 return null;
             }
         }
+
+        public async Task<List<BowlGame>> GetGamesAsync(string? seasonId = null)
+        {
+            var url = "api/GetGames";
+            if (!string.IsNullOrEmpty(seasonId))
+            {
+                url += $"?seasonId={seasonId}";
+            }
+
+            return await _http.GetFromJsonAsync<List<BowlGame>>(url) ?? new List<BowlGame>();
+        }
     }
 }
