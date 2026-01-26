@@ -19,13 +19,14 @@
     </div>
     <div class="card-body pt-0 pb-3">
         <!-- Away Team -->
+        @{ var awayName = GetTeamName(false); }
         <div class="d-flex align-items-center mb-2 team-row @(IsWinner(Game.TeamAway) ? "fw-bold" : "")" 
-             style="border-left: 5px solid @(GetColor(Game.AwayTeamInfo)); padding-left: 10px;">
-            <img src="@GetLogo(Game.AwayTeamInfo)" alt="@Game.TeamAway" class="me-2 team-logo" 
+             style="border-left: 5px solid @(GetColor(Game.AwayTeamInfo, awayName)); padding-left: 10px;">
+            <img src="@GetLogo(Game.AwayTeamInfo, awayName)" alt="@awayName" class="me-2 team-logo" 
                  width="32" height="32" style="object-fit: contain;"
                  onerror="this.src='/images/ncaa-logo.png'" />
             <div class="flex-grow-1 text-truncate">
-                @Game.TeamAway
+                @awayName
                 @if (Game.TeamAwaySeed.HasValue)
                 {
                     <span class="small text-muted ms-1">(@Game.TeamAwaySeed)</span>
@@ -35,13 +36,14 @@
         </div>
 
         <!-- Home Team -->
+        @{ var homeName = GetTeamName(true); }
         <div class="d-flex align-items-center team-row @(IsWinner(Game.TeamHome) ? "fw-bold" : "")" 
-             style="border-left: 5px solid @(GetColor(Game.HomeTeamInfo)); padding-left: 10px;">
-            <img src="@GetLogo(Game.HomeTeamInfo)" alt="@Game.TeamHome" class="me-2 team-logo" 
+             style="border-left: 5px solid @(GetColor(Game.HomeTeamInfo, homeName)); padding-left: 10px;">
+            <img src="@GetLogo(Game.HomeTeamInfo, homeName)" alt="@homeName" class="me-2 team-logo" 
                  width="32" height="32" style="object-fit: contain;"
                  onerror="this.src='/images/ncaa-logo.png'" />
             <div class="flex-grow-1 text-truncate">
-                @Game.TeamHome
+                @homeName
                 @if (Game.TeamHomeSeed.HasValue)
                 {
                     <span class="small text-muted ms-1">(@Game.TeamHomeSeed)</span>
@@ -76,19 +78,22 @@
 
 @code {
     [Parameter] public BowlGame Game { get; set; } = default!;
+    [Parameter] public List<BowlGame>? AllGames { get; set; }
 
     private string GetFormattedTime()
     {
         return DateTimeHelper.ToCentral(Game.StartTime).ToString("MMM d • h:mm tt");
     }
 
-    private string GetColor(TeamInfo? info)
+    private string GetColor(TeamInfo? info, string resolvedName)
     {
+        if (IsTBD(resolvedName)) return "#e9ecef"; // Grey for TBD
         return !string.IsNullOrEmpty(info?.Color) ? info.Color : "#ccc";
     }
 
-    private string GetLogo(TeamInfo? info)
+    private string GetLogo(TeamInfo? info, string resolvedName)
     {
+        if (IsTBD(resolvedName)) return "/images/ncaa-logo.png";
         return !string.IsNullOrEmpty(info?.PrimaryLogoUrl) ? info.PrimaryLogoUrl : "/images/ncaa-logo.png";
     }
     
@@ -102,5 +107,59 @@
     {
         if (!Game.IsFinal) return false;
         return Game.WinningTeamName == teamName;
+    }
+
+    private bool IsTBD(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return true;
+        if (name.Equals("TBD", StringComparison.OrdinalIgnoreCase)) return true;
+        if (name.StartsWith("Winner of")) return true;
+        return false;
+    }
+
+    private string GetTeamName(bool isHome)
+    {
+        string currentName = isHome ? Game.TeamHome : Game.TeamAway;
+        
+        // If we have a valid name, and it's not literally "TBD", return it
+        if (!string.IsNullOrEmpty(currentName) && !currentName.Equals("TBD", StringComparison.OrdinalIgnoreCase))
+        {
+            return currentName;
+        }
+
+        if (AllGames == null) return "TBD";
+
+        // Logic from Results.razor
+        var feeders = AllGames
+            .Where(g => g.NextGameId == Game.Id)
+            .OrderBy(g => g.StartTime)
+            .ToList();
+
+        if (feeders.Count == 0) return "TBD";
+
+        if (feeders.Count == 1) 
+        {
+            return $"Winner of {feeders[0].BowlName}";
+        }
+
+        // 2 Feeders: Disambiguate
+        string otherSlotName = isHome ? Game.TeamAway : Game.TeamHome;
+        BowlGame? claimedFeeder = null;
+
+        if (!string.IsNullOrEmpty(otherSlotName) && !otherSlotName.Equals("TBD", StringComparison.OrdinalIgnoreCase))
+        {
+            claimedFeeder = feeders.FirstOrDefault(f => f.Status == GameStatus.Final && f.WinningTeamName == otherSlotName);
+        }
+
+        if (claimedFeeder != null)
+        {
+            var unclaimed = feeders.FirstOrDefault(f => f.Id != claimedFeeder.Id);
+            return unclaimed != null ? $"Winner of {unclaimed.BowlName}" : "TBD";
+        }
+        else
+        {
+            // Deterministic assignment
+            return isHome ? $"Winner of {feeders[0].BowlName}" : $"Winner of {feeders[1].BowlName}";
+        }
     }
 }
