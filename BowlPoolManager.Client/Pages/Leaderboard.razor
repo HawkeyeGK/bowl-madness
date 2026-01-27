@@ -46,8 +46,15 @@
                 @if (currentPool != null)
                 {
                     <div class="text-muted small">
-                        <i class="bi bi-clock-fill text-danger me-1"></i>
-                        <span>Picks Lock: @DateTimeHelper.ToCentral(currentPool.LockDate).ToString("MMM d, h:mm tt") CT</span>
+                        @if (DateTime.UtcNow > currentPool.LockDate)
+                        {
+                            <span>Picks Locked: @DateTimeHelper.ToCentral(currentPool.LockDate).ToString("MMM d, h:mm tt") CT</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-clock-fill text-danger me-1"></i>
+                            <span>Picks Lock: @DateTimeHelper.ToCentral(currentPool.LockDate).ToString("MMM d, h:mm tt") CT</span>
+                        }
                     </div>
                 }
                 else
