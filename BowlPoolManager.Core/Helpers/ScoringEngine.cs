@@ -4,7 +4,7 @@ namespace BowlPoolManager.Core.Helpers
 {
     public static class ScoringEngine
     {
-        public static List<LeaderboardRow> Calculate(List<BowlGame> games, List<BracketEntry> entries)
+        public static List<LeaderboardRow> Calculate(List<BowlGame> games, List<BracketEntry> entries, string? tieBreakerGameId = null)
         {
             // 1. Identify Eliminated Teams (Teams that have lost any FINAL game)
             var eliminatedTeams = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -15,6 +15,21 @@ namespace BowlPoolManager.Core.Helpers
             {
                 if (game.TeamHomeScore < game.TeamAwayScore) eliminatedTeams.Add(game.TeamHome);
                 else if (game.TeamAwayScore < game.TeamHomeScore) eliminatedTeams.Add(game.TeamAway);
+            }
+
+            // 2. Identify Tiebreaker Game Status & Score
+            bool isTieBreakerFinal = false;
+            int tieBreakerTotalPoints = 0;
+
+            if (!string.IsNullOrEmpty(tieBreakerGameId))
+            {
+                var tbGame = games.FirstOrDefault(g => g.Id == tieBreakerGameId);
+                if (tbGame != null && tbGame.Status == GameStatus.Final)
+                {
+                    isTieBreakerFinal = true;
+                    // Add scores safely
+                    tieBreakerTotalPoints = (tbGame.TeamHomeScore ?? 0) + (tbGame.TeamAwayScore ?? 0);
+                }
             }
 
             var rows = new List<LeaderboardRow>();
@@ -40,6 +55,7 @@ namespace BowlPoolManager.Core.Helpers
                         Score = 0, 
                         MaxPossible = 0, 
                         CorrectPicks = 0,
+                        TieBreakerDelta = null,
                         RoundScores = safeRoundScores
                     });
                     continue;
@@ -97,19 +113,38 @@ namespace BowlPoolManager.Core.Helpers
                     }
                 }
 
+                // Calculate Tiebreaker Delta if applicable
+                int? delta = null;
+                if (isTieBreakerFinal)
+                {
+                    delta = Math.Abs(entry.TieBreakerPoints - tieBreakerTotalPoints);
+                }
+
                 rows.Add(new LeaderboardRow 
                 { 
                     Entry = entry, 
                     Score = currentScore, 
                     CorrectPicks = correct,
                     RoundScores = roundScores,
-                    MaxPossible = maxPossible
+                    MaxPossible = maxPossible,
+                    TieBreakerDelta = delta
                 });
             }
 
-            // SORT ORDER: Total -> Max Potential -> Name
+            // SORT ORDER: 
+            // 1. Total Score (Desc)
+            // 2. Correct Picks (Desc)
+            // 3. Tiebreaker Delta (Asc, but ONLY if game is Final) - If not final, we don't sort by it (effectively equal)
+            // 4. Name (Asc) fallback
+
+            // To handle null deltas (not final) effectively being "equal", 
+            // we can just treat null as Int.MaxValue so they go to bottom if we were sorting, 
+            // but for the Rank ASSIGNMENT, we need to be careful.
+
+            // Let's sort optimally for display
             var sortedRows = rows.OrderByDescending(r => r.Score)
-                                 .ThenByDescending(r => r.MaxPossible)
+                                 .ThenByDescending(r => r.CorrectPicks)
+                                 .ThenBy(r => r.TieBreakerDelta ?? int.MaxValue) // Nulls go last or don't matter if all null
                                  .ThenBy(r => r.Entry.PlayerName)
                                  .ToList();
 
@@ -117,14 +152,38 @@ namespace BowlPoolManager.Core.Helpers
             int rank = 1;
             for (int i = 0; i < sortedRows.Count; i++)
             {
-                if (i > 0 && sortedRows[i].Score == sortedRows[i - 1].Score)
+                var currentRow = sortedRows[i];
+                currentRow.Rank = rank; // Default assignment
+
+                if (i > 0)
                 {
-                    sortedRows[i].Rank = sortedRows[i - 1].Rank;
+                    var prevRow = sortedRows[i - 1];
+
+                    bool scoresEqual = currentRow.Score == prevRow.Score;
+                    bool picksEqual = currentRow.CorrectPicks == prevRow.CorrectPicks;
+                    
+                    // Tiebreaker logic: Only breaks ties if the game is FINAL (Delta has value)
+                    bool tieBreakerEqual = true;
+                    if (isTieBreakerFinal)
+                    {
+                        // If both have deltas, compare them.
+                        if (currentRow.TieBreakerDelta.HasValue && prevRow.TieBreakerDelta.HasValue)
+                        {
+                            tieBreakerEqual = currentRow.TieBreakerDelta.Value == prevRow.TieBreakerDelta.Value;
+                        }
+                    }
+
+                    // If everything that matters is equal, give same rank
+                    if (scoresEqual && picksEqual && tieBreakerEqual)
+                    {
+                        currentRow.Rank = prevRow.Rank;
+                    }
+                    else
+                    {
+                        currentRow.Rank = rank;
+                    }
                 }
-                else
-                {
-                    sortedRows[i].Rank = rank;
-                }
+                
                 rank++;
             }
 
