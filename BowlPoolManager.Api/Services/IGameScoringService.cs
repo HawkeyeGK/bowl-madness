@@ -14,5 +14,10 @@ namespace BowlPoolManager.Api.Services
         /// Returns the timestamp of the last successful score refresh.
         /// </summary>
         DateTime GetLastRefreshTime();
+
+        /// <summary>
+        /// Updates a single game and propagates the winner to the next game in the bracket if applicable.
+        /// </summary>
+        Task ProcessGameUpdateAsync(BowlGame game);
     }
 }

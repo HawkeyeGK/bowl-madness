@@ -108,7 +108,7 @@ namespace BowlPoolManager.Api.Functions
              if (!authResult.IsValid) return authResult.ErrorResponse!;
 
              var game = await JsonSerializer.DeserializeAsync<BowlGame>(req.Body);
-             if (game != null) await _gameRepo.UpdateGameAsync(game); // Use Repo
+             if (game != null) await _scoringService.ProcessGameUpdateAsync(game);
              
              return req.CreateResponse(HttpStatusCode.OK);
         }
