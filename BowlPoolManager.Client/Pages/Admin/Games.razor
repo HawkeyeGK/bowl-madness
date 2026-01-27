@@ -304,6 +304,10 @@
                 url += $"?seasonId={selectedSeasonId}";
             }
             games = await Http.GetFromJsonAsync<List<BowlGame>>(url);
+            if (games != null)
+            {
+                games = games.OrderBy(g => g.StartTime).ToList();
+            }
         }
         catch (Exception ex)
         {
