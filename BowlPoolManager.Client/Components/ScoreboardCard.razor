@@ -19,16 +19,16 @@
     </div>
     <div class="card-body pt-0 pb-3">
         <!-- Away Team -->
-        @{ var awayName = GetTeamName(false); var isAwayTbd = IsTBD(awayName); }
+        @{ var (awayName, awayInfo) = GetResolvedTeamData(false); var isAwayTbd = IsTBD(awayName); }
         <div class="d-flex align-items-center mb-2 team-row @(IsWinner(Game.TeamAway) ? "fw-bold" : "")" 
-             style="border-left: 5px solid @(GetColor(Game.AwayTeamInfo, awayName)); padding-left: 10px;">
-            @if (isAwayTbd || string.IsNullOrEmpty(GetLogo(Game.AwayTeamInfo)))
+             style="border-left: 5px solid @(GetColor(awayInfo, awayName)); padding-left: 10px;">
+            @if (isAwayTbd || string.IsNullOrEmpty(GetLogo(awayInfo)))
             {
                 <i class="bi bi-shield-shaded me-2 text-secondary" style="font-size: 32px; width: 32px; text-align: center;"></i>
             }
             else
             {
-                <img src="@GetLogo(Game.AwayTeamInfo)" alt="@awayName" class="me-2 team-logo" 
+                <img src="@GetLogo(awayInfo)" alt="@awayName" class="me-2 team-logo" 
                      width="32" height="32" style="object-fit: contain;"
                      onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" />
                 <i class="bi bi-shield-shaded me-2 text-secondary" style="font-size: 32px; width: 32px; text-align: center; display: none;"></i>
@@ -45,16 +45,16 @@
         </div>
 
         <!-- Home Team -->
-        @{ var homeName = GetTeamName(true); var isHomeTbd = IsTBD(homeName); }
+        @{ var (homeName, homeInfo) = GetResolvedTeamData(true); var isHomeTbd = IsTBD(homeName); }
         <div class="d-flex align-items-center team-row @(IsWinner(Game.TeamHome) ? "fw-bold" : "")" 
-             style="border-left: 5px solid @(GetColor(Game.HomeTeamInfo, homeName)); padding-left: 10px;">
-            @if (isHomeTbd || string.IsNullOrEmpty(GetLogo(Game.HomeTeamInfo)))
+             style="border-left: 5px solid @(GetColor(homeInfo, homeName)); padding-left: 10px;">
+            @if (isHomeTbd || string.IsNullOrEmpty(GetLogo(homeInfo)))
             {
                  <i class="bi bi-shield-shaded me-2 text-secondary" style="font-size: 32px; width: 32px; text-align: center;"></i>
             }
             else
             {
-                <img src="@GetLogo(Game.HomeTeamInfo)" alt="@homeName" class="me-2 team-logo" 
+                <img src="@GetLogo(homeInfo)" alt="@homeName" class="me-2 team-logo" 
                      width="32" height="32" style="object-fit: contain;"
                      onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" />
                 <i class="bi bi-shield-shaded me-2 text-secondary" style="font-size: 32px; width: 32px; text-align: center; display: none;"></i>
@@ -140,17 +140,18 @@
         return false;
     }
 
-    private string GetTeamName(bool isHome)
+    private (string Name, TeamInfo? Info) GetResolvedTeamData(bool isHome)
     {
         string currentName = isHome ? Game.TeamHome : Game.TeamAway;
+        TeamInfo? currentInfo = isHome ? Game.HomeTeamInfo : Game.AwayTeamInfo;
         
         // If we have a valid name, and it's not literally "TBD", return it
         if (!string.IsNullOrEmpty(currentName) && !currentName.Equals("TBD", StringComparison.OrdinalIgnoreCase))
         {
-            return currentName;
+            return (currentName, currentInfo);
         }
 
-        if (AllGames == null) return "TBD";
+        if (AllGames == null) return ("TBD", null);
 
         // Logic from Results.razor
         var feeders = AllGames
@@ -158,31 +159,55 @@
             .OrderBy(g => g.StartTime)
             .ToList();
 
-        if (feeders.Count == 0) return "TBD";
+        if (feeders.Count == 0) return ("TBD", null);
+
+        BowlGame? targetFeeder = null;
 
         if (feeders.Count == 1) 
         {
-            return $"Winner of {feeders[0].BowlName}";
-        }
-
-        // 2 Feeders: Disambiguate
-        string otherSlotName = isHome ? Game.TeamAway : Game.TeamHome;
-        BowlGame? claimedFeeder = null;
-
-        if (!string.IsNullOrEmpty(otherSlotName) && !otherSlotName.Equals("TBD", StringComparison.OrdinalIgnoreCase))
-        {
-            claimedFeeder = feeders.FirstOrDefault(f => f.Status == GameStatus.Final && f.WinningTeamName == otherSlotName);
-        }
-
-        if (claimedFeeder != null)
-        {
-            var unclaimed = feeders.FirstOrDefault(f => f.Id != claimedFeeder.Id);
-            return unclaimed != null ? $"Winner of {unclaimed.BowlName}" : "TBD";
+            targetFeeder = feeders[0];
         }
         else
         {
-            // Deterministic assignment
-            return isHome ? $"Winner of {feeders[0].BowlName}" : $"Winner of {feeders[1].BowlName}";
+            // 2 Feeders: Disambiguate
+            string otherSlotName = isHome ? Game.TeamAway : Game.TeamHome;
+            BowlGame? claimedFeeder = null;
+
+            if (!string.IsNullOrEmpty(otherSlotName) && !otherSlotName.Equals("TBD", StringComparison.OrdinalIgnoreCase))
+            {
+                claimedFeeder = feeders.FirstOrDefault(f => f.Status == GameStatus.Final && f.WinningTeamName == otherSlotName);
+            }
+
+            if (claimedFeeder != null)
+            {
+                var unclaimed = feeders.FirstOrDefault(f => f.Id != claimedFeeder.Id);
+                targetFeeder = unclaimed;
+            }
+            else
+            {
+                // Deterministic assignment
+                targetFeeder = isHome ? feeders[0] : feeders[1];
+            }
         }
+
+        if (targetFeeder != null)
+        {
+            if (targetFeeder.IsFinal && !string.IsNullOrEmpty(targetFeeder.WinningTeamName))
+            {
+                string winnerName = targetFeeder.WinningTeamName;
+                // Resolve Info
+                TeamInfo? winnerInfo = null;
+                if (string.Equals(winnerName, targetFeeder.TeamHome, StringComparison.OrdinalIgnoreCase))
+                    winnerInfo = targetFeeder.HomeTeamInfo;
+                else if (string.Equals(winnerName, targetFeeder.TeamAway, StringComparison.OrdinalIgnoreCase))
+                    winnerInfo = targetFeeder.AwayTeamInfo; // Fallback to info associated with the name
+
+                return (winnerName, winnerInfo);
+            }
+
+            return ($"Winner of {targetFeeder.BowlName}", null);
+        }
+
+        return ("TBD", null);
     }
 }
