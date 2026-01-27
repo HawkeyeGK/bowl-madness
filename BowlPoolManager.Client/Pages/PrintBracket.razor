@@ -65,9 +65,9 @@ else
                     </div>
                     
                     <div class="matchup">
-                        <div class="team @GetPickClass(game.Id, game.TeamHome)">@game.TeamHome</div>
+                        <div class="team @GetPickClass(game, game.TeamHome)">@game.TeamHome</div>
                         <div class="vs">vs</div>
-                        <div class="team @GetPickClass(game.Id, game.TeamAway)">@game.TeamAway</div>
+                        <div class="team @GetPickClass(game, game.TeamAway)">@game.TeamAway</div>
                     </div>
                 </div>
             }
@@ -82,8 +82,8 @@ else
                     {
                         <div class="match-card">
                              <div class="game-meta-row">@game.BowlName <span class="meta-right">@FormatTimeShort(game.StartTime)</span></div>
-                            <div class="team-slot @GetPickClass(game.Id, game.TeamHome)">@game.TeamHome</div>
-                            <div class="team-slot @GetPickClass(game.Id, game.TeamAway)">@game.TeamAway</div>
+                            <div class="team-slot @GetPickClass(game, game.TeamHome)">@game.TeamHome</div>
+                            <div class="team-slot @GetPickClass(game, game.TeamAway)">@game.TeamAway</div>
                          </div>
                     }
                 </div>
@@ -96,8 +96,8 @@ else
                         var participants = GetParticipants(game);
                         <div class="match-card">
                             <div class="game-meta-row">@game.BowlName <span class="meta-right">@FormatTimeShort(game.StartTime)</span></div>
-                            <div class="team-slot @GetPickClass(game.Id, participants.Top)">@RenderSlot(participants.Top)</div>
-                            <div class="team-slot @GetPickClass(game.Id, participants.Bottom)">@RenderSlot(participants.Bottom)</div>
+                            <div class="team-slot @GetPickClass(game, participants.Top)">@RenderSlot(participants.Top)</div>
+                            <div class="team-slot @GetPickClass(game, participants.Bottom)">@RenderSlot(participants.Bottom)</div>
                          </div>
                     }
                 </div>
@@ -110,8 +110,8 @@ else
                         var participants = GetParticipants(game);
                         <div class="match-card spacer-lg">
                             <div class="game-meta-row">@game.BowlName</div>
-                            <div class="team-slot @GetPickClass(game.Id, participants.Top)">@RenderSlot(participants.Top)</div>
-                            <div class="team-slot @GetPickClass(game.Id, participants.Bottom)">@RenderSlot(participants.Bottom)</div>
+                            <div class="team-slot @GetPickClass(game, participants.Top)">@RenderSlot(participants.Top)</div>
+                            <div class="team-slot @GetPickClass(game, participants.Bottom)">@RenderSlot(participants.Bottom)</div>
                          </div>
                     }
                 </div>
@@ -124,8 +124,8 @@ else
                         var participants = GetParticipants(game);
                         <div class="match-card champ-card">
                             <div class="game-meta-row text-center">@game.BowlName</div>
-                            <div class="team-slot @GetPickClass(game.Id, participants.Top)">@RenderSlot(participants.Top)</div>
-                            <div class="team-slot @GetPickClass(game.Id, participants.Bottom)">@RenderSlot(participants.Bottom)</div>
+                            <div class="team-slot @GetPickClass(game, participants.Top)">@RenderSlot(participants.Top)</div>
+                            <div class="team-slot @GetPickClass(game, participants.Bottom)">@RenderSlot(participants.Bottom)</div>
                              
                             <div class="champ-line">
                                 <span class="small fw-bold me-1">CHAMPION:</span>
@@ -174,11 +174,15 @@ else
         .no-print { display: none !important; }
         .game-box { break-inside: avoid; background-color: transparent !important; border-color: #000 !important; }
         .match-card { background-color: transparent !important; }
-        .user-pick { box-shadow: inset 0 0 0 2px #dc3545 !important; background-color: #fff0f0 !important; font-weight: bold; }
+        .user-pick-correct { box-shadow: inset 0 0 0 2px #198754 !important; background-color: #d1e7dd !important; font-weight: bold; }
+        .user-pick-incorrect { box-shadow: inset 0 0 0 2px #dc3545 !important; background-color: #f8d7da !important; font-weight: bold; }
+        .user-pick-pending { box-shadow: inset 0 0 0 2px #0d6efd !important; background-color: #cfe2ff !important; font-weight: bold; }
         .handwritten { color: #dc3545 !important; font-weight: bold; font-family: "Courier New", Courier, monospace; }
     }
     .print-wrapper { font-family: 'Arial Narrow', sans-serif; color: #000; max-width: 100%; }
-    .user-pick { box-shadow: inset 0 0 0 2px #dc3545; background-color: #fff0f0; font-weight: bold; border-radius: 3px; padding-left: 2px; }
+    .user-pick-correct { box-shadow: inset 0 0 0 2px #198754; background-color: #d1e7dd; font-weight: bold; border-radius: 3px; padding-left: 2px; }
+    .user-pick-incorrect { box-shadow: inset 0 0 0 2px #dc3545; background-color: #f8d7da; font-weight: bold; border-radius: 3px; padding-left: 2px; }
+    .user-pick-pending { box-shadow: inset 0 0 0 2px #0d6efd; background-color: #cfe2ff; font-weight: bold; border-radius: 3px; padding-left: 2px; }
     .handwritten { color: #dc3545; font-weight: 800; font-family: "Courier New", Courier, monospace; font-size: 1.1em; letter-spacing: -0.5px; }
     .header-row { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 6px; }
     .inputs-area { display: flex; gap: 20px; width: 70%; }
@@ -370,13 +374,20 @@ else
         }).ThenBy(g => g.StartTime).ToList();
     }
 
-    private string GetPickClass(string gameId, string? teamName)
+    private string GetPickClass(BowlGame game, string? teamName)
     {
         if (userEntry == null || userEntry.Picks == null || string.IsNullOrEmpty(teamName)) return "";
         
-        if (userEntry.Picks.TryGetValue(gameId, out var pick) && pick == teamName)
+        if (userEntry.Picks.TryGetValue(game.Id, out var pick) && pick == teamName)
         {
-            return "user-pick";
+            if (game.IsFinal)
+            {
+                return string.Equals(pick, game.WinningTeamName, StringComparison.OrdinalIgnoreCase) 
+                    ? "user-pick-correct" 
+                    : "user-pick-incorrect";
+            }
+            // Pending/Future Game
+            return "user-pick-pending";
         }
         return "";
     }
