@@ -78,68 +78,76 @@ else
                 @* ROUND 1 *@
                 <div class="round-col">
                      <div class="round-header">First Round</div>
-                    @foreach (var game in round1Games)
-                    {
-                        <div class="match-card">
-                             <div class="game-meta-row">@game.BowlName <span class="meta-right">@FormatTimeShort(game.StartTime)</span></div>
-                            <div class="team-slot @GetPickClass(game, game.TeamHome)">@game.TeamHome</div>
-                            <div class="team-slot @GetPickClass(game, game.TeamAway)">@game.TeamAway</div>
-                         </div>
-                    }
+                     <div class="games-container">
+                        @foreach (var game in round1Games)
+                        {
+                            <div class="match-card">
+                                 <div class="game-meta-row">@game.BowlName <span class="meta-right">@FormatTimeShort(game.StartTime)</span></div>
+                                <div class="team-slot @GetPickClass(game, game.TeamHome)">@game.TeamHome</div>
+                                <div class="team-slot @GetPickClass(game, game.TeamAway)">@game.TeamAway</div>
+                             </div>
+                        }
+                    </div>
                 </div>
 
                 @* QUARTERFINALS *@
                 <div class="round-col">
                     <div class="round-header">Quarterfinals</div>
-                    @foreach (var game in quarterGames)
-                    {
-                        var participants = GetParticipants(game);
-                        <div class="match-card">
-                            <div class="game-meta-row">@game.BowlName <span class="meta-right">@FormatTimeShort(game.StartTime)</span></div>
-                            <div class="team-slot @GetPickClass(game, participants.Top)">@RenderSlot(participants.Top)</div>
-                            <div class="team-slot @GetPickClass(game, participants.Bottom)">@RenderSlot(participants.Bottom)</div>
-                         </div>
-                    }
+                    <div class="games-container">
+                        @foreach (var game in quarterGames)
+                        {
+                            var participants = GetParticipants(game);
+                            <div class="match-card">
+                                <div class="game-meta-row">@game.BowlName <span class="meta-right">@FormatTimeShort(game.StartTime)</span></div>
+                                <div class="team-slot @GetPickClass(game, participants.Top)">@RenderSlot(participants.Top)</div>
+                                <div class="team-slot @GetPickClass(game, participants.Bottom)">@RenderSlot(participants.Bottom)</div>
+                             </div>
+                        }
+                    </div>
                 </div>
 
                 @* SEMIFINALS *@
                 <div class="round-col">
                      <div class="round-header">Semifinals</div>
-                    @foreach (var game in semiGames)
-                    {
-                        var participants = GetParticipants(game);
-                        <div class="match-card spacer-lg">
-                            <div class="game-meta-row">@game.BowlName</div>
-                            <div class="team-slot @GetPickClass(game, participants.Top)">@RenderSlot(participants.Top)</div>
-                            <div class="team-slot @GetPickClass(game, participants.Bottom)">@RenderSlot(participants.Bottom)</div>
-                         </div>
-                    }
+                     <div class="games-container">
+                        @foreach (var game in semiGames)
+                        {
+                            var participants = GetParticipants(game);
+                            <div class="match-card spacer-lg">
+                                <div class="game-meta-row">@game.BowlName</div>
+                                <div class="team-slot @GetPickClass(game, participants.Top)">@RenderSlot(participants.Top)</div>
+                                <div class="team-slot @GetPickClass(game, participants.Bottom)">@RenderSlot(participants.Bottom)</div>
+                             </div>
+                        }
+                    </div>
                 </div>
 
                 @* CHAMPIONSHIP *@
                 <div class="round-col center-vertical">
                      <div class="round-header">Championship</div>
-                    @foreach (var game in champGames)
-                    {
-                        var participants = GetParticipants(game);
-                        <div class="match-card champ-card">
-                            <div class="game-meta-row text-center">@game.BowlName</div>
-                            <div class="team-slot @GetPickClass(game, participants.Top)">@RenderSlot(participants.Top)</div>
-                            <div class="team-slot @GetPickClass(game, participants.Bottom)">@RenderSlot(participants.Bottom)</div>
-                             
-                            <div class="champ-line">
-                                <span class="small fw-bold me-1">CHAMPION:</span>
-                                 @if (userEntry != null && userEntry.Picks != null && userEntry.Picks.TryGetValue(game.Id, out var winner))
-                                {
-                                    <span class="line-draw handwritten text-danger">@winner</span>
-                                 }
-                                else
-                                {
-                                     <span class="line-draw">_________________</span>
-                                }
-                            </div>
-                         </div>
-                    }
+                     <div class="games-container">
+                        @foreach (var game in champGames)
+                        {
+                            var participants = GetParticipants(game);
+                            <div class="match-card champ-card">
+                                <div class="game-meta-row text-center">@game.BowlName</div>
+                                <div class="team-slot @GetPickClass(game, participants.Top)">@RenderSlot(participants.Top)</div>
+                                <div class="team-slot @GetPickClass(game, participants.Bottom)">@RenderSlot(participants.Bottom)</div>
+                                 
+                                <div class="champ-line">
+                                    <span class="small fw-bold me-1">CHAMPION:</span>
+                                     @if (userEntry != null && userEntry.Picks != null && userEntry.Picks.TryGetValue(game.Id, out var winner))
+                                    {
+                                        <span class="line-draw handwritten text-danger">@winner</span>
+                                     }
+                                    else
+                                    {
+                                         <span class="line-draw">_________________</span>
+                                    }
+                                </div>
+                             </div>
+                        }
+                    </div>
                 </div>
             </div>
         </div>
@@ -168,8 +176,8 @@ else
 <style>
     /* ... (KEEP STYLES AS IS) ... */
     :root { --border-color: #888; --bg-color: #f8f9fa; }
-    @@media print {
-        @@page { size: landscape; margin: 0.25in; }
+    @media print {
+        @page { size: landscape; margin: 0.25in; }
         body { zoom: 95%; background-color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .no-print { display: none !important; }
         .game-box { break-inside: avoid; background-color: transparent !important; border-color: #000 !important; }
@@ -202,10 +210,11 @@ else
     .team { padding: 1px 2px; }
     .bracket-section { border-top: 2px solid #000; padding-top: 5px; margin-top: 5px; position: relative; }
     .bracket-container { display: flex; justify-content: space-between; height: 300px; }
-    .round-col { display: flex; flex-direction: column; justify-content: space-around; flex: 1; margin: 0 4px; position: relative; }
-    .round-col.center-vertical { justify-content: center; } 
-    .round-header { text-align: center; font-weight: bold; font-size: 0.7rem; text-transform: uppercase; background: #eee; border: 1px solid #ccc; margin-bottom: 4px; }
-    .center-vertical .round-header { position: absolute; top: 0; width: 100%; }
+    .round-col { display: flex; flex-direction: column; flex: 1; margin: 0 4px; position: relative; }
+    .games-container { display: flex; flex-direction: column; justify-content: space-around; flex: 1; }
+    .round-col.center-vertical { justify-content: flex-start; } 
+    .round-header { text-align: center; font-weight: bold; font-size: 0.7rem; text-transform: uppercase; background: #eee; border: 1px solid #ccc; margin-bottom: 4px; height: 18px; line-height: 16px; }
+    .center-vertical .round-header { position: relative; top: auto; width: 100%; }
     .match-card { border: 1px solid #000; padding: 2px 4px; position: relative; font-size: 0.7rem; background: #fff; }
     .game-meta-row { font-size: 0.6rem; font-weight: bold; border-bottom: 1px solid #ccc; margin-bottom: 2px; display: flex; justify-content: space-between; }
     .meta-right { font-weight: normal; font-size: 0.55rem; }
