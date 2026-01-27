@@ -29,15 +29,21 @@
     .matrix-table {
         border-collapse: separate; 
         border-spacing: 0;
-        min-width: 100%;
+        table-layout: fixed; /* Force fixed layout */
+        width: auto; /* Let it grow manually based on columns */
         margin-bottom: 0;
     }
 
-    /* 3. PREVENT WRAPPING */
+    /* 3. COLUMNS */
     .matrix-table th, 
     .matrix-table td {
-        white-space: nowrap;
         vertical-align: middle;
+        text-align: center;
+        width: 70px;      /* FIXED WIDTH */
+        min-width: 70px;
+        max-width: 70px;
+        padding: 4px;
+        overflow: hidden;
     }
 
     /* 4. STICKY HEADERS (Top Row) */
@@ -48,31 +54,31 @@
         background-color: #f8f9fa;
         border-bottom: 2px solid #dee2e6;
         padding: 0.5rem;
-        text-align: center;
         box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+        white-space: normal; /* ALLOW WRAP */
+        height: auto;
+        font-size: 0.75rem;
+        line-height: 1.1;
     }
 
     /* 5. STICKY FIRST COLUMN (Left Column) */
-    .matrix-table td.sticky-col {
+    .matrix-table td.sticky-col, .matrix-table th.sticky-col-header  {
         position: sticky;
         left: 0;
         z-index: 10; 
         background-color: #fff !important; 
         border-right: 2px solid #dee2e6;
         font-weight: 500;
-        min-width: 200px; 
+        width: 180px;      /* FIXED WIDTH FOR NAMES */
+        min-width: 180px;
+        max-width: 180px;
+        text-align: left; /* Align names left */
         box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.1);
     }
-
-    /* 6. CORNER CELL (Top-Left Intersection) */
-    .matrix-table th.corner-header {
-        position: sticky;
-        left: 0;
-        top: 0;
-        z-index: 30; 
+    .matrix-table th.sticky-col-header {
+        z-index: 30; /* Corner overlap */
         background-color: #e9ecef !important;
-        border-right: 2px solid #dee2e6;
-        min-width: 200px;
+        text-align: center;
     }
 
     /* 7. ROW HOVER */
@@ -80,31 +86,36 @@
     .matrix-table tr:hover td.sticky-col { background-color: #e9ecef !important; }
 
     /* Sim Controls */
-    .sim-control {
+    .sim-control-btn {
         cursor: pointer;
-        font-size: 0.75rem;
-        padding: 4px 8px;
+        padding: 2px;
         border-radius: 4px;
         border: 1px solid #ced4da;
-        margin: 2px;
-        display: block;
+        margin: 2px auto;
+        display: flex;
+        justify-content: center;
+        align-items: center;
         width: 100%;
-        text-align: center;
+        height: 28px;
+        background-color: white;
     }
-    .sim-control:hover { filter: brightness(0.95); }
-    .sim-control.active-win {
-        background-color: #198754; 
-        color: white;
+    .sim-control-btn:hover { filter: brightness(0.95); background-color: #e9ecef; }
+    .sim-control-btn.active-win {
+        background-color: #d1e7dd; 
         border-color: #198754;
+        box-shadow: inset 0 0 0 1px #198754;
     }
-    .sim-control.active-loss {
+    .sim-control-btn.active-loss {
         opacity: 0.4;
-        text-decoration: line-through;
+        background-color: #f8d7da;
     }
     
     /* Colors */
     .cell-win { background-color: #d1e7dd !important; color: #0f5132; }
-    .cell-loss { background-color: #f8d7da !important; color: #842029; }
+    .cell-loss { background-color: #f8d7da !important; color: #842029; opacity: 0.6; }
+
+    .team-logo-sm { width: 18px; height: 18px; object-fit: contain; margin-right: 2px; }
+    .team-abbrev { font-size: 0.75rem; font-weight: bold; }
 </style>
 
 <div class="container-fluid mt-3 px-4">
@@ -162,48 +173,52 @@
             <table class="table mb-0 matrix-table table-bordered">
                 <thead>
                     <tr>
-                        <th class="corner-header">
-                            <div class="d-flex justify-content-between text-muted small">
+                        <th class="sticky-col-header">
+                            <div class="d-flex justify-content-between text-muted small px-1">
                                 <span>Player</span>
-                                <span>Proj. Score</span>
+                                <span>Proj.</span>
                             </div>
                         </th>
                         @foreach (var game in games)
                         {
                             <th>
-                                <div class="small fw-bold mb-1" style="font-size: 0.7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="@game.BowlName">
+                                <div class="fw-bold mb-1 text-truncate" title="@game.BowlName">
                                     @game.BowlName
                                 </div>
-                                <div class="badge bg-light text-secondary border mb-2">@game.PointValue pts</div>
+                                <div class="badge bg-light text-secondary border mb-1" style="font-size: 0.65rem;">@game.PointValue</div>
                                 
-                                @* UNIFIED CONTROL LOGIC: All games (Final or Future) are editable *@
                                 @{
                                     var options = GetSelectableTeams(game);
                                 }
                                 
                                 @if(options.Count <= 2) 
                                 {
-                                    @* Simple Toggle for Head-to-Head *@
                                     <div class="d-flex flex-column gap-1">
-                                        @foreach(var team in options)
+                                        @foreach(var teamName in options)
                                         {
-                                            <div class="sim-control @GetSimClass(game.Id, team, options)" 
-                                                 @onclick="() => ToggleSimWinner(game.Id, team)">
-                                                @team
+                                            var logo = GetTeamLogo(teamName);
+                                            var abbr = GetTeamAbbrev(teamName);
+                                            <div class="sim-control-btn @GetSimClass(game.Id, teamName, options)" 
+                                                 title="@teamName"
+                                                 @onclick="() => ToggleSimWinner(game.Id, teamName)">
+                                                @if(!string.IsNullOrEmpty(logo))
+                                                {
+                                                    <img src="@logo" class="team-logo-sm" />
+                                                }
+                                                <span class="team-abbrev">@abbr</span>
                                             </div>
                                         }
                                     </div>
                                 }
                                 else
                                 {
-                                    @* Dropdown for Playoffs/Many Options *@
-                                    <select class="form-select form-select-sm" style="font-size: 0.75rem;" 
+                                    <select class="form-select form-select-sm p-1" style="font-size: 0.65rem;" 
                                             value="@(simulatedWinners.ContainsKey(game.Id) ? simulatedWinners[game.Id] : "")"
                                             @onchange="@(e => SetSimWinner(game.Id, e.Value?.ToString()))">
-                                        <option value="">-- Select Winner --</option>
-                                        @foreach(var team in options)
+                                        <option value="">?</option>
+                                        @foreach(var teamName in options)
                                         {
-                                            <option value="@team">@team</option>
+                                            <option value="@teamName">@GetTeamAbbrev(teamName)</option>
                                         }
                                     </select>
                                 }
@@ -228,14 +243,22 @@
                             @foreach (var game in games)
                             {
                                 var pick = row.Entry.Picks != null && row.Entry.Picks.ContainsKey(game.Id) ? row.Entry.Picks[game.Id] : "";
-                                <td class="text-center @GetCellClass(game, pick)">
+                                <td class="@GetCellClass(game, pick)">
                                     @if (!string.IsNullOrEmpty(pick))
                                     {
-                                        <span style="font-size: 0.85rem;">@pick</span>
+                                        var logo = GetTeamLogo(pick);
+                                        var abbr = GetTeamAbbrev(pick);
+                                        <div class="d-flex align-items-center justify-content-center" title="@pick">
+                                            @if(!string.IsNullOrEmpty(logo))
+                                            {
+                                                <img src="@logo" class="team-logo-sm" />
+                                            }
+                                            <span class="team-abbrev">@abbr</span>
+                                        </div>
                                     }
                                     else
                                     {
-                                        <span class="text-muted">-</span>
+                                        <span class="text-muted small">-</span>
                                     }
                                 </td>
                             }
@@ -263,6 +286,9 @@
     // Simulation State
     private Dictionary<string, string> simulatedWinners = new();
     private List<LeaderboardRow> projectedStandings = new();
+    
+    // Cache for efficient Team Info Lookup
+    private Dictionary<string, TeamInfo> teamLookup = new(StringComparer.OrdinalIgnoreCase);
 
     // Smart Bracket Map: Key = TargetGameId, Value = List of Games that feed into it
     private ILookup<string, BowlGame>? _feederMap;
@@ -290,10 +316,19 @@
             // 1. Filter Pools (Active Season Only AND Open)
             poolList = allPools.Where(p => !p.IsArchived && DateTime.UtcNow >= p.LockDate).ToList();
 
-            // 2. Build the Bracket Tree
+            // 2. Build the Bracket Tree & Populate Team Lookup
             _feederMap = allGames
                 .Where(g => !string.IsNullOrEmpty(g.NextGameId))
                 .ToLookup(g => g.NextGameId!);
+
+            foreach(var g in allGames)
+            {
+                if (!string.IsNullOrEmpty(g.TeamHome) && g.HomeTeamInfo != null) 
+                    teamLookup[g.TeamHome] = g.HomeTeamInfo;
+                    
+                if (!string.IsNullOrEmpty(g.TeamAway) && g.AwayTeamInfo != null) 
+                    teamLookup[g.TeamAway] = g.AwayTeamInfo;
+            }
 
             // 3. Pre-fill Simulation with Reality
             foreach(var game in allGames.Where(g => g.Status == GameStatus.Final))
@@ -595,5 +630,25 @@
         }
         
         return "";
+    }
+    
+    private string GetTeamLogo(string teamName)
+    {
+        if (string.IsNullOrEmpty(teamName)) return "";
+        return teamLookup.TryGetValue(teamName, out var info) ? info.PrimaryLogoUrl : "";
+    }
+
+    private string GetTeamAbbrev(string teamName)
+    {
+        if (string.IsNullOrEmpty(teamName)) return "";
+        if (teamLookup.TryGetValue(teamName, out var info) && !string.IsNullOrEmpty(info.Abbreviation)) 
+            return info.Abbreviation;
+            
+        // Fallback: Use first 3 chars or predefined map if needed, 
+        // but typically all teams in DB have abbrevs.
+        // If TBD, return TBD
+        if (teamName.Length > 4 && !teamName.Contains(" ")) return teamName.Substring(0, 3).ToUpper();
+        
+        return teamName; // Return full name if short enough or TBD
     }
 }
