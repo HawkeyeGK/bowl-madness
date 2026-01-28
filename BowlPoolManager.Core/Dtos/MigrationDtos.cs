@@ -12,7 +12,8 @@ namespace BowlPoolManager.Core.Dtos
     {
         public List<LegacyGameDto> LegacyGames { get; set; } = new();
         public List<string> LegacyTeamNames { get; set; } = new();
-        public List<string> LegacyPoolIds { get; set; } = new(); // NEW
+        public List<string> LegacySeasonIds { get; set; } = new(); // NEW: Seasons found
+        public List<LegacyPoolDto> LegacyPools { get; set; } = new(); // NEW: Pools found (Id + Season)
         public int LegacyEntryCount { get; set; }
     }
 
@@ -23,14 +24,25 @@ namespace BowlPoolManager.Core.Dtos
         public string HomeTeam { get; set; }
         public string AwayTeam { get; set; }
         public DateTime StartTime { get; set; }
+        public string SeasonId { get; set; } // NEW
+    }
+
+    public class LegacyPoolDto
+    {
+        public string PoolId { get; set; }
+        public string SeasonId { get; set; }
     }
 
     public class MigrationExecutionRequest
     {
+        // Defaults/Globals (Optional fallback)
         public string TargetPoolId { get; set; }
         public string TargetSeasonId { get; set; }
-        public Dictionary<string, string> GameMapping { get; set; } = new(); // OldGameId -> NewGameId
-        public Dictionary<string, string> TeamMapping { get; set; } = new(); // OldTeamName -> NewTeamName
-        public Dictionary<string, string> PoolMapping { get; set; } = new(); // LegacyPoolId -> NewPoolId
+        
+        // Mappings
+        public Dictionary<string, string> SeasonMapping { get; set; } = new(); // LegacySeasonId -> TargetSeasonId
+        public Dictionary<string, string> PoolMapping { get; set; } = new();   // LegacyPoolId -> TargetPoolId
+        public Dictionary<string, string> GameMapping { get; set; } = new();   // LegacyGameId -> NewGameId
+        public Dictionary<string, string> TeamMapping { get; set; } = new();   // OldTeamName -> NewTeamName
     }
 }

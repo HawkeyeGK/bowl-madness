@@ -47,13 +47,15 @@ namespace BowlPoolManager.Api.Functions
 
             try
             {
-                var (games, teamNames, poolIds, entryCount) = await _migrationRepository.AnalyzeLegacyDataAsync();
-
+                var (games, teamNames, seasonIds, pools, entryCount) = await _migrationRepository.AnalyzeLegacyDataAsync();
+                
+                // Note: LegacyPoolIds removed from DTO, replaced with LegacySeasonIds and LegacyPools
                 return new OkObjectResult(new MigrationAnalysisResult
                 {
                     LegacyGames = games.OrderBy(g => g.StartTime).ToList(),
                     LegacyTeamNames = teamNames,
-                    LegacyPoolIds = poolIds,
+                    LegacySeasonIds = seasonIds,
+                    LegacyPools = pools,
                     LegacyEntryCount = entryCount
                 });
             }
@@ -93,13 +95,31 @@ namespace BowlPoolManager.Api.Functions
                         int tieBreakerPoints = (int?)item["tieBreakerPoints"] ?? 0;
                         DateTime createdOn = (DateTime?)item["createdOn"] ?? DateTime.UtcNow;
 
-                        // Determine Target Pool
-                        string targetPoolId = migrationRequest.TargetPoolId; // Default
-                        string? legacySourceId = (string?)item["seasonId"];
-                        if (!string.IsNullOrEmpty(legacySourceId) && 
-                            migrationRequest.PoolMapping.TryGetValue(legacySourceId, out var mappedPoolId) && 
-                            !string.IsNullOrEmpty(mappedPoolId))
+                        // 1. Determine Target Season
+                        string? legacySeasonId = (string?)item["seasonId"];
+                        string targetSeasonId = migrationRequest.TargetSeasonId; // Default fallback
+
+                        // If user provided specific season mappings, use them
+                        if (!string.IsNullOrEmpty(legacySeasonId) && migrationRequest.SeasonMapping.Any())
                         {
+                            if (!migrationRequest.SeasonMapping.TryGetValue(legacySeasonId, out var mappedSeasonId) || string.IsNullOrEmpty(mappedSeasonId))
+                            {
+                                continue; // Skip entry if season is not mapped
+                            }
+                            targetSeasonId = mappedSeasonId;
+                        }
+                        
+                        // 2. Determine Target Pool
+                        string? legacyPoolId = (string?)item["poolId"];
+                        string targetPoolId = migrationRequest.TargetPoolId; // Default fallback
+                        
+                        // If user provided specific pool mappings, use them
+                        if (!string.IsNullOrEmpty(legacyPoolId) && migrationRequest.PoolMapping.Any())
+                        {
+                            if (!migrationRequest.PoolMapping.TryGetValue(legacyPoolId, out var mappedPoolId) || string.IsNullOrEmpty(mappedPoolId))
+                            {
+                                continue; // Skip entry if pool is not mapped
+                            }
                             targetPoolId = mappedPoolId;
                         }
 
@@ -107,7 +127,7 @@ namespace BowlPoolManager.Api.Functions
                         var newEntry = new BracketEntry
                         {
                             PoolId = targetPoolId,
-                            SeasonId = migrationRequest.TargetSeasonId,
+                            SeasonId = targetSeasonId,
                             UserId = userId ?? string.Empty, // Handle missing UserID
                             PlayerName = playerName ?? "Unknown Player", // Handle missing name
                             TieBreakerPoints = tieBreakerPoints,

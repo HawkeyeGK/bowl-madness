@@ -74,34 +74,36 @@
         </div>
     }
 
-    @if (currentStep == MigrationStep.PoolMapping)
+    @if (currentStep == MigrationStep.SeasonMapping)
     {
         <div class="card bg-dark text-white shadow-sm border-secondary mb-4">
             <div class="card-header bg-secondary bg-opacity-25 border-secondary d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Step 1.5: Map Pools</h5>
-                <small class="text-light opacity-75">Found @analysisResult?.LegacyPoolIds?.Count legacy pools</small>
+                <h5 class="mb-0">Step 2: Map Seasons</h5>
+                <small class="text-light opacity-75">Found @analysisResult?.LegacySeasonIds?.Count legacy seasons</small>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-dark table-hover mb-0">
                         <thead>
                             <tr>
-                                <th>Legacy Season / Source</th>
-                                <th>Target Pool</th>
+                                <th>Legacy Season ID</th>
+                                <th>Target Season</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var oldPoolId in analysisResult?.LegacyPoolIds ?? new List<string>())
+                            @foreach (var oldSid in analysisResult?.LegacySeasonIds ?? new List<string>())
                             {
                                 <tr>
-                                    <td>@oldPoolId</td>
+                                    <td>@oldSid</td>
                                     <td>
-                                        <select class="form-select form-select-sm" @bind="poolMapping[oldPoolId]">
-                                            @if (pools != null)
+                                        <select class="form-select form-select-sm" @bind="seasonMapping[oldSid]">
+                                            <option value="">-- Skip --</option>
+                                            @if (seasons != null)
                                             {
-                                                foreach (var pool in pools)
+                                                foreach (var s in seasons)
                                                 {
-                                                    <option value="@pool.Id">@pool.Name</option>
+                                                    // Auto-select if IDs match? optional improvement
+                                                    <option value="@s.Id">@s.Name (@s.SeasonId)</option>
                                                 }
                                             }
                                         </select>
@@ -114,7 +116,59 @@
             </div>
             <div class="card-footer bg-transparent border-secondary d-flex justify-content-between">
                 <button class="btn btn-outline-secondary" @onclick="() => currentStep = MigrationStep.Configuration">Back</button>
-                <button class="btn btn-primary" @onclick="() => currentStep = MigrationStep.GameMapping">Next: Map Games</button>
+                <button class="btn btn-primary" @onclick="ProceedToPoolMapping">Next: Map Pools</button>
+            </div>
+        </div>
+    }
+
+    @if (currentStep == MigrationStep.PoolMapping)
+    {
+        <div class="card bg-dark text-white shadow-sm border-secondary mb-4">
+            <div class="card-header bg-secondary bg-opacity-25 border-secondary d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Step 3: Map Pools</h5>
+                <small class="text-light opacity-75">Found @analysisResult?.LegacyPools?.Count legacy pools</small>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Legacy Season</th>
+                                <th>Legacy Pool ID</th>
+                                <th>Target Pool</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var legacyPool in analysisResult?.LegacyPools ?? new List<LegacyPoolDto>())
+                            {
+                                // Only show if the season is mapped
+                                if (seasonMapping.TryGetValue(legacyPool.SeasonId, out var targetSid) && !string.IsNullOrEmpty(targetSid)) 
+                                {
+                                    <tr>
+                                        <td>@legacyPool.SeasonId</td>
+                                        <td>@legacyPool.PoolId</td>
+                                        <td>
+                                            <select class="form-select form-select-sm" @bind="poolMapping[legacyPool.PoolId]">
+                                                <option value="">-- Select Pool --</option>
+                                                @if (pools != null)
+                                                {
+                                                    foreach (var pool in pools)
+                                                    {
+                                                        <option value="@pool.Id">@pool.Name</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-secondary d-flex justify-content-between">
+                <button class="btn btn-outline-secondary" @onclick="() => currentStep = MigrationStep.SeasonMapping">Back</button>
+                <button class="btn btn-primary" @onclick="ProceedToGameMapping">Next: Map Games</button>
             </div>
         </div>
     }
@@ -123,7 +177,7 @@
     {
         <div class="card bg-dark text-white shadow-sm border-secondary mb-4">
             <div class="card-header bg-secondary bg-opacity-25 border-secondary d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Step 2: Map Games</h5>
+                <h5 class="mb-0">Step 4: Map Games</h5>
                 <div>
                      <button class="btn btn-sm btn-outline-info me-2" @onclick="AutoMapGames">Auto-Map</button>
                      <small class="text-light opacity-75">Found @analysisResult?.LegacyGames.Count legacy games</small>
@@ -134,6 +188,7 @@
                     <table class="table table-dark table-hover mb-0">
                         <thead>
                             <tr>
+                                <th>Legacy Season</th>
                                 <th>Legacy Game</th>
                                 <th>Target Game</th>
                             </tr>
@@ -141,31 +196,38 @@
                         <tbody>
                             @foreach (var legacyGame in analysisResult?.LegacyGames ?? new List<LegacyGameDto>())
                             {
-                                <tr>
-                                    <td>
-                                        <div>@legacyGame.Description</div>
-                                        <small class="text-muted">@legacyGame.StartTime.ToShortDateString()</small>
-                                    </td>
-                                    <td>
-                                        <select class="form-select form-select-sm" @bind="gameMapping[legacyGame.Id]">
-                                            <option value="">-- Skip --</option>
-                                            @if (targetGames != null)
-                                            {
-                                                foreach (var game in targetGames)
+                                // Only show if game's season matches a mapped season
+                                // Note: legacyGame.SeasonId needs to be used here
+                                if (seasonMapping.TryGetValue(legacyGame.SeasonId, out var targetSid) && !string.IsNullOrEmpty(targetSid))
+                                {
+                                    <tr>
+                                        <td>@legacyGame.SeasonId</td>
+                                        <td>
+                                            <div>@legacyGame.Description</div>
+                                            <small class="text-muted">@legacyGame.StartTime.ToShortDateString()</small>
+                                        </td>
+                                        <td>
+                                            <select class="form-select form-select-sm" @bind="gameMapping[legacyGame.Id]">
+                                                <option value="">-- Skip --</option>
+                                                @if (targetGames != null)
                                                 {
-                                                    <option value="@game.Id">@game.BowlName: @game.TeamHome vs @game.TeamAway</option>
+                                                     // Filter target games by the mapped Target Season ID
+                                                     foreach (var game in targetGames.Where(g => g.SeasonId == targetSid))
+                                                     {
+                                                        <option value="@game.Id">@game.BowlName: @game.TeamHome vs @game.TeamAway</option>
+                                                     }
                                                 }
-                                            }
-                                        </select>
-                                    </td>
-                                </tr>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                }
                             }
                         </tbody>
                     </table>
                 </div>
             </div>
             <div class="card-footer bg-transparent border-secondary d-flex justify-content-between">
-                <button class="btn btn-outline-secondary" @onclick="() => currentStep = MigrationStep.Configuration">Back</button>
+                <button class="btn btn-outline-secondary" @onclick="() => currentStep = MigrationStep.PoolMapping">Back</button>
                 <button class="btn btn-primary" @onclick="() => currentStep = MigrationStep.TeamMapping">Next: Map Teams</button>
             </div>
         </div>
@@ -241,12 +303,12 @@
 </div>
 
 @code {
-    private enum MigrationStep { Configuration, PoolMapping, GameMapping, TeamMapping, Complete }
+    private enum MigrationStep { Configuration, SeasonMapping, PoolMapping, GameMapping, TeamMapping, Complete }
     private MigrationStep currentStep = MigrationStep.Configuration;
 
     private List<Season>? seasons;
     private List<BowlPool>? pools;
-    private List<BowlGame>? targetGames;
+    private List<BowlGame>? targetGames; // Note: This might need to be a dictionary or loaded per mapping
 
     private string targetSeasonId = "";
     private string targetPoolId = "";
@@ -256,9 +318,11 @@
     private string? executionSummary;
 
     private MigrationAnalysisResult? analysisResult;
+    private Dictionary<string, string> seasonMapping = new();
+    private Dictionary<string, string> poolMapping = new();
     private Dictionary<string, string> gameMapping = new();
     private Dictionary<string, string> teamMapping = new();
-    private Dictionary<string, string> poolMapping = new();
+    
     private int migratedCount = 0;
     private List<TeamInfo> AllTeams = new();
 
@@ -350,6 +414,16 @@
                 if (analysisResult != null)
                 {
                     // Initialize Mappings
+                    seasonMapping = new Dictionary<string, string>();
+                    if (analysisResult.LegacySeasonIds != null)
+                    {
+                        foreach (var sid in analysisResult.LegacySeasonIds)
+                        {
+                            seasonMapping[sid] = ""; // User must select
+                        }
+                    }
+
+                    poolMapping = new Dictionary<string, string>(); // Will be populated in next step logic
                     gameMapping = new Dictionary<string, string>();
                     foreach (var game in analysisResult.LegacyGames)
                     {
@@ -362,20 +436,7 @@
                         teamMapping[team] = "";
                     }
 
-                    // Pool Mapping
-                    poolMapping = new Dictionary<string, string>();
-                    if (analysisResult.LegacyPoolIds != null && analysisResult.LegacyPoolIds.Any())
-                    {
-                        foreach (var pid in analysisResult.LegacyPoolIds)
-                        {
-                            poolMapping[pid] = targetPoolId; // Default to selected target
-                        }
-                        currentStep = MigrationStep.PoolMapping;
-                    }
-                    else
-                    {
-                        currentStep = MigrationStep.GameMapping;
-                    }
+                    currentStep = MigrationStep.SeasonMapping;
                 }
             }
             else
@@ -455,6 +516,35 @@
         }
     }
 
+    private void ProceedToPoolMapping() => currentStep = MigrationStep.PoolMapping;
+
+    private async Task ProceedToGameMapping() 
+    {
+        // Load target games for all selected target seasons
+        isLoading = true;
+        try 
+        {
+            var distinctTargetSeasons = seasonMapping.Values.Where(v => !string.IsNullOrEmpty(v)).Distinct();
+            targetGames = new List<BowlGame>();
+            
+            foreach(var sid in distinctTargetSeasons)
+            {
+               var games = await PoolService.GetGamesAsync(sid);
+               if (games != null) targetGames.AddRange(games);
+            }
+        }
+        catch(Exception ex)
+        {
+            errorMessage = $"Error loading target games: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+
+        currentStep = MigrationStep.GameMapping;
+    }
+
     private async Task ExecuteMigration()
     {
         if (!await JS.InvokeAsync<bool>("confirm", "Are you sure you want to execute migrations? Use Test Data first to verify.")) return;
@@ -468,9 +558,10 @@
             {
                 TargetPoolId = targetPoolId,
                 TargetSeasonId = targetSeasonId,
+                SeasonMapping = seasonMapping, // Added
+                PoolMapping = poolMapping,
                 GameMapping = gameMapping,
-                TeamMapping = teamMapping,
-                PoolMapping = poolMapping
+                TeamMapping = teamMapping
             };
 
             var response = await Http.PostAsJsonAsync("api/migration/execute", request);
@@ -495,11 +586,13 @@
             isLoading = false;
         }
     }
-
+ 
     private void ResetWizard()
     {
         currentStep = MigrationStep.Configuration;
         analysisResult = null;
+        seasonMapping.Clear();
+        poolMapping.Clear();
         gameMapping.Clear();
         teamMapping.Clear();
         migratedCount = 0;
