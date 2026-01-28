@@ -226,43 +226,46 @@
 
         if (games == null) return "TBD";
 
-        // Logic matched from ScoreboardCard
+        // Logic matched from ScoreboardCard & GameScoringService
         var feeders = games
-            .Where(g => g.NextGameId == game.Id)
+            .Where(g => string.Equals(g.NextGameId, game.Id, StringComparison.OrdinalIgnoreCase))
             .OrderBy(g => g.StartTime)
+            .ThenBy(g => g.BowlName) // Stable sort
             .ToList();
 
         if (feeders.Count == 0) return "TBD";
 
         BowlGame? targetFeeder = null;
+        
+        // Determine slot based on feed index
+        // Find myself in the feeders list? No, I am the 'NextGame' here.
+        // We need to find which feeder corresponds to 'isHome' slot.
 
-        if (feeders.Count == 1) 
+        if (feeders.Count > 1)
         {
-            targetFeeder = feeders[0];
+            // 0 -> Home, 1 -> Away
+            targetFeeder = isHome ? feeders[0] : feeders[1];
         }
         else
         {
-            // 2 Feeders: Disambiguate
-            // Attempt to find the "other" team to deduce ours
+            // Single Feeder
+            // Heuristic: If the OTHER slot is filled by a real name, assume this feeder is for ME.
+            // If both are TBD, assume Home (0).
+            
             string otherSlotName = isHome ? game.TeamAway : game.TeamHome;
-            BowlGame? claimedFeeder = null;
-
-            if (!IsTBD(otherSlotName))
+            bool otherIsPlaceholder = IsTBD(otherSlotName);
+            
+            if (!otherIsPlaceholder) 
             {
-                // If the other slot is filled, which feeder did it come from?
-                // Logic: A feeder is 'claimed' if its winner matches the other slot's name
-                claimedFeeder = feeders.FirstOrDefault(f => f.Status == GameStatus.Final && f.WinningTeamName == otherSlotName);
-            }
-
-            if (claimedFeeder != null)
-            {
-                // If the other slot claimed one, we are the other one
-                targetFeeder = feeders.FirstOrDefault(f => f.Id != claimedFeeder.Id);
+                 // Other slot is taken, so I must be the one for this feeder
+                 targetFeeder = feeders[0];
             }
             else
             {
-                // Deterministic assignment
-                targetFeeder = isHome ? feeders[0] : feeders[1];
+                // Both empty. Default to Home gets the feeder?
+                // If I am Home, I get it.
+                // If I am Away, I don't.
+                if (isHome) targetFeeder = feeders[0];
             }
         }
 

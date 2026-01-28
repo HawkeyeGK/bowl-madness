@@ -165,38 +165,49 @@ namespace BowlPoolManager.Api.Services
         {
             if (string.IsNullOrEmpty(completedGame.NextGameId)) return;
 
-            var nextGame = context.FirstOrDefault(g => g.Id == completedGame.NextGameId);
-            if (nextGame == null) return;
+            var nextGame = context.FirstOrDefault(g => string.Equals(g.Id, completedGame.NextGameId, StringComparison.OrdinalIgnoreCase));
+            if (nextGame == null)
+            {
+                _logger.LogWarning($"PropagateWinner: Could not find NextGame with Id '{completedGame.NextGameId}' for CompletedGame '{completedGame.BowlName}'");
+                return;
+            }
 
             // Identify feeders to determine slot
             var feeders = context
-                .Where(g => g.NextGameId == nextGame.Id)
+                .Where(g => string.Equals(g.NextGameId, nextGame.Id, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(g => g.StartTime)
                 .ToList();
 
             bool isHomeSlot = true; // Default to Home (earlier game logic)
 
-            if (feeders.Count > 1)
+            // Determine slot based on feed index
+            var myIndex = feeders.FindIndex(f => string.Equals(f.Id, completedGame.Id, StringComparison.OrdinalIgnoreCase));
+            
+            if (myIndex >= 0)
             {
-                // If there are multiple feeders, assume Time Order:
-                // 0 -> Home, 1 -> Away
-                if (feeders[1].Id == completedGame.Id) isHomeSlot = false;
+                // Found myself in the feeders list
+                if (feeders.Count > 1)
+                {
+                    // If multiple feeders: 0 -> Home, 1 -> Away
+                    isHomeSlot = (myIndex == 0);
+                }
+                else
+                {
+                    // Single feeder in list (myself)
+                    // Fallback to placeholder logic to guess slot
+                    bool homeIsPlaceholder = IsPlaceholder(nextGame.TeamHome);
+                    bool awayIsPlaceholder = IsPlaceholder(nextGame.TeamAway);
+
+                    if (!homeIsPlaceholder && awayIsPlaceholder) isHomeSlot = false;
+                    _logger.LogInformation($"PropagateWinner: Single feeder '{completedGame.BowlName}'. Slot guessed as: {(isHomeSlot ? "Home" : "Away")}");
+                }
             }
             else
             {
-                // Single feeder scenario:
-                // Check if the other slot is already occupied by a "Real" team (not a placeholder)
-                // If "TeamAway" is occupied and "TeamHome" is placeholder, we go to Home.
-                // If both are placeholders, default to Home?
-                // Or try to match placeholder text "Winner of [BowlName]"?
-                bool homeIsPlaceholder = IsPlaceholder(nextGame.TeamHome);
-                bool awayIsPlaceholder = IsPlaceholder(nextGame.TeamAway);
-
-                if (!homeIsPlaceholder && awayIsPlaceholder) isHomeSlot = false;
-                // else if (homeIsPlaceholder && !awayIsPlaceholder) -> isHomeSlot = true;
-                // else -> default true
+                // Should not happen if data is consistent, but safeguard
+                _logger.LogWarning($"PropagateWinner: CompletedGame '{completedGame.BowlName}' not found in feeders list for NextGame '{nextGame.BowlName}'.");
             }
-
+            
             bool changed = false;
 
             if (completedGame.Status == GameStatus.Final && !string.IsNullOrEmpty(completedGame.WinningTeamName))
@@ -263,6 +274,7 @@ namespace BowlPoolManager.Api.Services
             if (changed)
             {
                 await _gameRepo.UpdateGameAsync(nextGame);
+                _logger.LogInformation($"PropagateWinner: Updated NextGame '{nextGame.BowlName}' {nextGame.TeamHome} vs {nextGame.TeamAway}");
                 // Recursive propagation!
                 await PropagateWinner(nextGame, context);
             }
