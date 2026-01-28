@@ -50,6 +50,38 @@ namespace BowlPoolManager.Api.Repositories
         {
              var games = await GetLegacyGamesAsync();
              
+             // 1. Fetch Legacy Pool Definitions to get Metadata (Name, Season)
+             var poolLookup = new Dictionary<string, string>();
+             try 
+             {
+                 var poolQuery = new QueryDefinition("SELECT * FROM c WHERE c.type = 'BowlPool'");
+                 var poolIterator = _container.GetItemQueryIterator<dynamic>(poolQuery);
+                 while (poolIterator.HasMoreResults)
+                 {
+                     foreach (var item in await poolIterator.ReadNextAsync())
+                     {
+                         string id = item.id;
+                         string name = "";
+                         // User requested "season" value specifically
+                         if (item.season != null) name = item.season.ToString();
+                         else if (item.Season != null) name = item.Season.ToString();
+                         
+                         // Fallback to name if season is missing
+                         if (string.IsNullOrEmpty(name))
+                         {
+                              if (item.name != null) name = item.name.ToString();
+                              else if (item.Name != null) name = item.Name.ToString();
+                         }
+
+                         if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(name))
+                         {
+                             poolLookup[id] = name;
+                         }
+                     }
+                 }
+             }
+             catch { /* Ignore failures in fetching pool metadata, validation will default to ID */ }
+
              var teamNames = new HashSet<string>();
              var seasonIds = new HashSet<string>();
              var pools = new List<LegacyPoolDto>(); 
@@ -95,18 +127,6 @@ namespace BowlPoolManager.Api.Repositories
                          sId = "LEGACY";
                      }
 
-                     // Capture explicit 'season' or other descriptive properties for display name
-                     string poolName = "";
-                     try 
-                     {
-                         if (item.season != null) poolName = item.season.ToString();
-                         else if (item.Season != null) poolName = item.Season.ToString();
-                         else if (item.year != null) poolName = item.year.ToString();
-                         else if (item.Year != null) poolName = item.Year.ToString();
-                         else if (item.description != null) poolName = item.description.ToString();
-                         else if (item.poolName != null) poolName = item.poolName.ToString();
-                     } catch {}
-
                      if (!string.IsNullOrEmpty(sId))
                      {
                          seasonIds.Add(sId);
@@ -118,15 +138,34 @@ namespace BowlPoolManager.Api.Repositories
                              if (!seenPools.Contains(key))
                              {
                                  string finalPoolName = pId; // Default to ID
-                                 if (!string.IsNullOrWhiteSpace(poolName)) 
+                                 
+                                 // 1. Try Lookup from BowlPool documents
+                                 if (poolLookup.TryGetValue(pId, out var lookupName))
                                  {
-                                     finalPoolName = poolName;
+                                     finalPoolName = lookupName;
                                  }
-                                 else if (sId != "LEGACY")
+                                 // 2. Fallback: Try explicit properties on the entry itself (older logic)
+                                 else 
                                  {
-                                     // If we found a real season ID/Name (e.g. "2024"), use that as the Pool Name 
-                                     // since legacy often conflates them.
-                                     finalPoolName = sId;
+                                      string poolName = "";
+                                      try 
+                                      {
+                                          if (item.season != null) poolName = item.season.ToString();
+                                          else if (item.Season != null) poolName = item.Season.ToString();
+                                          else if (item.year != null) poolName = item.year.ToString();
+                                          else if (item.Year != null) poolName = item.Year.ToString();
+                                          else if (item.description != null) poolName = item.description.ToString();
+                                          else if (item.poolName != null) poolName = item.poolName.ToString();
+                                      } catch {}
+
+                                      if (!string.IsNullOrWhiteSpace(poolName)) 
+                                      {
+                                          finalPoolName = poolName;
+                                      }
+                                      else if (sId != "LEGACY")
+                                      {
+                                          finalPoolName = sId;
+                                      }
                                  }
 
                                  seenPools.Add(key);
