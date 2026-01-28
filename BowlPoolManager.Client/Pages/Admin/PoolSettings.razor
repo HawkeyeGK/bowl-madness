@@ -52,7 +52,7 @@
                             {
                                 <tr>
                                     <td class="fw-bold">@pool.Name</td>
-                                    <td>@pool.Season</td>
+                                    <td>@(seasons.FirstOrDefault(s => s.Id == pool.SeasonId)?.Name ?? pool.Season.ToString())</td>
                                     <td>
                                         @if(pool.IsArchived)
                                         {
@@ -308,7 +308,8 @@
         if (editingPool == null) return;
         
         editingPool.SeasonId = newSeasonId;
-        if (int.TryParse(newSeasonId, out int year))
+        var newSeason = seasons.FirstOrDefault(s => s.Id == newSeasonId);
+        if (newSeason != null && int.TryParse(newSeason.SeasonId, out int year))
         {
             editingPool.Season = year;
         }
@@ -392,8 +393,8 @@
             return;
         }
 
-        // Sync Season (Int) with SeasonId (String) just in case
-        if (int.TryParse(editingPool.SeasonId, out int year))
+        var seasonObj = seasons.FirstOrDefault(s => s.Id == editingPool.SeasonId);
+        if (seasonObj != null && int.TryParse(seasonObj.SeasonId, out int year))
         {
             editingPool.Season = year;
         }
