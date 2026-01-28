@@ -95,12 +95,16 @@ namespace BowlPoolManager.Api.Repositories
                          sId = "LEGACY";
                      }
 
-                     // Capture explicit 'season' property for display name if available
+                     // Capture explicit 'season' or other descriptive properties for display name
                      string poolName = "";
                      try 
                      {
                          if (item.season != null) poolName = item.season.ToString();
                          else if (item.Season != null) poolName = item.Season.ToString();
+                         else if (item.year != null) poolName = item.year.ToString();
+                         else if (item.Year != null) poolName = item.Year.ToString();
+                         else if (item.description != null) poolName = item.description.ToString();
+                         else if (item.poolName != null) poolName = item.poolName.ToString();
                      } catch {}
 
                      if (!string.IsNullOrEmpty(sId))
@@ -113,12 +117,24 @@ namespace BowlPoolManager.Api.Repositories
                              var key = $"{sId}|{pId}";
                              if (!seenPools.Contains(key))
                              {
+                                 string finalPoolName = pId; // Default to ID
+                                 if (!string.IsNullOrWhiteSpace(poolName)) 
+                                 {
+                                     finalPoolName = poolName;
+                                 }
+                                 else if (sId != "LEGACY")
+                                 {
+                                     // If we found a real season ID/Name (e.g. "2024"), use that as the Pool Name 
+                                     // since legacy often conflates them.
+                                     finalPoolName = sId;
+                                 }
+
                                  seenPools.Add(key);
                                  pools.Add(new LegacyPoolDto 
                                  { 
                                      SeasonId = sId, 
                                      PoolId = pId,
-                                     PoolName = !string.IsNullOrEmpty(poolName) ? poolName : pId // Fallback to ID
+                                     PoolName = finalPoolName
                                  });
                              }
                          }
