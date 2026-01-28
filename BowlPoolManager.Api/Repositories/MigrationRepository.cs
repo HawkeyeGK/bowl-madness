@@ -95,6 +95,14 @@ namespace BowlPoolManager.Api.Repositories
                          sId = "LEGACY";
                      }
 
+                     // Capture explicit 'season' property for display name if available
+                     string poolName = "";
+                     try 
+                     {
+                         if (item.season != null) poolName = item.season.ToString();
+                         else if (item.Season != null) poolName = item.Season.ToString();
+                     } catch {}
+
                      if (!string.IsNullOrEmpty(sId))
                      {
                          seasonIds.Add(sId);
@@ -106,7 +114,12 @@ namespace BowlPoolManager.Api.Repositories
                              if (!seenPools.Contains(key))
                              {
                                  seenPools.Add(key);
-                                 pools.Add(new LegacyPoolDto { SeasonId = sId, PoolId = pId });
+                                 pools.Add(new LegacyPoolDto 
+                                 { 
+                                     SeasonId = sId, 
+                                     PoolId = pId,
+                                     PoolName = !string.IsNullOrEmpty(poolName) ? poolName : pId // Fallback to ID
+                                 });
                              }
                          }
                      }

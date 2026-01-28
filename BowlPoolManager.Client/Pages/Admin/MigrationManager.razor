@@ -122,7 +122,7 @@
                         <thead>
                             <tr>
                                 <th>Legacy Season</th>
-                                <th>Legacy Pool ID</th>
+                                <th>Legacy Pool</th>
                                 <th>Target Pool</th>
                             </tr>
                         </thead>
@@ -134,7 +134,13 @@
                                 {
                                     <tr>
                                         <td>@legacyPool.SeasonId</td>
-                                        <td>@legacyPool.PoolId</td>
+                                        <td>
+                                            @legacyPool.PoolName
+                                            @if (legacyPool.PoolName != legacyPool.PoolId)
+                                            {
+                                                <div class="small text-muted">@legacyPool.PoolId</div>
+                                            }
+                                        </td>
                                         <td>
                                             <select class="form-select form-select-sm" @bind="poolMapping[legacyPool.PoolId]">
                                                 <option value="">-- Select Pool --</option>

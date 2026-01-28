@@ -31,6 +31,7 @@ namespace BowlPoolManager.Core.Dtos
     public class LegacyPoolDto
     {
         public string PoolId { get; set; }
+        public string PoolName { get; set; } // NEW: For display (captures legacy 'season' property)
         public string SeasonId { get; set; }
     }
 
