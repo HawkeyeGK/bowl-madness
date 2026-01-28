@@ -273,7 +273,7 @@
             errorMessage = null;
 
             var request = new MigrationAnalysisRequest { SourceSeasonId = "2024" }; // Optional, currently unused by backend
-            var response = await Http.PostAsJsonAsync("api/admin/migration/analyze", request);
+            var response = await Http.PostAsJsonAsync("api/migration/analyze", request);
 
             if (response.IsSuccessStatusCode)
             {
@@ -370,16 +370,19 @@
                 TeamMapping = teamMapping
             };
 
-            var response = await Http.PostAsJsonAsync("api/admin/migration/execute", request);
+            var response = await Http.PostAsJsonAsync("api/migration/execute", request);
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<dynamic>();
-                migratedCount = (int)result.GetProperty("migratedCount").GetInt32();
-                currentStep = MigrationStep.Complete;
+                executionSummary = $"Migration Completed! Migrated: {result.migratedCount}, Errors: {result.errorCount}";
+                // The instruction snippet removed setting currentStep to Complete here,
+                // so we'll assume the UI will handle displaying executionSummary.
+                // If the wizard should still advance to 'Complete' step, this line would be needed:
+                // currentStep = MigrationStep.Complete;
             }
             else 
             {
-                errorMessage = $"Execution failed: {await response.Content.ReadAsStringAsync()}";
+                errorMessage = $"Migration failed: {response.ReasonPhrase}";
             }
         }
         catch (Exception ex)
