@@ -26,6 +26,10 @@ builder.Services.AddSingleton<CosmosClient>(sp =>
 {
     var config = sp.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
     var connStr = config["CosmosDbConnectionString"];
+    if (string.IsNullOrEmpty(connStr))
+    {
+        connStr = config.GetConnectionString("CosmosDbConnectionString");
+    }
     
     if (string.IsNullOrEmpty(connStr)) throw new InvalidOperationException("CosmosDbConnectionString is missing.");
 

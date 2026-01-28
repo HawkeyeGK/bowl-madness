@@ -13,6 +13,7 @@ using BowlPoolManager.Core.Dtos;
 using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Api.Repositories;
 using BowlPoolManager.Core;
+using BowlPoolManager.Api.Helpers;
 
 namespace BowlPoolManager.Api.Functions.Admin
 {
@@ -21,18 +22,22 @@ namespace BowlPoolManager.Api.Functions.Admin
         private readonly ILogger<MigrationFunctions> _logger;
         private readonly CosmosClient _cosmosClient;
         private readonly IEntryRepository _entryRepository;
+        private readonly IUserRepository _userRepository;
         private const string LegacyContainerName = "MainContainer";
 
-        public MigrationFunctions(ILogger<MigrationFunctions> logger, CosmosClient cosmosClient, IEntryRepository entryRepository)
+        public MigrationFunctions(ILogger<MigrationFunctions> logger, CosmosClient cosmosClient, IEntryRepository entryRepository, IUserRepository userRepository)
         {
             _logger = logger;
             _cosmosClient = cosmosClient;
             _entryRepository = entryRepository;
+            _userRepository = userRepository;
         }
 
         [Function("AnalyzeLegacyData")]
-        public async Task<IActionResult> AnalyzeLegacyData([HttpTrigger(AuthorizationLevel.Function, "post", Route = "admin/migration/analyze")] HttpRequest req)
+        public async Task<IActionResult> AnalyzeLegacyData([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/migration/analyze")] HttpRequest req)
         {
+            if (!await IsSuperAdminAsync(req)) return new StatusCodeResult(StatusCodes.Status403Forbidden);
+
             _logger.LogInformation("Analyzing legacy data...");
 
             try
@@ -113,8 +118,10 @@ namespace BowlPoolManager.Api.Functions.Admin
         }
 
         [Function("ExecuteMigration")]
-        public async Task<IActionResult> ExecuteMigration([HttpTrigger(AuthorizationLevel.Function, "post", Route = "admin/migration/execute")] HttpRequest req)
+        public async Task<IActionResult> ExecuteMigration([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/migration/execute")] HttpRequest req)
         {
+            if (!await IsSuperAdminAsync(req)) return new StatusCodeResult(StatusCodes.Status403Forbidden);
+
             try
             {
                 string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
@@ -125,9 +132,6 @@ namespace BowlPoolManager.Api.Functions.Admin
                 var container = _cosmosClient.GetContainer(Constants.Database.DbName, LegacyContainerName);
                 var query = new QueryDefinition("SELECT * FROM c WHERE c.type = 'BracketEntry'");
                 
-                // If SourceSeasonId is provided in a future update, filters could be added here.
-                // For now, fetch all.
-
                 var iterator = container.GetItemQueryIterator<dynamic>(query);
 
                 int migratedCount = 0;
@@ -149,16 +153,10 @@ namespace BowlPoolManager.Api.Functions.Admin
                                 TieBreakerPoints = (int?)item.tieBreakerPoints ?? 0,
                                 CreatedOn = (DateTime?)item.createdOn ?? DateTime.UtcNow,
                                 IsPaid = false,
-                                Type = Constants.DocumentTypes.BracketEntry, // Ensure type is set
+                                Type = Constants.DocumentTypes.BracketEntry,
                                 Picks = new Dictionary<string, string>()
                             };
                             
-                            // Map Id if possible, or let it generate new?
-                            // Plan says: "Instantiate a new BracketEntry object" -> implies new ID.
-                            // But usually migration might want to preserve IDs?
-                            // Plan says: "Map Metadata: Copy PlayerName, UserId. Set PoolId and SeasonId to Target. Set CreatedOn..."
-                            // It does NOT say "Copy Id". So I will let it generate a new ID (BracketEntry default).
-
                             if (item.picks != null)
                             {
                                 var picksString = item.picks.ToString();
@@ -174,15 +172,14 @@ namespace BowlPoolManager.Api.Functions.Admin
                                         if (migrationRequest.GameMapping.TryGetValue(oldGameId, out var newGameId) &&
                                             !string.IsNullOrEmpty(newGameId))
                                         {
-                                            string newTeamName = oldTeamName; // Default to old name
+                                            string newTeamName = oldTeamName; 
                                             if (migrationRequest.TeamMapping.TryGetValue(oldTeamName, out var mappedTeamName) && 
                                                 !string.IsNullOrEmpty(mappedTeamName))
                                             {
                                                 newTeamName = mappedTeamName;
                                             }
                                             
-                                            // Only add if we have a valid mapping
-                                            if (!string.IsNullOrEmpty(newGameId)) // already checked
+                                            if (!string.IsNullOrEmpty(newGameId))
                                             {
                                                 newEntry.Picks[newGameId] = newTeamName;
                                             }
@@ -208,6 +205,33 @@ namespace BowlPoolManager.Api.Functions.Admin
             {
                 _logger.LogError(ex, "Error executing migration");
                 return new StatusCodeResult(StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        private async Task<bool> IsSuperAdminAsync(HttpRequest req)
+        {
+            try 
+            {
+                if (!req.Headers.TryGetValue("x-ms-client-principal", out var headerValues)) return false;
+                var header = headerValues.FirstOrDefault();
+                if (string.IsNullOrEmpty(header)) return false;
+
+                var data = Convert.FromBase64String(header);
+                var decoded = System.Text.Encoding.UTF8.GetString(data);
+                
+                // Using dynamic to avoid needing SecurityHelper.ClientPrincipal access if strict, 
+                // but we know SecurityHelper is available in Api.Helpers.
+                // However, deserialization to a local or mapped type is safer.
+                var principal = JsonConvert.DeserializeObject<SecurityHelper.ClientPrincipal>(decoded);
+                
+                if (principal == null || string.IsNullOrEmpty(principal.UserId)) return false;
+
+                var user = await _userRepository.GetUserAsync(principal.UserId);
+                return user != null && user.AppRole == Constants.Roles.SuperAdmin;
+            }
+            catch
+            {
+                return false;
             }
         }
     }
