@@ -23,6 +23,22 @@
         <span class="badge bg-danger">Super Admin Zone</span>
     </div>
 
+    @* Season Selector *@
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <label class="form-label fw-bold">Select Season:</label>
+            <select class="form-select" value="@selectedSeasonId" @onchange="OnSeasonChanged">
+                @if (seasons != null)
+                {
+                    @foreach (var s in seasons)
+                    {
+                        <option value="@s.Id">@s.Name</option>
+                    }
+                }
+            </select>
+        </div>
+    </div>
+
     @if (games == null)
     {
         <div class="alert alert-info">Loading Schedule...</div>
@@ -105,8 +121,9 @@
 
 @code {
     private List<BowlGame>? games;
+    private List<Season>? seasons;
     private string? statusMessage;
-    private string currentSeasonId = "";
+    private string selectedSeasonId = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -117,11 +134,19 @@
     {
         try
         {
-            var seasons = await SeasonService.GetSeasonsAsync();
+            seasons = await SeasonService.GetSeasonsAsync();
             var current = seasons.FirstOrDefault(s => s.IsCurrent);
             if (current != null)
             {
-                currentSeasonId = current.Id;
+                selectedSeasonId = current.Id;
+            }
+            else if (seasons.Any())
+            {
+                selectedSeasonId = seasons.First().Id;
+            }
+
+            if (!string.IsNullOrEmpty(selectedSeasonId))
+            {
                 await LoadGames();
             }
         }
@@ -131,14 +156,20 @@
         }
     }
 
+    private async Task OnSeasonChanged(ChangeEventArgs e)
+    {
+        selectedSeasonId = e.Value?.ToString() ?? "";
+        await LoadGames();
+    }
+
     private async Task LoadGames()
     {
         try
         {
             var url = "api/GetGames";
-            if (!string.IsNullOrEmpty(currentSeasonId))
+            if (!string.IsNullOrEmpty(selectedSeasonId))
             {
-                url += $"?seasonId={currentSeasonId}";
+                url += $"?seasonId={selectedSeasonId}";
             }
             
             var allGames = await Http.GetFromJsonAsync<List<BowlGame>>(url);
