@@ -61,12 +61,12 @@ namespace BowlPoolManager.Api.Repositories
                  {
                      entryCount++;
                      
-                     // Try to capture poolId
+                     // Try to capture classification field (User requests Season)
                      try 
                      {
-                         if (item.poolId != null) 
+                         if (item.seasonId != null) 
                          {
-                             poolIds.Add(item.poolId.ToString());
+                             poolIds.Add(item.seasonId.ToString());
                          }
                      }
                      catch {}

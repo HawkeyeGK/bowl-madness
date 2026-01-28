@@ -95,9 +95,9 @@ namespace BowlPoolManager.Api.Functions
 
                         // Determine Target Pool
                         string targetPoolId = migrationRequest.TargetPoolId; // Default
-                        string? legacyPoolId = (string?)item["poolId"];
-                        if (!string.IsNullOrEmpty(legacyPoolId) && 
-                            migrationRequest.PoolMapping.TryGetValue(legacyPoolId, out var mappedPoolId) && 
+                        string? legacySourceId = (string?)item["seasonId"];
+                        if (!string.IsNullOrEmpty(legacySourceId) && 
+                            migrationRequest.PoolMapping.TryGetValue(legacySourceId, out var mappedPoolId) && 
                             !string.IsNullOrEmpty(mappedPoolId))
                         {
                             targetPoolId = mappedPoolId;
