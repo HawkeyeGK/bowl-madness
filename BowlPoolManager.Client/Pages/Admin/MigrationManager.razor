@@ -7,6 +7,7 @@
 @inject HttpClient Http
 @inject IPoolService PoolService
 @inject ISeasonService SeasonService
+@inject IConfigurationService ConfigurationService
 @inject IJSRuntime JS
 
 <div class="container-fluid mt-4">
@@ -150,7 +151,13 @@
                                 <tr>
                                     <td>@oldName</td>
                                     <td>
-                                        <input type="text" class="form-control form-control-sm" @bind="teamMapping[oldName]" />
+                                        <select class="form-select form-select-sm" @bind="teamMapping[oldName]">
+                                            <option value="">-- Select Team --</option>
+                                            @foreach (var team in AllTeams)
+                                            {
+                                                <option value="@team.School">@team.School</option>
+                                            }
+                                        </select>
                                     </td>
                                 </tr>
                             }
@@ -207,6 +214,7 @@
     private Dictionary<string, string> gameMapping = new();
     private Dictionary<string, string> teamMapping = new();
     private int migratedCount = 0;
+    private List<TeamInfo> AllTeams = new();
 
     private bool CanAnalyze => !string.IsNullOrEmpty(targetSeasonId) && !string.IsNullOrEmpty(targetPoolId);
 
@@ -215,6 +223,7 @@
         try
         {
             isLoading = true;
+            await LoadTeams();
             seasons = await SeasonService.GetSeasonsAsync();
             var poolsList = await PoolService.GetPoolsAsync();
             // Filter pools? maybe just show all or let user pick.
@@ -263,6 +272,19 @@
         catch (Exception ex)
         {
             errorMessage = $"Error loading games: {ex.Message}";
+        }
+    }
+
+    private async Task LoadTeams()
+    {
+        try
+        {
+            AllTeams = await ConfigurationService.GetTeamsAsync() ?? new();
+            AllTeams = AllTeams.OrderBy(t => t.School).ToList();
+        }
+        catch(Exception ex) 
+        {
+            errorMessage = $"Error loading teams: {ex.Message}";
         }
     }
 
@@ -334,23 +356,43 @@
 
     private void AutoMapTeams()
     {
-        if (analysisResult == null) return;
+        if (analysisResult == null || !AllTeams.Any()) return;
 
         foreach (var oldName in analysisResult.LegacyTeamNames)
         {
-            // Remove leading seeds (e.g. "12 BYU" -> "BYU")
-            // Regex or split
+            // 1. Clean the name (remove leading seeds like "12 BYU" -> "BYU")
             var cleanName = oldName;
-            
-            // Check if starts with number
-            var specificCulture = System.Globalization.CultureInfo.InvariantCulture;
             var parts = oldName.Split(' ');
             if (parts.Length > 1 && int.TryParse(parts[0], out _))
             {
                 cleanName = string.Join(" ", parts.Skip(1));
+            } else if (parts.Length > 1 && parts[0].StartsWith("(") && parts[0].EndsWith(")"))
+            {
+                 // Handle (12) BYU style
+                 cleanName = string.Join(" ", parts.Skip(1));
+            }
+
+            // 2. Try Exact Match
+            var match = AllTeams.FirstOrDefault(t => t.School.Equals(cleanName, StringComparison.OrdinalIgnoreCase) || 
+                                                     t.Abbreviation.Equals(cleanName, StringComparison.OrdinalIgnoreCase));
+
+            // 3. Try Contains/Fuzzy
+            if (match == null)
+            {
+                match = AllTeams.FirstOrDefault(t => t.School.Contains(cleanName, StringComparison.OrdinalIgnoreCase) || 
+                                                     cleanName.Contains(t.School, StringComparison.OrdinalIgnoreCase));
             }
             
-            teamMapping[oldName] = cleanName;
+            // 4. Try Mascot
+            if (match == null)
+            {
+                 match = AllTeams.FirstOrDefault(t => (t.Mascot != null && cleanName.Contains(t.Mascot, StringComparison.OrdinalIgnoreCase)));
+            }
+            
+            if (match != null)
+            {
+                teamMapping[oldName] = match.School;
+            }
         }
     }
 
