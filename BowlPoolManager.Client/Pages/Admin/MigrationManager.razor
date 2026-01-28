@@ -508,7 +508,21 @@
         }
     }
 
-    private void ProceedToPoolMapping() => currentStep = MigrationStep.PoolMapping;
+    private void ProceedToPoolMapping() 
+    {
+        // Ensure keys exist for all legacy pools to prevent KeyNotFoundException in bind
+        if (analysisResult?.LegacyPools != null)
+        {
+            foreach (var pool in analysisResult.LegacyPools)
+            {
+                if (!poolMapping.ContainsKey(pool.PoolId))
+                {
+                    poolMapping[pool.PoolId] = "";
+                }
+            }
+        }
+        currentStep = MigrationStep.PoolMapping;
+    }
 
     private async Task ProceedToGameMapping() 
     {
