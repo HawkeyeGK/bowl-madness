@@ -54,6 +54,7 @@ builder.Services.AddSingleton<IUserRepository, UserRepository>();
 builder.Services.AddSingleton<IArchiveRepository, ArchiveRepository>();
 builder.Services.AddSingleton<ISeasonRepository, SeasonRepository>();
 builder.Services.AddSingleton<IConfigurationRepository, ConfigurationRepository>();
+builder.Services.AddSingleton<IMigrationRepository, MigrationRepository>();
 // --------------------------------
 
 var host = builder.Build();

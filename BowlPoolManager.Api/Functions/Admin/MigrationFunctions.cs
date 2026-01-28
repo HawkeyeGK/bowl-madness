@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using BowlPoolManager.Core.Dtos;
@@ -20,15 +19,14 @@ namespace BowlPoolManager.Api.Functions.Admin
     public class MigrationFunctions
     {
         private readonly ILogger<MigrationFunctions> _logger;
-        private readonly CosmosClient _cosmosClient;
+        private readonly IMigrationRepository _migrationRepository; // Changed
         private readonly IEntryRepository _entryRepository;
         private readonly IUserRepository _userRepository;
-        private const string LegacyContainerName = "MainContainer";
 
-        public MigrationFunctions(ILogger<MigrationFunctions> logger, CosmosClient cosmosClient, IEntryRepository entryRepository, IUserRepository userRepository)
+        public MigrationFunctions(ILogger<MigrationFunctions> logger, IMigrationRepository migrationRepository, IEntryRepository entryRepository, IUserRepository userRepository)
         {
             _logger = logger;
-            _cosmosClient = cosmosClient;
+            _migrationRepository = migrationRepository; // Changed
             _entryRepository = entryRepository;
             _userRepository = userRepository;
         }
@@ -42,73 +40,14 @@ namespace BowlPoolManager.Api.Functions.Admin
 
             try
             {
-                // Access MainContainer directly
-                var container = _cosmosClient.GetContainer(Constants.Database.DbName, LegacyContainerName);
-
-                // 1. Fetch Games
-                var games = new List<LegacyGameDto>();
-                var gameIterator = container.GetItemQueryIterator<dynamic>(new QueryDefinition("SELECT * FROM c WHERE c.type = 'BowlGame'"));
-
-                while (gameIterator.HasMoreResults)
-                {
-                    foreach (var item in await gameIterator.ReadNextAsync())
-                    {
-                        games.Add(new LegacyGameDto
-                        {
-                            Id = item.id,
-                            Description = $"{item.bowlName}: {item.teamHome} vs {item.teamAway}",
-                            HomeTeam = item.teamHome,
-                            AwayTeam = item.teamAway,
-                            StartTime = item.startTime
-                        });
-                    }
-                }
-
-                // 2. Fetch Entries to find Team Names
-                var teamNames = new HashSet<string>();
-                int entryCount = 0;
-                var entryIterator = container.GetItemQueryIterator<dynamic>(new QueryDefinition("SELECT * FROM c WHERE c.type = 'BracketEntry'"));
-
-                while (entryIterator.HasMoreResults)
-                {
-                    foreach (var item in await entryIterator.ReadNextAsync())
-                    {
-                        entryCount++;
-                        if (item.picks != null)
-                        {
-                            try
-                            {
-                                var picksString = item.picks.ToString();
-                                var picks = JsonConvert.DeserializeObject<Dictionary<string, string>>(picksString);
-                                if (picks != null)
-                                {
-                                    foreach (var team in picks.Values)
-                                    {
-                                        if (!string.IsNullOrWhiteSpace(team))
-                                        {
-                                            teamNames.Add(team);
-                                        }
-                                    }
-                                }
-                            }
-                            catch
-                            {
-                                // Ignore parsing errors for individual picks
-                            }
-                        }
-                    }
-                }
+                var (games, teamNames, entryCount) = await _migrationRepository.AnalyzeLegacyDataAsync();
 
                 return new OkObjectResult(new MigrationAnalysisResult
                 {
                     LegacyGames = games.OrderBy(g => g.StartTime).ToList(),
-                    LegacyTeamNames = teamNames.OrderBy(t => t).ToList(),
+                    LegacyTeamNames = teamNames,
                     LegacyEntryCount = entryCount
                 });
-            }
-            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-            {
-                 return new BadRequestObjectResult($"Container '{LegacyContainerName}' not found in database '{Constants.Database.DbName}'.");
             }
             catch (Exception ex)
             {
@@ -129,73 +68,68 @@ namespace BowlPoolManager.Api.Functions.Admin
 
                 if (migrationRequest == null) return new BadRequestObjectResult("Invalid request");
 
-                var container = _cosmosClient.GetContainer(Constants.Database.DbName, LegacyContainerName);
-                var query = new QueryDefinition("SELECT * FROM c WHERE c.type = 'BracketEntry'");
-                
-                var iterator = container.GetItemQueryIterator<dynamic>(query);
+                var legacyEntries = await _migrationRepository.GetLegacyEntriesAsync();
 
                 int migratedCount = 0;
                 int errorCount = 0;
 
-                while (iterator.HasMoreResults)
+                foreach (var item in legacyEntries)
                 {
-                    foreach (var item in await iterator.ReadNextAsync())
+                    try
                     {
-                        try
+                        // Create new entry
+                        var newEntry = new BracketEntry
                         {
-                            // Create new entry
-                            var newEntry = new BracketEntry
-                            {
-                                PoolId = migrationRequest.TargetPoolId,
-                                SeasonId = migrationRequest.TargetSeasonId,
-                                UserId = item.userId,
-                                PlayerName = item.playerName,
-                                TieBreakerPoints = (int?)item.tieBreakerPoints ?? 0,
-                                CreatedOn = (DateTime?)item.createdOn ?? DateTime.UtcNow,
-                                IsPaid = false,
-                                Type = Constants.DocumentTypes.BracketEntry,
-                                Picks = new Dictionary<string, string>()
-                            };
+                            PoolId = migrationRequest.TargetPoolId,
+                            SeasonId = migrationRequest.TargetSeasonId,
+                            UserId = item.userId,
+                            PlayerName = item.playerName,
+                            TieBreakerPoints = (int?)item.tieBreakerPoints ?? 0,
+                            CreatedOn = (DateTime?)item.createdOn ?? DateTime.UtcNow,
+                            IsPaid = false,
+                            Type = Constants.DocumentTypes.BracketEntry,
+                            Picks = new Dictionary<string, string>()
+                        };
+                        
+                        // Map Picks
+                        if (item.picks != null)
+                        {
+                            var picksString = item.picks.ToString();
+                            var oldPicks = JsonConvert.DeserializeObject<Dictionary<string, string>>(picksString);
                             
-                            if (item.picks != null)
+                            if (oldPicks != null)
                             {
-                                var picksString = item.picks.ToString();
-                                var oldPicks = JsonConvert.DeserializeObject<Dictionary<string, string>>(picksString);
-                                
-                                if (oldPicks != null)
+                                foreach (var pick in oldPicks)
                                 {
-                                    foreach (var pick in oldPicks)
-                                    {
-                                        string oldGameId = pick.Key;
-                                        string oldTeamName = pick.Value;
+                                    string oldGameId = pick.Key;
+                                    string oldTeamName = pick.Value;
 
-                                        if (migrationRequest.GameMapping.TryGetValue(oldGameId, out var newGameId) &&
-                                            !string.IsNullOrEmpty(newGameId))
+                                    if (migrationRequest.GameMapping.TryGetValue(oldGameId, out var newGameId) &&
+                                        !string.IsNullOrEmpty(newGameId))
+                                    {
+                                        string newTeamName = oldTeamName; 
+                                        if (migrationRequest.TeamMapping.TryGetValue(oldTeamName, out var mappedTeamName) && 
+                                            !string.IsNullOrEmpty(mappedTeamName))
                                         {
-                                            string newTeamName = oldTeamName; 
-                                            if (migrationRequest.TeamMapping.TryGetValue(oldTeamName, out var mappedTeamName) && 
-                                                !string.IsNullOrEmpty(mappedTeamName))
-                                            {
-                                                newTeamName = mappedTeamName;
-                                            }
-                                            
-                                            if (!string.IsNullOrEmpty(newGameId))
-                                            {
-                                                newEntry.Picks[newGameId] = newTeamName;
-                                            }
+                                            newTeamName = mappedTeamName;
+                                        }
+                                        
+                                        if (!string.IsNullOrEmpty(newGameId))
+                                        {
+                                            newEntry.Picks[newGameId] = newTeamName;
                                         }
                                     }
                                 }
                             }
+                        }
 
-                            await _entryRepository.AddEntryAsync(newEntry);
-                            migratedCount++;
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, $"Failed to migrate entry {item.id}");
-                            errorCount++;
-                        }
+                        await _entryRepository.AddEntryAsync(newEntry);
+                        migratedCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Failed to migrate entry {item.id}");
+                        errorCount++;
                     }
                 }
 
@@ -219,9 +153,6 @@ namespace BowlPoolManager.Api.Functions.Admin
                 var data = Convert.FromBase64String(header);
                 var decoded = System.Text.Encoding.UTF8.GetString(data);
                 
-                // Using dynamic to avoid needing SecurityHelper.ClientPrincipal access if strict, 
-                // but we know SecurityHelper is available in Api.Helpers.
-                // However, deserialization to a local or mapped type is safer.
                 var principal = JsonConvert.DeserializeObject<SecurityHelper.ClientPrincipal>(decoded);
                 
                 if (principal == null || string.IsNullOrEmpty(principal.UserId)) return false;
