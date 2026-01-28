@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Azure.Cosmos;
+using Microsoft.Extensions.Configuration;
 using BowlPoolManager.Api.Services;
 using BowlPoolManager.Api.Repositories;
 using BowlPoolManager.Core; 
