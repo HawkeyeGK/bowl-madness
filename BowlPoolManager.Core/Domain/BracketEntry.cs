@@ -44,6 +44,10 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("isPaid")]
         public bool IsPaid { get; set; } = false;
 
+        [JsonProperty("isAdminEntered")]
+        [JsonPropertyName("isAdminEntered")]
+        public bool IsAdminEntered { get; set; } = false;
+
         [JsonProperty("type")]
         [JsonPropertyName("type")]
         public string Type { get; set; } = Constants.DocumentTypes.BracketEntry;

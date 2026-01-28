@@ -91,13 +91,43 @@ namespace BowlPoolManager.Api.Functions
                         var item = JObject.FromObject(rawItem);
 
                         // Safely get properties
-                        string? userId = (string?)item["userId"];
-                        string? playerName = (string?)item["playerName"];
-                        int tieBreakerPoints = (int?)item["tieBreakerPoints"] ?? 0;
-                        DateTime createdOn = (DateTime?)item["createdOn"] ?? DateTime.UtcNow;
+                        string? userId = null;
+                        string? playerName = null;
+                        int tieBreakerPoints = 0;
+                        DateTime createdOn = DateTime.UtcNow;
+                        bool isAdminEntered = false;
+
+                        try 
+                        {
+                            userId = (string?)item["userId"];
+                            playerName = (string?)item["playerName"];
+                            tieBreakerPoints = (int?)item["tieBreakerPoints"] ?? 0;
+                            createdOn = (DateTime?)item["createdOn"] ?? DateTime.UtcNow;
+                        } 
+                        catch 
+                        {
+                            // If property access fails (NoSuchMember etc), default to Admin Entered
+                            isAdminEntered = true;
+                        }
+
+                        // Sanity checks
+                        if (string.IsNullOrEmpty(userId))
+                        {
+                            userId = Guid.NewGuid().ToString(); // Assign a unique dummy ID for the record
+                            isAdminEntered = true; // Recover missing user as admin entered
+                            
+                            if (string.IsNullOrEmpty(playerName))
+                            {
+                                playerName = "Legacy Entry (Admin)";
+                            }
+                        }
+                        
+                        if (string.IsNullOrEmpty(playerName)) playerName = "Unknown Player";
 
                         // 1. Determine Target Season
-                        string? legacySeasonId = (string?)item["seasonId"];
+                        string? legacySeasonId = null;
+                        try { legacySeasonId = (string?)item["seasonId"]; } catch { }
+                         
                         if (string.IsNullOrEmpty(legacySeasonId))
                         {
                             legacySeasonId = "LEGACY";
@@ -125,7 +155,8 @@ namespace BowlPoolManager.Api.Functions
                         }
                         
                         // 2. Determine Target Pool
-                        string? legacyPoolId = (string?)item["poolId"];
+                        string? legacyPoolId = null;
+                        try { legacyPoolId = (string?)item["poolId"]; } catch { }
                         string targetPoolId = "";
                         
                         // Resolve Pool Mapping
@@ -152,11 +183,12 @@ namespace BowlPoolManager.Api.Functions
                         {
                             PoolId = targetPoolId,
                             SeasonId = targetSeasonId,
-                            UserId = userId ?? string.Empty, // Handle missing UserID
-                            PlayerName = playerName ?? "Unknown Player", // Handle missing name
+                            UserId = userId,
+                            PlayerName = playerName,
                             TieBreakerPoints = tieBreakerPoints,
                             CreatedOn = createdOn,
                             IsPaid = false,
+                            IsAdminEntered = isAdminEntered, // Set flag
                             Type = Constants.DocumentTypes.BracketEntry,
                             Picks = new Dictionary<string, string>()
                         };
@@ -199,7 +231,9 @@ namespace BowlPoolManager.Api.Functions
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, $"Failed to migrate entry {rawItem.id}");
+                        string errorId = "unknown";
+                        try { errorId = rawItem.id; } catch { }
+                        _logger.LogError(ex, $"Failed to migrate entry {errorId}");
                         errorCount++;
                     }
                 }
