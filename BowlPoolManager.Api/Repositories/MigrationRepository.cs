@@ -41,15 +41,16 @@ namespace BowlPoolManager.Api.Repositories
              // Implementing optimized query or processing if possible, but raw iteration is safer for legacy data structure variability.
              // Reusing the combined analysis method is better for performance (single pass).
              // Keeping this for interface completeness if needed separately.
-             var (games, teamNames, count) = await AnalyzeLegacyDataAsync();
+             var (games, teamNames, poolIds, count) = await AnalyzeLegacyDataAsync();
              return teamNames;
         }
 
-        public async Task<(List<LegacyGameDto> Games, List<string> TeamNames, int EntryCount)> AnalyzeLegacyDataAsync()
+        public async Task<(List<LegacyGameDto> Games, List<string> TeamNames, List<string> PoolIds, int EntryCount)> AnalyzeLegacyDataAsync()
         {
              var games = await GetLegacyGamesAsync();
              
              var teamNames = new HashSet<string>();
+             var poolIds = new HashSet<string>();
              int entryCount = 0;
              var query = new QueryDefinition("SELECT * FROM c WHERE c.type = 'BracketEntry'");
              var iterator = _container.GetItemQueryIterator<dynamic>(query);
@@ -59,6 +60,17 @@ namespace BowlPoolManager.Api.Repositories
                  foreach (var item in await iterator.ReadNextAsync())
                  {
                      entryCount++;
+                     
+                     // Try to capture poolId
+                     try 
+                     {
+                         if (item.poolId != null) 
+                         {
+                             poolIds.Add(item.poolId.ToString());
+                         }
+                     }
+                     catch {}
+
                      if (item.picks != null)
                      {
                          try
@@ -84,7 +96,7 @@ namespace BowlPoolManager.Api.Repositories
                  }
              }
 
-             return (games, teamNames.OrderBy(t => t).ToList(), entryCount);
+             return (games, teamNames.OrderBy(t => t).ToList(), poolIds.OrderBy(p => p).ToList(), entryCount);
         }
 
         public async Task<List<dynamic>> GetLegacyEntriesAsync()

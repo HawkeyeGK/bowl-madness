@@ -12,6 +12,7 @@ namespace BowlPoolManager.Core.Dtos
     {
         public List<LegacyGameDto> LegacyGames { get; set; } = new();
         public List<string> LegacyTeamNames { get; set; } = new();
+        public List<string> LegacyPoolIds { get; set; } = new(); // NEW
         public int LegacyEntryCount { get; set; }
     }
 
@@ -30,5 +31,6 @@ namespace BowlPoolManager.Core.Dtos
         public string TargetSeasonId { get; set; }
         public Dictionary<string, string> GameMapping { get; set; } = new(); // OldGameId -> NewGameId
         public Dictionary<string, string> TeamMapping { get; set; } = new(); // OldTeamName -> NewTeamName
+        public Dictionary<string, string> PoolMapping { get; set; } = new(); // LegacyPoolId -> NewPoolId
     }
 }

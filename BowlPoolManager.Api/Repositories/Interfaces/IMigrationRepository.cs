@@ -6,7 +6,7 @@ namespace BowlPoolManager.Api.Repositories
     {
         Task<List<LegacyGameDto>> GetLegacyGamesAsync();
         Task<List<string>> GetLegacyTeamNamesAsync();
-        Task<(List<LegacyGameDto> Games, List<string> TeamNames, int EntryCount)> AnalyzeLegacyDataAsync();
+        Task<(List<LegacyGameDto> Games, List<string> TeamNames, List<string> PoolIds, int EntryCount)> AnalyzeLegacyDataAsync();
         Task<List<dynamic>> GetLegacyEntriesAsync();
     }
 }

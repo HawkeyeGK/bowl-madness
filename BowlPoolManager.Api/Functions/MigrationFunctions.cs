@@ -47,12 +47,13 @@ namespace BowlPoolManager.Api.Functions
 
             try
             {
-                var (games, teamNames, entryCount) = await _migrationRepository.AnalyzeLegacyDataAsync();
+                var (games, teamNames, poolIds, entryCount) = await _migrationRepository.AnalyzeLegacyDataAsync();
 
                 return new OkObjectResult(new MigrationAnalysisResult
                 {
                     LegacyGames = games.OrderBy(g => g.StartTime).ToList(),
                     LegacyTeamNames = teamNames,
+                    LegacyPoolIds = poolIds,
                     LegacyEntryCount = entryCount
                 });
             }
@@ -92,10 +93,20 @@ namespace BowlPoolManager.Api.Functions
                         int tieBreakerPoints = (int?)item["tieBreakerPoints"] ?? 0;
                         DateTime createdOn = (DateTime?)item["createdOn"] ?? DateTime.UtcNow;
 
+                        // Determine Target Pool
+                        string targetPoolId = migrationRequest.TargetPoolId; // Default
+                        string? legacyPoolId = (string?)item["poolId"];
+                        if (!string.IsNullOrEmpty(legacyPoolId) && 
+                            migrationRequest.PoolMapping.TryGetValue(legacyPoolId, out var mappedPoolId) && 
+                            !string.IsNullOrEmpty(mappedPoolId))
+                        {
+                            targetPoolId = mappedPoolId;
+                        }
+
                         // Create new entry
                         var newEntry = new BracketEntry
                         {
-                            PoolId = migrationRequest.TargetPoolId,
+                            PoolId = targetPoolId,
                             SeasonId = migrationRequest.TargetSeasonId,
                             UserId = userId ?? string.Empty, // Handle missing UserID
                             PlayerName = playerName ?? "Unknown Player", // Handle missing name

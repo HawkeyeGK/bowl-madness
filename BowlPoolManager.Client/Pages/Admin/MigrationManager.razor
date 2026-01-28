@@ -74,6 +74,51 @@
         </div>
     }
 
+    @if (currentStep == MigrationStep.PoolMapping)
+    {
+        <div class="card bg-dark text-white shadow-sm border-secondary mb-4">
+            <div class="card-header bg-secondary bg-opacity-25 border-secondary d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Step 1.5: Map Pools</h5>
+                <small class="text-light opacity-75">Found @analysisResult?.LegacyPoolIds?.Count legacy pools</small>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Legacy Pool Identifier</th>
+                                <th>Target Pool</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var oldPoolId in analysisResult?.LegacyPoolIds ?? new List<string>())
+                            {
+                                <tr>
+                                    <td>@oldPoolId</td>
+                                    <td>
+                                        <select class="form-select form-select-sm" @bind="poolMapping[oldPoolId]">
+                                            @if (pools != null)
+                                            {
+                                                foreach (var pool in pools)
+                                                {
+                                                    <option value="@pool.Id">@pool.Name</option>
+                                                }
+                                            }
+                                        </select>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-secondary d-flex justify-content-between">
+                <button class="btn btn-outline-secondary" @onclick="() => currentStep = MigrationStep.Configuration">Back</button>
+                <button class="btn btn-primary" @onclick="() => currentStep = MigrationStep.GameMapping">Next: Map Games</button>
+            </div>
+        </div>
+    }
+
     @if (currentStep == MigrationStep.GameMapping)
     {
         <div class="card bg-dark text-white shadow-sm border-secondary mb-4">
@@ -196,7 +241,7 @@
 </div>
 
 @code {
-    private enum MigrationStep { Configuration, GameMapping, TeamMapping, Complete }
+    private enum MigrationStep { Configuration, PoolMapping, GameMapping, TeamMapping, Complete }
     private MigrationStep currentStep = MigrationStep.Configuration;
 
     private List<Season>? seasons;
@@ -213,6 +258,7 @@
     private MigrationAnalysisResult? analysisResult;
     private Dictionary<string, string> gameMapping = new();
     private Dictionary<string, string> teamMapping = new();
+    private Dictionary<string, string> poolMapping = new();
     private int migratedCount = 0;
     private List<TeamInfo> AllTeams = new();
 
@@ -316,7 +362,20 @@
                         teamMapping[team] = "";
                     }
 
-                    currentStep = MigrationStep.GameMapping;
+                    // Pool Mapping
+                    poolMapping = new Dictionary<string, string>();
+                    if (analysisResult.LegacyPoolIds != null && analysisResult.LegacyPoolIds.Any())
+                    {
+                        foreach (var pid in analysisResult.LegacyPoolIds)
+                        {
+                            poolMapping[pid] = targetPoolId; // Default to selected target
+                        }
+                        currentStep = MigrationStep.PoolMapping;
+                    }
+                    else
+                    {
+                        currentStep = MigrationStep.GameMapping;
+                    }
                 }
             }
             else
@@ -410,7 +469,8 @@
                 TargetPoolId = targetPoolId,
                 TargetSeasonId = targetSeasonId,
                 GameMapping = gameMapping,
-                TeamMapping = teamMapping
+                TeamMapping = teamMapping,
+                PoolMapping = poolMapping
             };
 
             var response = await Http.PostAsJsonAsync("api/migration/execute", request);
