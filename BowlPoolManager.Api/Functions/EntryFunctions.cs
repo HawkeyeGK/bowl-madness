@@ -234,7 +234,7 @@ namespace BowlPoolManager.Api.Functions
         }
 
         [Function("DeleteEntry")]
-        public async Task<HttpResponseData> DeleteEntry([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+        public async Task<HttpResponseData> DeleteEntry([HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "DeleteEntry/{id}")] HttpRequestData req, string id)
         {
             try
             {
@@ -246,8 +246,6 @@ namespace BowlPoolManager.Api.Functions
                     return unauth;
                 }
 
-                var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
-                var id = query["id"];
                 if (string.IsNullOrEmpty(id)) 
                 {
                     var badReq = req.CreateResponse(HttpStatusCode.BadRequest);

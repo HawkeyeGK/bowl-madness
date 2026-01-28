@@ -13,6 +13,7 @@ using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Api.Repositories;
 using BowlPoolManager.Core;
 using BowlPoolManager.Api.Helpers;
+using Newtonsoft.Json.Linq;
 
 namespace BowlPoolManager.Api.Functions
 {
@@ -79,28 +80,37 @@ namespace BowlPoolManager.Api.Functions
                 int migratedCount = 0;
                 int errorCount = 0;
 
-                foreach (var item in legacyEntries)
+                foreach (var rawItem in legacyEntries)
                 {
                     try
                     {
+                        var item = JObject.FromObject(rawItem);
+
+                        // Safely get properties
+                        string? userId = (string?)item["userId"];
+                        string? playerName = (string?)item["playerName"];
+                        int tieBreakerPoints = (int?)item["tieBreakerPoints"] ?? 0;
+                        DateTime createdOn = (DateTime?)item["createdOn"] ?? DateTime.UtcNow;
+
                         // Create new entry
                         var newEntry = new BracketEntry
                         {
                             PoolId = migrationRequest.TargetPoolId,
                             SeasonId = migrationRequest.TargetSeasonId,
-                            UserId = item.userId,
-                            PlayerName = item.playerName,
-                            TieBreakerPoints = (int?)item.tieBreakerPoints ?? 0,
-                            CreatedOn = (DateTime?)item.createdOn ?? DateTime.UtcNow,
+                            UserId = userId ?? string.Empty, // Handle missing UserID
+                            PlayerName = playerName ?? "Unknown Player", // Handle missing name
+                            TieBreakerPoints = tieBreakerPoints,
+                            CreatedOn = createdOn,
                             IsPaid = false,
                             Type = Constants.DocumentTypes.BracketEntry,
                             Picks = new Dictionary<string, string>()
                         };
                         
                         // Map Picks
-                        if (item.picks != null)
+                        var picksToken = item["picks"];
+                        if (picksToken != null)
                         {
-                            var picksString = item.picks.ToString();
+                            var picksString = picksToken.ToString();
                             var oldPicks = JsonConvert.DeserializeObject<Dictionary<string, string>>(picksString);
                             
                             if (oldPicks != null)
@@ -134,7 +144,7 @@ namespace BowlPoolManager.Api.Functions
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, $"Failed to migrate entry {item.id}");
+                        _logger.LogError(ex, $"Failed to migrate entry {rawItem.id}");
                         errorCount++;
                     }
                 }

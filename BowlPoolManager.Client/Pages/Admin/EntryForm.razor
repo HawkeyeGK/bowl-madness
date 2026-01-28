@@ -458,7 +458,7 @@
         if (confirmed) {
             isSaving = true;
             try {
-                var response = await Http.DeleteAsync($"api/DeleteEntry?id={EntryId}");
+                var response = await Http.DeleteAsync($"api/DeleteEntry/{EntryId}");
                 if (response.IsSuccessStatusCode) { Nav.NavigateTo("/admin/entries"); } else { errorMessage = "Error deleting entry."; }
             } catch(Exception ex) { errorMessage = $"Error: {ex.Message}"; } finally { isSaving = false; }
         }
