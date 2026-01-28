@@ -201,6 +201,7 @@
     
     private bool isLoading = false;
     private string? errorMessage;
+    private string? executionSummary;
 
     private MigrationAnalysisResult? analysisResult;
     private Dictionary<string, string> gameMapping = new();
@@ -374,11 +375,9 @@
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<dynamic>();
-                executionSummary = $"Migration Completed! Migrated: {result.migratedCount}, Errors: {result.errorCount}";
-                // The instruction snippet removed setting currentStep to Complete here,
-                // so we'll assume the UI will handle displaying executionSummary.
-                // If the wizard should still advance to 'Complete' step, this line would be needed:
-                // currentStep = MigrationStep.Complete;
+                migratedCount = (int)result.GetProperty("migratedCount").GetInt32();
+                executionSummary = $"Migration Completed! Migrated: {migratedCount}, Errors: {result.GetProperty("errorCount")}";
+                currentStep = MigrationStep.Complete;
             }
             else 
             {
