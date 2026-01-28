@@ -144,19 +144,8 @@ namespace BowlPoolManager.Api.Functions
                  return badRequest;
             }
 
-            var games = await _gameRepo.GetGamesAsync(seasonId);
-            
-            // Iterate through completed games and force an update to propagate
-            // We sort by StartTime to ensure feeders are processed before targets
-            var completedGames = games
-                .Where(g => g.Status == GameStatus.Final)
-                .OrderBy(g => g.StartTime)
-                .ToList();
-
-            foreach (var game in completedGames)
-            {
-                await _scoringService.ProcessGameUpdateAsync(game);
-            }
+            // Call the dedicated bulk propagation method
+            await _scoringService.ForcePropagateAllAsync(seasonId);
 
             return req.CreateResponse(HttpStatusCode.OK);
         }

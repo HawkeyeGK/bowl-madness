@@ -161,6 +161,36 @@ namespace BowlPoolManager.Api.Services
             }
         }
 
+        /// <summary>
+        /// Forces propagation of all completed games in a season.
+        /// This method fetches games once, then iterates through them in chronological order,
+        /// ensuring that each propagation uses the same in-memory list to avoid stale data issues.
+        /// </summary>
+        public async Task ForcePropagateAllAsync(string seasonId)
+        {
+            var allGames = await _gameRepo.GetGamesAsync(seasonId);
+            
+            // Process completed games in chronological order
+            // This ensures feeder games are processed before target games
+            var completedGames = allGames
+                .Where(g => g.Status == GameStatus.Final)
+                .OrderBy(g => g.StartTime)
+                .ToList();
+
+            _logger.LogInformation($"ForcePropagateAllAsync: Processing {completedGames.Count} completed games for season {seasonId}");
+
+            foreach (var game in completedGames)
+            {
+                if (!string.IsNullOrEmpty(game.NextGameId))
+                {
+                    // Use the SAME list for all calls - modifications are in-memory and carried forward
+                    await PropagateWinner(game, allGames);
+                }
+            }
+            
+            _logger.LogInformation($"ForcePropagateAllAsync: Completed propagation for season {seasonId}");
+        }
+
         private async Task PropagateWinner(BowlGame completedGame, List<BowlGame> context)
         {
             if (string.IsNullOrEmpty(completedGame.NextGameId)) return;

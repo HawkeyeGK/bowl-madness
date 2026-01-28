@@ -19,5 +19,11 @@ namespace BowlPoolManager.Api.Services
         /// Updates a single game and propagates the winner to the next game in the bracket if applicable.
         /// </summary>
         Task ProcessGameUpdateAsync(BowlGame game);
+
+        /// <summary>
+        /// Forces propagation of all completed games in a season, using a single in-memory list
+        /// to avoid stale data issues.
+        /// </summary>
+        Task ForcePropagateAllAsync(string seasonId);
     }
 }
