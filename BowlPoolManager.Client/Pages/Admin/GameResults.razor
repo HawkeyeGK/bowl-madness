@@ -103,6 +103,68 @@
             </div>
         </div>
     }
+
+    <div class="mt-5">
+        <button class="btn btn-outline-secondary btn-sm mb-3" @onclick="() => showDebug = !showDebug">
+            @(showDebug ? "Hide Debug Info" : "Show Debug Info")
+        </button>
+
+        @if (showDebug && games != null)
+        {
+            <div class="card bg-light border-warning">
+                <div class="card-header bg-warning text-dark fw-bold">Linkage Diagnostics</div>
+                <div class="card-body font-monospace small">
+                    <ul class="list-group list-group-flush">
+                        @foreach (var game in games.Where(g => !string.IsNullOrEmpty(g.NextGameId) || games.Any(f => f.NextGameId == g.Id)))
+                        {
+                            // Find who feeds INTO me
+                            var feeders = games.Where(f => string.Equals(f.NextGameId, game.Id, StringComparison.OrdinalIgnoreCase)).OrderBy(f => f.StartTime).ToList();
+                            
+                            // Find who I feed INTO
+                            var nextGame = games.FirstOrDefault(f => string.Equals(f.Id, game.NextGameId, StringComparison.OrdinalIgnoreCase));
+
+                            <li class="list-group-item bg-transparent">
+                                <div class="fw-bold text-primary">@game.BowlName (@game.Id)</div>
+                                <div class="ms-3">
+                                    <span>👉 Feeds Into: </span>
+                                    @if (nextGame != null)
+                                    {
+                                        <span class="text-success">@nextGame.BowlName (@nextGame.Id)</span>
+                                    }
+                                    else if (!string.IsNullOrEmpty(game.NextGameId))
+                                    {
+                                         <span class="text-danger fw-bold">BROKEN LINK (Target: @game.NextGameId)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">None (Championship or Unlinked)</span>
+                                    }
+                                </div>
+                                <div class="ms-3">
+                                    <span>👈 Fed By (@feeders.Count):</span>
+                                    @if (feeders.Any())
+                                    {
+                                        <ul>
+                                            @foreach (var f in feeders)
+                                            {
+                                                <li>
+                                                    @f.BowlName (@f.Id) - @f.StartTime.ToString("g")
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted"> None</span>
+                                    }
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        }
+    </div>
     
     @if (!string.IsNullOrEmpty(statusMessage))
     {
@@ -124,6 +186,7 @@
     private List<Season>? seasons;
     private string? statusMessage;
     private string selectedSeasonId = "";
+    private bool showDebug = false;
 
     protected override async Task OnInitializedAsync()
     {
