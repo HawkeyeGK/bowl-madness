@@ -44,7 +44,7 @@
                             {
                                 foreach (var season in seasons)
                                 {
-                                    <option value="@season.SeasonId" selected="@(season.SeasonId == targetSeasonId)">@season.Name (@season.SeasonId)</option>
+                                    <option value="@season.Id" selected="@(season.Id == targetSeasonId)">@season.Name (@season.SeasonId)</option>
                                 }
                             }
                         </select>
@@ -226,7 +226,7 @@
                 var currentSeason = await SeasonService.GetCurrentSeasonAsync();
                 if (currentSeason != null)
                 {
-                    targetSeasonId = currentSeason.SeasonId;
+                    targetSeasonId = currentSeason.Id;
                     await LoadTargetGames(targetSeasonId);
                 }
             }
