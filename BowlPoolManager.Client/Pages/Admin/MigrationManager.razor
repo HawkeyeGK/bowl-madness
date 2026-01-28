@@ -1,0 +1,403 @@
+@page "/admin/migration"
+@using BowlPoolManager.Core.Dtos
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Client.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject HttpClient Http
+@inject IPoolService PoolService
+@inject ISeasonService SeasonService
+@inject IJSRuntime JS
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="text-white mb-0">Migration Wizard</h3>
+        @if (isLoading)
+        {
+            <div class="spinner-border text-light" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (currentStep == MigrationStep.Configuration)
+    {
+        <div class="card bg-dark text-white shadow-sm border-secondary mb-4">
+            <div class="card-header bg-secondary bg-opacity-25 border-secondary">
+                <h5 class="mb-0">Step 1: Configuration</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Target Season</label>
+                        <select class="form-select @(seasons == null ? "disabled" : "")" @onchange="OnSeasonChanged">
+                            <option value="">-- Select Season --</option>
+                            @if (seasons != null)
+                            {
+                                foreach (var season in seasons)
+                                {
+                                    <option value="@season.Id" selected="@(season.Id == targetSeasonId)">@season.Id</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Target Pool</label>
+                        <select class="form-select @(pools == null ? "disabled" : "")" @bind="targetPoolId">
+                            <option value="">-- Select Pool --</option>
+                            @if (pools != null)
+                            {
+                                foreach (var pool in pools)
+                                {
+                                    <option value="@pool.Id">@pool.Name</option>
+                                }
+                            }
+                        </select>
+                        <div class="form-text text-light opacity-50">Select the pool where new entries will be created.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-secondary text-end">
+                <button class="btn btn-primary" @onclick="AnalyzeLegacyData" disabled="@(!CanAnalyze)">
+                    Analyze Legacy Data <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </div>
+    }
+
+    @if (currentStep == MigrationStep.GameMapping)
+    {
+        <div class="card bg-dark text-white shadow-sm border-secondary mb-4">
+            <div class="card-header bg-secondary bg-opacity-25 border-secondary d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Step 2: Map Games</h5>
+                <div>
+                     <button class="btn btn-sm btn-outline-info me-2" @onclick="AutoMapGames">Auto-Map</button>
+                     <small class="text-light opacity-75">Found @analysisResult?.LegacyGames.Count legacy games</small>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Legacy Game</th>
+                                <th>Target Game</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var legacyGame in analysisResult?.LegacyGames ?? new List<LegacyGameDto>())
+                            {
+                                <tr>
+                                    <td>
+                                        <div>@legacyGame.Description</div>
+                                        <small class="text-muted">@legacyGame.StartTime.ToShortDateString()</small>
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm" @bind="gameMapping[legacyGame.Id]">
+                                            <option value="">-- Skip --</option>
+                                            @if (targetGames != null)
+                                            {
+                                                foreach (var game in targetGames)
+                                                {
+                                                    <option value="@game.Id">@game.BowlName: @game.TeamHome vs @game.TeamAway</option>
+                                                }
+                                            }
+                                        </select>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-secondary d-flex justify-content-between">
+                <button class="btn btn-outline-secondary" @onclick="() => currentStep = MigrationStep.Configuration">Back</button>
+                <button class="btn btn-primary" @onclick="() => currentStep = MigrationStep.TeamMapping">Next: Map Teams</button>
+            </div>
+        </div>
+    }
+
+    @if (currentStep == MigrationStep.TeamMapping)
+    {
+        <div class="card bg-dark text-white shadow-sm border-secondary mb-4">
+            <div class="card-header bg-secondary bg-opacity-25 border-secondary d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Step 3: Map Teams</h5>
+                 <div>
+                     <button class="btn btn-sm btn-outline-info me-2" @onclick="AutoMapTeams">Auto-Clean Names</button>
+                     <small class="text-light opacity-75">Found @analysisResult?.LegacyTeamNames.Count unique teams</small>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                 <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                    <table class="table table-dark table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Legacy Team Name</th>
+                                <th>Target Team Name (New)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var oldName in analysisResult?.LegacyTeamNames ?? new List<string>())
+                            {
+                                <tr>
+                                    <td>@oldName</td>
+                                    <td>
+                                        <input type="text" class="form-control form-control-sm" @bind="teamMapping[oldName]" />
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+             <div class="card-footer bg-transparent border-secondary d-flex justify-content-between">
+                <button class="btn btn-outline-secondary" @onclick="() => currentStep = MigrationStep.GameMapping">Back</button>
+                <button class="btn btn-success" @onclick="ExecuteMigration">
+                    <i class="bi bi-play-circle-fill me-1"></i> Execute Migration
+                </button>
+            </div>
+        </div>
+    }
+    
+    @if (currentStep == MigrationStep.Complete)
+    {
+         <div class="card bg-success text-white shadow-sm border-0 mb-4">
+             <div class="card-body text-center p-5">
+                 <i class="bi bi-check-circle-fill display-1 mb-3"></i>
+                 <h2>Migration Complete!</h2>
+                 <p class="lead">Successfully migrated entries.</p>
+                 <div class="mt-4">
+                     <h5>Summary:</h5>
+                     <ul class="list-unstyled">
+                         <li>Total Legacy Entries: @analysisResult?.LegacyEntryCount</li>
+                         <li>Migrated: @migratedCount</li>
+                     </ul>
+                 </div>
+                 <button class="btn btn-light mt-3" @onclick="ResetWizard">Start Over</button>
+             </div>
+         </div>
+    }
+
+</div>
+
+@code {
+    private enum MigrationStep { Configuration, GameMapping, TeamMapping, Complete }
+    private MigrationStep currentStep = MigrationStep.Configuration;
+
+    private List<Season>? seasons;
+    private List<BowlPool>? pools;
+    private List<BowlGame>? targetGames;
+
+    private string targetSeasonId = "";
+    private string targetPoolId = "";
+    
+    private bool isLoading = false;
+    private string? errorMessage;
+
+    private MigrationAnalysisResult? analysisResult;
+    private Dictionary<string, string> gameMapping = new();
+    private Dictionary<string, string> teamMapping = new();
+    private int migratedCount = 0;
+
+    private bool CanAnalyze => !string.IsNullOrEmpty(targetSeasonId) && !string.IsNullOrEmpty(targetPoolId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+            seasons = await SeasonService.GetSeasonsAsync();
+            var poolsList = await PoolService.GetPoolsAsync();
+            // Filter pools? maybe just show all or let user pick.
+            pools = poolsList;
+            
+            // Default to most recent season
+            if (seasons != null && seasons.Any())
+            {
+                var currentSeason = await SeasonService.GetCurrentSeasonAsync();
+                if (currentSeason != null)
+                {
+                    targetSeasonId = currentSeason.Id;
+                    await LoadTargetGames(targetSeasonId);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error initializing: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnSeasonChanged(ChangeEventArgs e)
+    {
+        targetSeasonId = e.Value?.ToString() ?? "";
+        if (!string.IsNullOrEmpty(targetSeasonId))
+        {
+            await LoadTargetGames(targetSeasonId);
+        }
+        else 
+        {
+            targetGames = null;
+        }
+    }
+
+    private async Task LoadTargetGames(string seasonId)
+    {
+        try 
+        {
+            targetGames = await PoolService.GetGamesAsync(seasonId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading games: {ex.Message}";
+        }
+    }
+
+    private async Task AnalyzeLegacyData()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+
+            var request = new MigrationAnalysisRequest { SourceSeasonId = "2024" }; // Optional, currently unused by backend
+            var response = await Http.PostAsJsonAsync("api/admin/migration/analyze", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                analysisResult = await response.Content.ReadFromJsonAsync<MigrationAnalysisResult>();
+                if (analysisResult != null)
+                {
+                    // Initialize Mappings
+                    gameMapping = new Dictionary<string, string>();
+                    foreach (var game in analysisResult.LegacyGames)
+                    {
+                        gameMapping[game.Id] = ""; 
+                    }
+
+                    teamMapping = new Dictionary<string, string>();
+                    foreach (var team in analysisResult.LegacyTeamNames)
+                    {
+                        teamMapping[team] = "";
+                    }
+
+                    currentStep = MigrationStep.GameMapping;
+                }
+            }
+            else
+            {
+                errorMessage = $"Analysis failed: {response.ReasonPhrase}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error analyzing data: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void AutoMapGames()
+    {
+        if (targetGames == null || analysisResult == null) return;
+
+        foreach (var legacyGame in analysisResult.LegacyGames)
+        {
+            // Simple heuristic mapping
+            // Try to find a target game with similar Home/Away teams
+            var match = targetGames.FirstOrDefault(tg => 
+                (tg.TeamHome.Contains(legacyGame.HomeTeam, StringComparison.OrdinalIgnoreCase) || legacyGame.HomeTeam.Contains(tg.TeamHome, StringComparison.OrdinalIgnoreCase)) &&
+                (tg.TeamAway.Contains(legacyGame.AwayTeam, StringComparison.OrdinalIgnoreCase) || legacyGame.AwayTeam.Contains(tg.TeamAway, StringComparison.OrdinalIgnoreCase))
+            );
+            
+            if (match != null)
+            {
+                gameMapping[legacyGame.Id] = match.Id;
+            }
+        }
+    }
+
+    private void AutoMapTeams()
+    {
+        if (analysisResult == null) return;
+
+        foreach (var oldName in analysisResult.LegacyTeamNames)
+        {
+            // Remove leading seeds (e.g. "12 BYU" -> "BYU")
+            // Regex or split
+            var cleanName = oldName;
+            
+            // Check if starts with number
+            var specificCulture = System.Globalization.CultureInfo.InvariantCulture;
+            var parts = oldName.Split(' ');
+            if (parts.Length > 1 && int.TryParse(parts[0], out _))
+            {
+                cleanName = string.Join(" ", parts.Skip(1));
+            }
+            
+            teamMapping[oldName] = cleanName;
+        }
+    }
+
+    private async Task ExecuteMigration()
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Are you sure you want to execute migrations? Use Test Data first to verify.")) return;
+
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+
+            var request = new MigrationExecutionRequest
+            {
+                TargetPoolId = targetPoolId,
+                TargetSeasonId = targetSeasonId,
+                GameMapping = gameMapping,
+                TeamMapping = teamMapping
+            };
+
+            var response = await Http.PostAsJsonAsync("api/admin/migration/execute", request);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<dynamic>();
+                migratedCount = (int)result.GetProperty("migratedCount").GetInt32();
+                currentStep = MigrationStep.Complete;
+            }
+            else 
+            {
+                errorMessage = $"Execution failed: {await response.Content.ReadAsStringAsync()}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error executing migration: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ResetWizard()
+    {
+        currentStep = MigrationStep.Configuration;
+        analysisResult = null;
+        gameMapping.Clear();
+        teamMapping.Clear();
+        migratedCount = 0;
+    }
+}

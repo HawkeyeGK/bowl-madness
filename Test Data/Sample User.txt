@@ -1,0 +1,13 @@
+{
+    "id": "f9033834e9114385a99b77658ab99bf4",
+    "Email": "randynash4436@gmail.com",
+    "DisplayName": "randynash4436@gmail.com",
+    "appRole": "Player",
+    "type": "UserProfile",
+    "CreatedOn": "2025-12-16T02:22:11.0359283Z",
+    "_rid": "2QR5ANQy-4cnAAAAAAAAAA==",
+    "_self": "dbs/2QR5AA==/colls/2QR5ANQy-4c=/docs/2QR5ANQy-4cnAAAAAAAAAA==/",
+    "_etag": "\"3a01e91f-0000-0300-0000-6940c2530000\"",
+    "_attachments": "attachments/",
+    "_ts": 1765851731
+}
