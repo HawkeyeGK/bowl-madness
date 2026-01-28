@@ -31,6 +31,12 @@ namespace BowlPoolManager.Api.Functions.Admin
             _userRepository = userRepository;
         }
 
+        [Function("MigrationPing")]
+        public IActionResult MigrationPing([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "admin/migration/ping")] HttpRequest req)
+        {
+            return new OkObjectResult("Pong");
+        }
+
         [Function("AnalyzeLegacyData")]
         public async Task<IActionResult> AnalyzeLegacyData([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/migration/analyze")] HttpRequest req)
         {
