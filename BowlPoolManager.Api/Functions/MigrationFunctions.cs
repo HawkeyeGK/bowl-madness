@@ -47,7 +47,7 @@ namespace BowlPoolManager.Api.Functions
 
             try
             {
-                var (games, teamNames, seasonIds, pools, entryCount) = await _migrationRepository.AnalyzeLegacyDataAsync();
+                var (games, teamNames, seasonIds, pools, entryCount, debugInfo) = await _migrationRepository.AnalyzeLegacyDataAsync();
                 
                 // Note: LegacyPoolIds removed from DTO, replaced with LegacySeasonIds and LegacyPools
                 return new OkObjectResult(new MigrationAnalysisResult
@@ -56,7 +56,8 @@ namespace BowlPoolManager.Api.Functions
                     LegacyTeamNames = teamNames,
                     LegacySeasonIds = seasonIds,
                     LegacyPools = pools,
-                    LegacyEntryCount = entryCount
+                    LegacyEntryCount = entryCount,
+                    DebugInfo = debugInfo
                 });
             }
             catch (Exception ex)
@@ -97,6 +98,10 @@ namespace BowlPoolManager.Api.Functions
 
                         // 1. Determine Target Season
                         string? legacySeasonId = (string?)item["seasonId"];
+                        if (string.IsNullOrEmpty(legacySeasonId))
+                        {
+                            legacySeasonId = "LEGACY";
+                        }
                         string targetSeasonId = "";
 
                         // Resolve Season Mapping

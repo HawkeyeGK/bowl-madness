@@ -14,6 +14,7 @@ namespace BowlPoolManager.Core.Dtos
         public List<string> LegacyTeamNames { get; set; } = new();
         public List<string> LegacySeasonIds { get; set; } = new(); // NEW: Seasons found
         public List<LegacyPoolDto> LegacyPools { get; set; } = new(); // NEW: Pools found (Id + Season)
+        public string DebugInfo { get; set; } = ""; // NEW: Raw JSON of first item for debugging
         public int LegacyEntryCount { get; set; }
     }
 

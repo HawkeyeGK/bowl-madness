@@ -29,7 +29,7 @@ namespace BowlPoolManager.Api.Repositories
                         HomeTeam = item.teamHome,
                         AwayTeam = item.teamAway,
                         StartTime = item.startTime,
-                        SeasonId = (string?)item.seasonId ?? "" // Try to capture seasonId
+                        SeasonId = !string.IsNullOrEmpty((string?)item.seasonId) ? (string?)item.seasonId : "LEGACY"
                     });
                 }
             }
@@ -42,20 +42,22 @@ namespace BowlPoolManager.Api.Repositories
              // Implementing optimized query or processing if possible, but raw iteration is safer for legacy data structure variability.
              // Reusing the combined analysis method is better for performance (single pass).
              // Keeping this for interface completeness if needed separately.
-             var (games, teamNames, seasonIds, pools, count) = await AnalyzeLegacyDataAsync();
+             var (games, teamNames, seasonIds, pools, count, _) = await AnalyzeLegacyDataAsync();
              return teamNames;
         }
 
-        public async Task<(List<LegacyGameDto> Games, List<string> TeamNames, List<string> SeasonIds, List<LegacyPoolDto> Pools, int EntryCount)> AnalyzeLegacyDataAsync()
+        public async Task<(List<LegacyGameDto> Games, List<string> TeamNames, List<string> SeasonIds, List<LegacyPoolDto> Pools, int EntryCount, string DebugInfo)> AnalyzeLegacyDataAsync()
         {
              var games = await GetLegacyGamesAsync();
              
              var teamNames = new HashSet<string>();
              var seasonIds = new HashSet<string>();
-             var pools = new List<LegacyPoolDto>(); // Using List to store objects, handle uniqueness manually
-             var seenPools = new HashSet<string>(); // Key: seasonId|poolId
+             var pools = new List<LegacyPoolDto>(); 
+             var seenPools = new HashSet<string>(); 
 
              int entryCount = 0;
+             string debugInfo = "No entries found";
+
              var query = new QueryDefinition("SELECT * FROM c WHERE c.type = 'BracketEntry'");
              var iterator = _container.GetItemQueryIterator<dynamic>(query);
 
@@ -63,13 +65,35 @@ namespace BowlPoolManager.Api.Repositories
              {
                  foreach (var item in await iterator.ReadNextAsync())
                  {
+                     if (entryCount == 0)
+                     {
+                         try { debugInfo = JsonConvert.SerializeObject(item); } catch { debugInfo = "Error serializing item"; }
+                     }
                      entryCount++;
                      
                      string? sId = null;
                      string? pId = null;
 
-                     try { sId = (string?)item.seasonId; } catch {}
-                     try { pId = (string?)item.poolId; } catch {}
+                     // Try multiple casings/types for Season
+                     try 
+                     { 
+                        if (item.seasonId != null) sId = item.seasonId.ToString();
+                        else if (item.SeasonId != null) sId = item.SeasonId.ToString();
+                        else if (item.season != null) sId = item.season.ToString();
+                        else if (item.Season != null) sId = item.Season.ToString();
+                     } catch {}
+
+                     try 
+                     { 
+                        if (item.poolId != null) pId = item.poolId.ToString();
+                        else if (item.PoolId != null) pId = item.PoolId.ToString();
+                     } catch {}
+
+                     // If no season found on the item, assume it belongs to the single "LEGACY" season
+                     if (string.IsNullOrEmpty(sId))
+                     {
+                         sId = "LEGACY";
+                     }
 
                      if (!string.IsNullOrEmpty(sId))
                      {
@@ -109,7 +133,7 @@ namespace BowlPoolManager.Api.Repositories
                  }
              }
 
-             return (games, teamNames.OrderBy(t => t).ToList(), seasonIds.OrderBy(s => s).ToList(), pools.OrderBy(p => p.SeasonId).ThenBy(p => p.PoolId).ToList(), entryCount);
+             return (games, teamNames.OrderBy(t => t).ToList(), seasonIds.OrderBy(s => s).ToList(), pools.OrderBy(p => p.SeasonId).ThenBy(p => p.PoolId).ToList(), entryCount, debugInfo);
         }
 
         public async Task<List<dynamic>> GetLegacyEntriesAsync()

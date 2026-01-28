@@ -45,6 +45,15 @@
                     Ensure your legacy connection string is configured in <code>local.settings.json</code> or App Configuration.
                 </div>
             </div>
+
+            @if (analysisResult != null && !analysisResult.LegacySeasonIds.Any()) 
+            {
+               <div class="alert alert-warning m-3">
+                   <h6>No Seasons Found</h6>
+                   <p>The analysis ran but found no season IDs. Here is the raw data from the first entry found (if any):</p>
+                   <pre class="bg-dark text-light p-2 rounded">@analysisResult.DebugInfo</pre>
+               </div>
+            }
             <div class="card-footer bg-transparent border-secondary text-end">
                 <button class="btn btn-primary" @onclick="AnalyzeLegacyData">
                     Analyze Legacy Data <i class="bi bi-arrow-right ms-1"></i>
