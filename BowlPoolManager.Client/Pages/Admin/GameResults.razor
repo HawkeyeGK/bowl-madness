@@ -112,7 +112,12 @@
         @if (showDebug && games != null)
         {
             <div class="card bg-light border-warning">
-                <div class="card-header bg-warning text-dark fw-bold">Linkage Diagnostics</div>
+                <div class="card-header bg-warning text-dark fw-bold d-flex justify-content-between align-items-center">
+                    <span>Linkage Diagnostics</span>
+                    <button class="btn btn-danger btn-sm" @onclick="ForcePropagation">
+                        <i class="bi bi-arrow-repeat"></i> Force Linkage Update
+                    </button>
+                </div>
                 <div class="card-body font-monospace small">
                     <ul class="list-group list-group-flush">
                         @foreach (var game in games.Where(g => !string.IsNullOrEmpty(g.NextGameId) || games.Any(f => f.NextGameId == g.Id)))
@@ -274,6 +279,33 @@
         catch (Exception ex)
         {
             Console.WriteLine($"Error saving result: {ex.Message}");
+        }
+    }
+
+    private async Task ForcePropagation()
+    {
+        try
+        {
+             if (string.IsNullOrEmpty(selectedSeasonId)) return;
+             
+             statusMessage = "Forcing global propagation...";
+             var response = await Http.PostAsync($"api/ForcePropagation?seasonId={selectedSeasonId}", null);
+             
+             if (response.IsSuccessStatusCode)
+             {
+                 statusMessage = "Propagation Complete! Reloading...";
+                 await Task.Delay(2000);
+                 await LoadGames();
+                 statusMessage = null;
+             }
+             else
+             {
+                 statusMessage = $"Error: {response.StatusCode}";
+             }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error: {ex.Message}";
         }
     }
 

@@ -129,5 +129,36 @@ namespace BowlPoolManager.Api.Functions
              await _gameRepo.DeleteGameAsync(gameId);
              return req.CreateResponse(HttpStatusCode.OK);
         }
+
+        [Function("ForcePropagation")]
+        public async Task<HttpResponseData> ForcePropagation([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+        {
+            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
+            if (!authResult.IsValid) return authResult.ErrorResponse!;
+
+            var seasonId = req.Query["seasonId"];
+            if (string.IsNullOrEmpty(seasonId))
+            {
+                 var badRequest = req.CreateResponse(HttpStatusCode.BadRequest);
+                 await badRequest.WriteStringAsync("Season ID is required");
+                 return badRequest;
+            }
+
+            var games = await _gameRepo.GetGamesAsync(seasonId);
+            
+            // Iterate through completed games and force an update to propagate
+            // We sort by StartTime to ensure feeders are processed before targets
+            var completedGames = games
+                .Where(g => g.Status == GameStatus.Final)
+                .OrderBy(g => g.StartTime)
+                .ToList();
+
+            foreach (var game in completedGames)
+            {
+                await _scoringService.ProcessGameUpdateAsync(game);
+            }
+
+            return req.CreateResponse(HttpStatusCode.OK);
+        }
     }
 }
