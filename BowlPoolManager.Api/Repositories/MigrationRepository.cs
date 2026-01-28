@@ -62,20 +62,24 @@ namespace BowlPoolManager.Api.Repositories
                      {
                          string id = item.id;
                          string name = "";
-                         // User requested "season" value specifically
-                         if (item.season != null) name = item.season.ToString();
-                         else if (item.Season != null) name = item.Season.ToString();
-                         
-                         // Fallback to name if season is missing
-                         if (string.IsNullOrEmpty(name))
-                         {
-                              if (item.name != null) name = item.name.ToString();
-                              else if (item.Name != null) name = item.Name.ToString();
-                         }
+                         string season = "";
 
-                         if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(name))
+                         if (item.name != null) name = item.name.ToString();
+                         else if (item.Name != null) name = item.Name.ToString();
+
+                         if (item.season != null) season = item.season.ToString();
+                         else if (item.Season != null) season = item.Season.ToString();
+
+                         string displayName = name;
+                         if (!string.IsNullOrEmpty(season))
                          {
-                             poolLookup[id] = name;
+                             if (!string.IsNullOrEmpty(displayName)) displayName += $" ({season})";
+                             else displayName = season;
+                         }
+                         
+                         if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(displayName))
+                         {
+                             poolLookup[id] = displayName;
                          }
                      }
                  }
