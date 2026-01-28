@@ -36,38 +36,17 @@
                 <h5 class="mb-0">Step 1: Configuration</h5>
             </div>
             <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Target Season</label>
-                        <select class="form-select @(seasons == null ? "disabled" : "")" @onchange="OnSeasonChanged">
-                            <option value="">-- Select Season --</option>
-                            @if (seasons != null)
-                            {
-                                foreach (var season in seasons)
-                                {
-                                    <option value="@season.Id" selected="@(season.Id == targetSeasonId)">@season.Name (@season.SeasonId)</option>
-                                }
-                            }
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Target Pool</label>
-                        <select class="form-select @(pools == null ? "disabled" : "")" @bind="targetPoolId">
-                            <option value="">-- Select Pool --</option>
-                            @if (pools != null)
-                            {
-                                foreach (var pool in pools)
-                                {
-                                    <option value="@pool.Id">@pool.Name</option>
-                                }
-                            }
-                        </select>
-                        <div class="form-text text-light opacity-50">Select the pool where new entries will be created.</div>
-                    </div>
+                <p class="card-text">
+                    This wizard will scan the legacy database container for all Games, Pools, and Bracket Entries.
+                    You will then be able to map historic Seasons, Pools, Games, and Teams to the new system structure.
+                </p>
+                <div class="alert alert-info border-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Ensure your legacy connection string is configured in <code>local.settings.json</code> or App Configuration.
                 </div>
             </div>
             <div class="card-footer bg-transparent border-secondary text-end">
-                <button class="btn btn-primary" @onclick="AnalyzeLegacyData" disabled="@(!CanAnalyze)">
+                <button class="btn btn-primary" @onclick="AnalyzeLegacyData">
                     Analyze Legacy Data <i class="bi bi-arrow-right ms-1"></i>
                 </button>
             </div>
@@ -152,7 +131,7 @@
                                                 <option value="">-- Select Pool --</option>
                                                 @if (pools != null)
                                                 {
-                                                    foreach (var pool in pools)
+                                                    foreach (var pool in pools.Where(p => p.SeasonId == targetSid))
                                                     {
                                                         <option value="@pool.Id">@pool.Name</option>
                                                     }
@@ -326,7 +305,7 @@
     private int migratedCount = 0;
     private List<TeamInfo> AllTeams = new();
 
-    private bool CanAnalyze => !string.IsNullOrEmpty(targetSeasonId) && !string.IsNullOrEmpty(targetPoolId);
+    // private bool CanAnalyze => !string.IsNullOrEmpty(targetSeasonId) && !string.IsNullOrEmpty(targetPoolId);
 
     protected override async Task OnInitializedAsync()
     {
@@ -340,15 +319,17 @@
             pools = poolsList;
             
             // Default to most recent season
+            /*
             if (seasons != null && seasons.Any())
             {
                 var currentSeason = await SeasonService.GetCurrentSeasonAsync();
                 if (currentSeason != null)
                 {
                     targetSeasonId = currentSeason.Id;
-                    await LoadTargetGames(targetSeasonId);
+                    // await LoadTargetGames(targetSeasonId);
                 }
             }
+            */
         }
         catch (Exception ex)
         {
@@ -360,6 +341,7 @@
         }
     }
 
+    /*
     private async Task OnSeasonChanged(ChangeEventArgs e)
     {
         targetSeasonId = e.Value?.ToString() ?? "";
@@ -372,6 +354,7 @@
             targetGames = null;
         }
     }
+    */
 
     private async Task LoadTargetGames(string seasonId)
     {

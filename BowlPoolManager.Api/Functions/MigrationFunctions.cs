@@ -97,30 +97,49 @@ namespace BowlPoolManager.Api.Functions
 
                         // 1. Determine Target Season
                         string? legacySeasonId = (string?)item["seasonId"];
-                        string targetSeasonId = migrationRequest.TargetSeasonId; // Default fallback
+                        string targetSeasonId = "";
 
-                        // If user provided specific season mappings, use them
-                        if (!string.IsNullOrEmpty(legacySeasonId) && migrationRequest.SeasonMapping.Any())
+                        // Resolve Season Mapping
+                        if (!string.IsNullOrEmpty(legacySeasonId) && migrationRequest.SeasonMapping.TryGetValue(legacySeasonId, out var mappedSeasonId))
                         {
-                            if (!migrationRequest.SeasonMapping.TryGetValue(legacySeasonId, out var mappedSeasonId) || string.IsNullOrEmpty(mappedSeasonId))
-                            {
-                                continue; // Skip entry if season is not mapped
-                            }
                             targetSeasonId = mappedSeasonId;
+                        }
+
+                        // Fallback or Skip
+                        if (string.IsNullOrEmpty(targetSeasonId)) 
+                        {
+                            // If we have a global default, use it? No, user wants strict mapping.
+                            if (!string.IsNullOrEmpty(migrationRequest.TargetSeasonId)) 
+                            {
+                                targetSeasonId = migrationRequest.TargetSeasonId;
+                            }
+                            else 
+                            {
+                                continue; // Skip entry
+                            }
                         }
                         
                         // 2. Determine Target Pool
                         string? legacyPoolId = (string?)item["poolId"];
-                        string targetPoolId = migrationRequest.TargetPoolId; // Default fallback
+                        string targetPoolId = "";
                         
-                        // If user provided specific pool mappings, use them
-                        if (!string.IsNullOrEmpty(legacyPoolId) && migrationRequest.PoolMapping.Any())
+                        // Resolve Pool Mapping
+                        if (!string.IsNullOrEmpty(legacyPoolId) && migrationRequest.PoolMapping.TryGetValue(legacyPoolId, out var mappedPoolId))
                         {
-                            if (!migrationRequest.PoolMapping.TryGetValue(legacyPoolId, out var mappedPoolId) || string.IsNullOrEmpty(mappedPoolId))
-                            {
-                                continue; // Skip entry if pool is not mapped
-                            }
                             targetPoolId = mappedPoolId;
+                        }
+
+                        // Fallback or Skip
+                        if (string.IsNullOrEmpty(targetPoolId))
+                        {
+                             if (!string.IsNullOrEmpty(migrationRequest.TargetPoolId))
+                             {
+                                 targetPoolId = migrationRequest.TargetPoolId;
+                             }
+                             else
+                             {
+                                 continue; // Skip entry
+                             }
                         }
 
                         // Create new entry
