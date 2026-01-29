@@ -71,13 +71,18 @@
                 <div class="row g-3 mb-3">
                     <div class="col-md-3">
                         <label for="teamHome" class="form-label">Home Team</label>
-                        <select id="teamHome" class="form-select" value="@newGame.TeamHomeId" @onchange="OnHomeTeamChanged">
-                            <option value="">-- Select Team --</option>
-                            @foreach (var team in AllTeams)
-                            {
-                                <option value="@team.SchoolId">@team.School</option>
-                            }
-                        </select>
+                        <div class="input-group">
+                            <select id="teamHome" class="form-select" value="@newGame.TeamHomeId" @onchange="OnHomeTeamChanged">
+                                <option value="">-- Select Team --</option>
+                                @foreach (var team in AllTeams)
+                                {
+                                    <option value="@team.SchoolId">@team.School</option>
+                                }
+                            </select>
+                            <button type="button" class="btn btn-outline-danger" @onclick="ClearHomeTeam" title="Clear Home Team">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
                         @* Fallback/Display for verification *@
                         <div class="form-text text-muted small">
                             Selected: @(string.IsNullOrEmpty(newGame.TeamHome) ? "None" : newGame.TeamHome)
@@ -85,13 +90,18 @@
                     </div>
                     <div class="col-md-3">
                         <label for="teamAway" class="form-label">Away Team</label>
-                        <select id="teamAway" class="form-select" value="@newGame.TeamAwayId" @onchange="OnAwayTeamChanged">
-                            <option value="">-- Select Team --</option>
-                            @foreach (var team in AllTeams)
-                            {
-                                <option value="@team.SchoolId">@team.School</option>
-                            }
-                        </select>
+                        <div class="input-group">
+                            <select id="teamAway" class="form-select" value="@newGame.TeamAwayId" @onchange="OnAwayTeamChanged">
+                                <option value="">-- Select Team --</option>
+                                @foreach (var team in AllTeams)
+                                {
+                                    <option value="@team.SchoolId">@team.School</option>
+                                }
+                            </select>
+                            <button type="button" class="btn btn-outline-danger" @onclick="ClearAwayTeam" title="Clear Away Team">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
                          <div class="form-text text-muted small">
                             Selected: @(string.IsNullOrEmpty(newGame.TeamAway) ? "None" : newGame.TeamAway)
                         </div>
@@ -396,6 +406,22 @@
             newGame.TeamAway = "";
             newGame.AwayTeamInfo = null;
         }
+    }
+
+    private void ClearHomeTeam()
+    {
+        newGame.TeamHomeId = null;
+        newGame.TeamHome = "";
+        newGame.HomeTeamInfo = null;
+        newGame.TeamHomeSeed = null;
+    }
+
+    private void ClearAwayTeam()
+    {
+        newGame.TeamAwayId = null;
+        newGame.TeamAway = "";
+        newGame.AwayTeamInfo = null;
+        newGame.TeamAwaySeed = null;
     }
 
     private async Task EditGame(BowlGame game)
