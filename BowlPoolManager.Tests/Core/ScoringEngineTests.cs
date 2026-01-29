@@ -175,7 +175,7 @@ namespace BowlPoolManager.Tests.Core
             };
 
             // Act
-            var results = ScoringEngine.Calculate(games, entries, tieBreakerGameId: "T");
+            var results = ScoringEngine.Calculate(games, entries, new BowlPool { TieBreakerGameId = "T" });
 
             // Assert
             results[0].Entry.PlayerName.Should().Be("Close");
@@ -201,7 +201,7 @@ namespace BowlPoolManager.Tests.Core
             };
 
             // Act
-            var results = ScoringEngine.Calculate(games, entries, tieBreakerGameId: "T");
+            var results = ScoringEngine.Calculate(games, entries, new BowlPool { TieBreakerGameId = "T" });
 
             // Assert
             results[0].Rank.Should().Be(1);

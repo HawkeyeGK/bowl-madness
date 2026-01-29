@@ -348,7 +348,7 @@
             totalFinalGames = games.Count(g => g.Status == GameStatus.Final);
             isPoolFinal = (games.Count > 0 && totalFinalGames == games.Count);
             
-            leaderboard = ScoringEngine.Calculate(games, entries, currentPool?.TieBreakerGameId);
+            leaderboard = ScoringEngine.Calculate(games, entries, currentPool);
             Sort(sortColumn, forceToggle: false);
         }
         catch (Exception ex)

@@ -156,6 +156,30 @@
                         </div>
 
                         <div class="mb-3">
+                            <label class="form-label">TieBreaker Logic</label>
+                            <div class="row">
+                                <div class="col-6">
+                                    <label class="form-label small text-muted">Primary Rank</label>
+                                    <InputSelect @bind-Value="editingPool.PrimaryTieBreaker" class="form-select form-select-sm">
+                                        @foreach (var metric in Enum.GetValues(typeof(TieBreakerMetric)))
+                                        {
+                                            <option value="@metric">@metric</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small text-muted">Secondary Rank</label>
+                                    <InputSelect @bind-Value="editingPool.SecondaryTieBreaker" class="form-select form-select-sm">
+                                        @foreach (var metric in Enum.GetValues(typeof(TieBreakerMetric)))
+                                        {
+                                            <option value="@metric">@metric</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
                             <label class="form-label">Season</label>
                             <InputSelect Value="@editingPool.SeasonId" 
                                          ValueChanged="@((string s) => OnSeasonChanged(s))" 

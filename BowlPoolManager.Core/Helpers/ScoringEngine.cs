@@ -4,7 +4,7 @@ namespace BowlPoolManager.Core.Helpers
 {
     public static class ScoringEngine
     {
-        public static List<LeaderboardRow> Calculate(List<BowlGame> games, List<BracketEntry> entries, string? tieBreakerGameId = null)
+        public static List<LeaderboardRow> Calculate(List<BowlGame> games, List<BracketEntry> entries, BowlPool? poolConfig = null)
         {
             // 1. Identify Eliminated Teams (Teams that have lost any FINAL game)
             var eliminatedTeams = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -20,6 +20,7 @@ namespace BowlPoolManager.Core.Helpers
             // 2. Identify Tiebreaker Game Status & Score
             bool isTieBreakerFinal = false;
             int tieBreakerTotalPoints = 0;
+            string? tieBreakerGameId = poolConfig?.TieBreakerGameId;
 
             if (!string.IsNullOrEmpty(tieBreakerGameId))
             {
@@ -131,22 +132,37 @@ namespace BowlPoolManager.Core.Helpers
                 });
             }
 
-            // SORT ORDER: 
-            // 1. Total Score (Desc)
-            // 2. Correct Picks (Desc)
-            // 3. Tiebreaker Delta (Asc, but ONLY if game is Final) - If not final, we don't sort by it (effectively equal)
+            // SORT ORDER DETERMINATION
+            // Default: CorrectPickCount then ScoreDelta
+            var primaryMetric = poolConfig?.PrimaryTieBreaker ?? TieBreakerMetric.CorrectPickCount;
+            var secondaryMetric = poolConfig?.SecondaryTieBreaker ?? TieBreakerMetric.ScoreDelta;
+
+            // 1. Total Score (Always Descending)
+            var sortedQuery = rows.OrderByDescending(r => r.Score);
+            IOrderedEnumerable<LeaderboardRow> finalSortedQuery = sortedQuery;
+
+            // 2. Primary Tiebreaker
+            if (primaryMetric == TieBreakerMetric.CorrectPickCount)
+            {
+                finalSortedQuery = sortedQuery.ThenByDescending(r => r.CorrectPicks);
+            }
+            else // ScoreDelta
+            {
+                finalSortedQuery = sortedQuery.ThenBy(r => r.TieBreakerDelta ?? int.MaxValue);
+            }
+
+            // 3. Secondary Tiebreaker
+            if (secondaryMetric == TieBreakerMetric.CorrectPickCount)
+            {
+                finalSortedQuery = finalSortedQuery.ThenByDescending(r => r.CorrectPicks);
+            }
+            else // ScoreDelta
+            {
+                finalSortedQuery = finalSortedQuery.ThenBy(r => r.TieBreakerDelta ?? int.MaxValue);
+            }
+
             // 4. Name (Asc) fallback
-
-            // To handle null deltas (not final) effectively being "equal", 
-            // we can just treat null as Int.MaxValue so they go to bottom if we were sorting, 
-            // but for the Rank ASSIGNMENT, we need to be careful.
-
-            // Let's sort optimally for display
-            var sortedRows = rows.OrderByDescending(r => r.Score)
-                                 .ThenByDescending(r => r.CorrectPicks)
-                                 .ThenBy(r => r.TieBreakerDelta ?? int.MaxValue) // Nulls go last or don't matter if all null
-                                 .ThenBy(r => r.Entry.PlayerName)
-                                 .ToList();
+            var sortedRows = finalSortedQuery.ThenBy(r => r.Entry.PlayerName).ToList();
 
             // Assign Ranks
             int rank = 1;
@@ -160,21 +176,13 @@ namespace BowlPoolManager.Core.Helpers
                     var prevRow = sortedRows[i - 1];
 
                     bool scoresEqual = currentRow.Score == prevRow.Score;
-                    bool picksEqual = currentRow.CorrectPicks == prevRow.CorrectPicks;
                     
-                    // Tiebreaker logic: Only breaks ties if the game is FINAL (Delta has value)
-                    bool tieBreakerEqual = true;
-                    if (isTieBreakerFinal)
-                    {
-                        // If both have deltas, compare them.
-                        if (currentRow.TieBreakerDelta.HasValue && prevRow.TieBreakerDelta.HasValue)
-                        {
-                            tieBreakerEqual = currentRow.TieBreakerDelta.Value == prevRow.TieBreakerDelta.Value;
-                        }
-                    }
+                    // Determine equality based on configuration
+                    bool primaryEqual = IsMetricEqual(primaryMetric, currentRow, prevRow, isTieBreakerFinal);
+                    bool secondaryEqual = IsMetricEqual(secondaryMetric, currentRow, prevRow, isTieBreakerFinal);
 
                     // If everything that matters is equal, give same rank
-                    if (scoresEqual && picksEqual && tieBreakerEqual)
+                    if (scoresEqual && primaryEqual && secondaryEqual)
                     {
                         currentRow.Rank = prevRow.Rank;
                     }
@@ -188,6 +196,28 @@ namespace BowlPoolManager.Core.Helpers
             }
 
             return sortedRows;
+        }
+
+        private static bool IsMetricEqual(TieBreakerMetric metric, LeaderboardRow current, LeaderboardRow prev, bool isTieBreakerFinal)
+        {
+            if (metric == TieBreakerMetric.CorrectPickCount)
+            {
+                return current.CorrectPicks == prev.CorrectPicks;
+            }
+            else // ScoreDelta
+            {
+                 // If game isn't final, delta is effectively irrelevant/equal for ranking purposes
+                 if (!isTieBreakerFinal) return true;
+
+                 // If both have values, compare them
+                 if (current.TieBreakerDelta.HasValue && prev.TieBreakerDelta.HasValue)
+                 {
+                     return current.TieBreakerDelta.Value == prev.TieBreakerDelta.Value;
+                 }
+                 
+                 // If one has value and other doesn't (shouldn't happen if both in same pool context), treat as unequal
+                 return current.TieBreakerDelta.HasValue == prev.TieBreakerDelta.HasValue;
+            }
         }
     }
 }

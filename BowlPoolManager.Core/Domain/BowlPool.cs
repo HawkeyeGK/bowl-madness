@@ -50,9 +50,23 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("tieBreakerGameId")]
         public string TieBreakerGameId { get; set; } = string.Empty;
 
+        [JsonProperty("primaryTieBreaker")]
+        [JsonPropertyName("primaryTieBreaker")]
+        public TieBreakerMetric PrimaryTieBreaker { get; set; } = TieBreakerMetric.CorrectPickCount;
+
+        [JsonProperty("secondaryTieBreaker")]
+        [JsonPropertyName("secondaryTieBreaker")]
+        public TieBreakerMetric SecondaryTieBreaker { get; set; } = TieBreakerMetric.ScoreDelta;
+
         // COSMOS DISCRIMINATOR
         [JsonProperty("type")]
         [JsonPropertyName("type")]
         public string Type { get; set; } = Constants.DocumentTypes.BowlPool;
+    }
+
+    public enum TieBreakerMetric
+    {
+        CorrectPickCount,
+        ScoreDelta
     }
 }
