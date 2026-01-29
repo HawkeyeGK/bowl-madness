@@ -224,12 +224,49 @@ namespace BowlPoolManager.Api.Services
                 else
                 {
                     // Single feeder in list (myself)
-                    // Fallback to placeholder logic to guess slot
-                    bool homeIsPlaceholder = IsPlaceholder(nextGame.TeamHome);
-                    bool awayIsPlaceholder = IsPlaceholder(nextGame.TeamAway);
+                    // First, check if the winner already exists in one of the slots
+                    // This prevents double-propagation on subsequent runs
+                    var winnerName = completedGame.WinningTeamName;
+                    
+                    if (!string.IsNullOrEmpty(winnerName))
+                    {
+                        bool homeHasWinner = string.Equals(nextGame.TeamHome, winnerName, StringComparison.OrdinalIgnoreCase);
+                        bool awayHasWinner = string.Equals(nextGame.TeamAway, winnerName, StringComparison.OrdinalIgnoreCase);
+                        
+                        if (homeHasWinner && !awayHasWinner)
+                        {
+                            // Winner already in Home, stay with Home
+                            isHomeSlot = true;
+                            _logger.LogInformation($"PropagateWinner: Single feeder '{completedGame.BowlName}'. Winner '{winnerName}' already in Home slot.");
+                        }
+                        else if (awayHasWinner && !homeHasWinner)
+                        {
+                            // Winner already in Away, stay with Away
+                            isHomeSlot = false;
+                            _logger.LogInformation($"PropagateWinner: Single feeder '{completedGame.BowlName}'. Winner '{winnerName}' already in Away slot.");
+                        }
+                        else
+                        {
+                            // Winner not found in either slot (or somehow in both), use placeholder heuristic
+                            bool homeIsPlaceholder = IsPlaceholder(nextGame.TeamHome);
+                            bool awayIsPlaceholder = IsPlaceholder(nextGame.TeamAway);
 
-                    if (!homeIsPlaceholder && awayIsPlaceholder) isHomeSlot = false;
-                    _logger.LogInformation($"PropagateWinner: Single feeder '{completedGame.BowlName}'. Slot guessed as: {(isHomeSlot ? "Home" : "Away")}");
+                            if (!homeIsPlaceholder && awayIsPlaceholder) 
+                            {
+                                isHomeSlot = false;
+                            }
+                            _logger.LogInformation($"PropagateWinner: Single feeder '{completedGame.BowlName}'. Slot guessed as: {(isHomeSlot ? "Home" : "Away")} (Home placeholder: {homeIsPlaceholder}, Away placeholder: {awayIsPlaceholder})");
+                        }
+                    }
+                    else
+                    {
+                        // No winner yet, use placeholder heuristic
+                        bool homeIsPlaceholder = IsPlaceholder(nextGame.TeamHome);
+                        bool awayIsPlaceholder = IsPlaceholder(nextGame.TeamAway);
+
+                        if (!homeIsPlaceholder && awayIsPlaceholder) isHomeSlot = false;
+                        _logger.LogInformation($"PropagateWinner: Single feeder '{completedGame.BowlName}' (no winner). Slot guessed as: {(isHomeSlot ? "Home" : "Away")}");
+                    }
                 }
             }
             else
