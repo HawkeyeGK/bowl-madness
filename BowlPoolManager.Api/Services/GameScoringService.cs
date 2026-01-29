@@ -149,16 +149,82 @@ namespace BowlPoolManager.Api.Services
 
         public async Task ProcessGameUpdateAsync(BowlGame game)
         {
-            // 1. Persist the primary update
+            // 0. Fetch current DB state and all games for context
+            var allGames = await _gameRepo.GetGamesAsync(game.SeasonId);
+            var currentDbGame = allGames.FirstOrDefault(g => string.Equals(g.Id, game.Id, StringComparison.OrdinalIgnoreCase));
+            
+            // 1. Before saving, preserve propagated team data from completed feeders
+            // This prevents the UI from overwriting good data with stale placeholders
+            var feeders = allGames
+                .Where(g => string.Equals(g.NextGameId, game.Id, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(g => g.StartTime)
+                .ToList();
+            
+            if (feeders.Count > 0)
+            {
+                // Check each feeder and apply propagated values if the client is sending stale placeholders
+                foreach (var (feeder, index) in feeders.Select((f, i) => (f, i)))
+                {
+                    if (feeder.Status == GameStatus.Final && !string.IsNullOrEmpty(feeder.WinningTeamName))
+                    {
+                        var winnerName = feeder.WinningTeamName;
+                        var winnerInfo = string.Equals(winnerName, feeder.TeamHome, StringComparison.OrdinalIgnoreCase)
+                            ? feeder.HomeTeamInfo
+                            : feeder.AwayTeamInfo;
+                        var winnerSeed = string.Equals(winnerName, feeder.TeamHome, StringComparison.OrdinalIgnoreCase)
+                            ? feeder.TeamHomeSeed
+                            : feeder.TeamAwaySeed;
+                        
+                        // Determine which slot this feeder should populate
+                        bool isHomeSlot = (feeders.Count > 1) ? (index == 0) : DetermineSlotForSingleFeeder(game, winnerName);
+                        
+                        if (isHomeSlot && IsPlaceholder(game.TeamHome))
+                        {
+                            // Client sent stale placeholder for Home, use propagated value
+                            game.TeamHome = winnerName;
+                            game.HomeTeamInfo = winnerInfo;
+                            game.TeamHomeSeed = winnerSeed;
+                            _logger.LogInformation($"ProcessGameUpdate: Preserved propagated Home team '{winnerName}' for '{game.BowlName}'");
+                        }
+                        else if (!isHomeSlot && IsPlaceholder(game.TeamAway))
+                        {
+                            // Client sent stale placeholder for Away, use propagated value
+                            game.TeamAway = winnerName;
+                            game.AwayTeamInfo = winnerInfo;
+                            game.TeamAwaySeed = winnerSeed;
+                            _logger.LogInformation($"ProcessGameUpdate: Preserved propagated Away team '{winnerName}' for '{game.BowlName}'");
+                        }
+                    }
+                }
+            }
+            
+            // 2. Persist the primary update (now with preserved propagation)
             await _gameRepo.UpdateGameAsync(game);
 
-            // 2. Check for propagation requirements
+            // 3. Check for propagation requirements (this game propagates to others)
             if (!string.IsNullOrEmpty(game.NextGameId))
             {
-                // We need the full context to determine slots
-                var allGames = await _gameRepo.GetGamesAsync(game.SeasonId);
+                // Refresh allGames to include our update
+                allGames = await _gameRepo.GetGamesAsync(game.SeasonId);
                 await PropagateWinner(game, allGames);
             }
+        }
+        
+        /// <summary>
+        /// Helper to determine slot for a single-feeder scenario during preservation check.
+        /// </summary>
+        private bool DetermineSlotForSingleFeeder(BowlGame targetGame, string winnerName)
+        {
+            // Check if winner already exists in one slot
+            if (string.Equals(targetGame.TeamHome, winnerName, StringComparison.OrdinalIgnoreCase)) return true;
+            if (string.Equals(targetGame.TeamAway, winnerName, StringComparison.OrdinalIgnoreCase)) return false;
+            
+            // Fallback to placeholder heuristic
+            bool homeIsPlaceholder = IsPlaceholder(targetGame.TeamHome);
+            bool awayIsPlaceholder = IsPlaceholder(targetGame.TeamAway);
+            
+            if (!homeIsPlaceholder && awayIsPlaceholder) return false; // Away slot
+            return true; // Default to Home
         }
 
         /// <summary>
