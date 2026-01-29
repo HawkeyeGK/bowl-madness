@@ -130,6 +130,9 @@
 
                             <li class="list-group-item bg-transparent">
                                 <div class="fw-bold text-primary">@game.BowlName (@game.Id)</div>
+                                <div class="ms-3 text-secondary">
+                                    <span>📊 Raw: Home="@(game.TeamHome ?? "null")" | Away="@(game.TeamAway ?? "null")" | Status=@game.Status</span>
+                                </div>
                                 <div class="ms-3">
                                     <span>👉 Feeds Into: </span>
                                     @if (nextGame != null)
@@ -153,7 +156,7 @@
                                             @foreach (var f in feeders)
                                             {
                                                 <li>
-                                                    @f.BowlName (@f.Id) - @f.StartTime.ToString("g")
+                                                    @f.BowlName (@f.Id) - @f.StartTime.ToString("g") @(f.Status == GameStatus.Final ? $"✅ Winner: {f.WinningTeamName}" : "")
                                                 </li>
                                             }
                                         </ul>
@@ -344,22 +347,33 @@
         else
         {
             // Single Feeder
-            // Heuristic: If the OTHER slot is filled by a real name, assume this feeder is for ME.
-            // If both are TBD, assume Home (0).
+            // Heuristic: Determine which slot this feeder propagates to.
             
             string otherSlotName = isHome ? game.TeamAway : game.TeamHome;
             bool otherIsPlaceholder = IsTBD(otherSlotName);
             
+            // Get the feeder's winner (if final)
+            var feederWinner = feeders[0].Status == GameStatus.Final ? feeders[0].WinningTeamName : null;
+            
             if (!otherIsPlaceholder) 
             {
-                 // Other slot is taken, so I must be the one for this feeder
-                 targetFeeder = feeders[0];
+                // Other slot has a real team name.
+                // Check if the feeder's winner MATCHES the other slot.
+                // If so, the feeder already propagated there - this slot is unrelated (BYE team or different source).
+                if (feederWinner != null && string.Equals(feederWinner, otherSlotName, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Feeder already propagated to the other slot - this slot doesn't get this feeder
+                    targetFeeder = null;
+                }
+                else
+                {
+                    // Other slot is filled by someone else (e.g., BYE team), so I get this feeder
+                    targetFeeder = feeders[0];
+                }
             }
             else
             {
-                // Both empty. Default to Home gets the feeder?
-                // If I am Home, I get it.
-                // If I am Away, I don't.
+                // Both slots are placeholders. Default to Home gets the feeder.
                 if (isHome) targetFeeder = feeders[0];
             }
         }
