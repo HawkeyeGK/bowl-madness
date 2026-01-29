@@ -91,64 +91,25 @@ namespace BowlPoolManager.Api.Functions
                 });
             }
 
-            // Calculate & Map Standings
+            // Calculate & Map Standings using ScoringEngine
+            var leaderboard = BowlPoolManager.Core.Helpers.ScoringEngine.Calculate(seasonGames, entries, pool);
+            
             var calculatedStandings = new List<ArchiveStanding>();
 
-            foreach (var entry in entries)
+            foreach (var row in leaderboard)
             {
                 var standing = new ArchiveStanding
                 {
-                    PlayerName = entry.PlayerName,
-                    TieBreakerPoints = entry.TieBreakerPoints
+                    PlayerName = row.Entry.PlayerName,
+                    Rank = row.Rank,
+                    TotalPoints = row.Score,
+                    CorrectPicks = row.CorrectPicks,
+                    TieBreakerPoints = row.Entry.TieBreakerPoints,
+                    TieBreakerDelta = row.TieBreakerDelta,
+                    Picks = row.Entry.Picks ?? new Dictionary<string, string>()
                 };
                 
-                // Calculate Points
-                int points = 0;
-                if (entry.Picks != null)
-                {
-                    foreach (var pick in entry.Picks) // Dictionary<GameId, string>
-                    {
-                    var game = seasonGames.FirstOrDefault(g => g.Id == pick.Key);
-                    if (game == null) continue;
-
-                    // Add to Archives picks map
-                    standing.Picks[pick.Key] = pick.Value;
-
-                    // Calculate score
-                    if (game.TeamHomeScore.HasValue && game.TeamAwayScore.HasValue)
-                    {
-                        string winner = "";
-                        if (game.TeamHomeScore > game.TeamAwayScore) winner = game.TeamHome;
-                        else if (game.TeamAwayScore > game.TeamHomeScore) winner = game.TeamAway;
-                        
-                        if (pick.Value == winner)
-                        {
-                            points += game.PointValue;
-                        }
-                    }
-                }
-                }
-                standing.TotalPoints = points;
                 calculatedStandings.Add(standing);
-            }
-
-            // Sort and Rank
-            calculatedStandings = calculatedStandings
-                .OrderByDescending(s => s.TotalPoints)
-                .ThenByDescending(s => s.TieBreakerPoints)
-                .ToList();
-
-            // Standard Competition Ranking (1224)
-            for (int i = 0; i < calculatedStandings.Count; i++)
-            {
-                if (i > 0 && calculatedStandings[i].TotalPoints == calculatedStandings[i-1].TotalPoints)
-                {
-                    calculatedStandings[i].Rank = calculatedStandings[i-1].Rank;
-                }
-                else
-                {
-                    calculatedStandings[i].Rank = i + 1;
-                }
             }
             
             archive.Standings = calculatedStandings;

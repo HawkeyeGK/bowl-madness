@@ -102,9 +102,17 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("totalPoints")]
         public int TotalPoints { get; set; }
 
+        [JsonProperty("correctPicks")]
+        [JsonPropertyName("correctPicks")]
+        public int CorrectPicks { get; set; }
+
         [JsonProperty("tieBreakerPoints")]
         [JsonPropertyName("tieBreakerPoints")]
         public int TieBreakerPoints { get; set; }
+
+        [JsonProperty("tieBreakerDelta")]
+        [JsonPropertyName("tieBreakerDelta")]
+        public int? TieBreakerDelta { get; set; }
 
         // Key: GameId, Value: CreatePickedTeam
         [JsonProperty("picks")]
