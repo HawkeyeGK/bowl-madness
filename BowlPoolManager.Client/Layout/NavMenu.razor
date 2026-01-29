@@ -29,23 +29,7 @@
             </NavLink>
         </div>
 
-        @* 2. SCOREBOARD *@
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="results">
-                <span class="bi bi-display me-2" aria-hidden="true"></span> Scoreboard
-                @if (IsLive)
-                {
-                    <span class="badge bg-danger ms-2" style="font-size: 0.7em;">
-                        <span class="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style="width: 5px; height: 5px;"></span>
-                        LIVE
-                    </span>
-                }
-            </NavLink>
-        </div>
-
-
-
-        @* 3. MY PICKS / LOG IN *@
+        @* 2. MY PICKS / LOG IN *@
         <AuthorizeView>
             <Authorized>
                 <div class="nav-item px-3">
@@ -62,6 +46,20 @@
                 </div>
             </NotAuthorized>
         </AuthorizeView>
+
+        @* 3. SCOREBOARD *@
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="results">
+                <span class="bi bi-display me-2" aria-hidden="true"></span> Scoreboard
+                @if (IsLive)
+                {
+                    <span class="badge bg-danger ms-2" style="font-size: 0.7em;">
+                        <span class="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style="width: 5px; height: 5px;"></span>
+                        LIVE
+                    </span>
+                }
+            </NavLink>
+        </div>
 
         @* 4. PATH TO VICTORY (New Feature) *@
         <div class="nav-item px-3">
