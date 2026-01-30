@@ -126,8 +126,16 @@ namespace BowlPoolManager.Api.Functions
         {
             _logger.LogInformation("Getting all pools.");
             
+            var seasonId = req.Query["seasonId"];
+            if (string.IsNullOrEmpty(seasonId))
+            {
+                var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badReq.WriteStringAsync("Season ID is required");
+                return badReq;
+            }
+
             // Use Pool Repo
-            var pools = await _poolRepo.GetPoolsAsync();
+            var pools = await _poolRepo.GetPoolsAsync(seasonId);
             
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(pools);

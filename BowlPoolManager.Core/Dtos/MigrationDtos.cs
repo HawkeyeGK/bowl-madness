@@ -5,7 +5,7 @@ namespace BowlPoolManager.Core.Dtos
 {
     public class MigrationAnalysisRequest
     {
-        public string SourceSeasonId { get; set; }
+        public string SourceSeasonId { get; set; } = default!;
     }
 
     public class MigrationAnalysisResult
@@ -20,26 +20,26 @@ namespace BowlPoolManager.Core.Dtos
 
     public class LegacyGameDto
     {
-        public string Id { get; set; }
-        public string Description { get; set; }
-        public string HomeTeam { get; set; }
-        public string AwayTeam { get; set; }
+        public string Id { get; set; } = default!;
+        public string Description { get; set; } = default!;
+        public string HomeTeam { get; set; } = default!;
+        public string AwayTeam { get; set; } = default!;
         public DateTime StartTime { get; set; }
-        public string SeasonId { get; set; } // NEW
+        public string SeasonId { get; set; } = default!; // NEW
     }
 
     public class LegacyPoolDto
     {
-        public string PoolId { get; set; }
-        public string PoolName { get; set; } // NEW: For display (captures legacy 'season' property)
-        public string SeasonId { get; set; }
+        public string PoolId { get; set; } = default!;
+        public string PoolName { get; set; } = default!; // NEW: For display (captures legacy 'season' property)
+        public string SeasonId { get; set; } = default!;
     }
 
     public class MigrationExecutionRequest
     {
         // Defaults/Globals (Optional fallback)
-        public string TargetPoolId { get; set; }
-        public string TargetSeasonId { get; set; }
+        public string TargetPoolId { get; set; } = default!;
+        public string TargetSeasonId { get; set; } = default!;
         
         // Mappings
         public Dictionary<string, string> SeasonMapping { get; set; } = new(); // LegacySeasonId -> TargetSeasonId

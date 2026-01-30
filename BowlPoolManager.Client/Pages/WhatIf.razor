@@ -647,10 +647,13 @@
         // B. Feeder Games (Recursive)
         if (hasFeederGames)
         {
-            foreach (var feeder in _feederMap[game.Id])
+            if (_feederMap != null && _feederMap.Contains(game.Id))
             {
-                var incoming = GetPotentialWinnersForGame(feeder);
-                foreach (var team in incoming) entrants.Add(team);
+                foreach (var feeder in _feederMap[game.Id])
+                {
+                    var incoming = GetPotentialWinnersForGame(feeder);
+                    foreach (var team in incoming) entrants.Add(team);
+                }
             }
         }
 

@@ -29,7 +29,7 @@ namespace BowlPoolManager.Api.Repositories
                         HomeTeam = item.teamHome,
                         AwayTeam = item.teamAway,
                         StartTime = item.startTime,
-                        SeasonId = !string.IsNullOrEmpty((string?)item.seasonId) ? (string?)item.seasonId : "LEGACY"
+                        SeasonId = (!string.IsNullOrEmpty((string?)item.seasonId) ? (string?)item.seasonId : "LEGACY")!
                     });
                 }
             }

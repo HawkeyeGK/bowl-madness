@@ -580,9 +580,16 @@
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<dynamic>();
-                migratedCount = (int)result.GetProperty("migratedCount").GetInt32();
-                executionSummary = $"Migration Completed! Migrated: {migratedCount}, Errors: {result.GetProperty("errorCount")}";
-                currentStep = MigrationStep.Complete;
+                if (result is not null)
+                {
+                    migratedCount = (int)result.GetProperty("migratedCount").GetInt32();
+                    executionSummary = $"Migration Completed! Migrated: {migratedCount}, Errors: {result.GetProperty("errorCount")}";
+                    currentStep = MigrationStep.Complete;
+                }
+                else
+                {
+                    errorMessage = "Migration returned no result.";
+                }
             }
             else 
             {

@@ -37,8 +37,16 @@ namespace BowlPoolManager.Api.Functions
         {
             _logger.LogInformation("Getting entries.");
             var poolId = req.Query["poolId"];
+            var seasonId = req.Query["seasonId"];
 
-            var entries = await _entryRepo.GetEntriesAsync(poolId);
+            if (string.IsNullOrEmpty(seasonId))
+            {
+                var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badReq.WriteStringAsync("Season ID is required");
+                return badReq;
+            }
+
+            var entries = await _entryRepo.GetEntriesAsync(seasonId, poolId);
             
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(entries);
@@ -52,8 +60,16 @@ namespace BowlPoolManager.Api.Functions
             if (principal == null) return req.CreateResponse(HttpStatusCode.Unauthorized);
 
             var poolId = req.Query["poolId"] ?? ""; // SAFE COALESCE
+            var seasonId = req.Query["seasonId"];
 
-            var entries = await _entryRepo.GetEntriesForUserAsync(principal.UserId, poolId);
+             if (string.IsNullOrEmpty(seasonId))
+            {
+                var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badReq.WriteStringAsync("Season ID is required");
+                return badReq;
+            }
+
+            var entries = await _entryRepo.GetEntriesForUserAsync(principal.UserId, seasonId, poolId);
             
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(entries);
