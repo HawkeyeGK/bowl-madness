@@ -68,7 +68,18 @@
                                         <td class="text-center h5 text-secondary">@entry.Rank</td>
                                         <td>
                                             @entry.PlayerName
-                                            @if(entry.Rank == 1) { <i class="bi bi-crown-fill text-warning ms-2"></i> }
+                                            @if (entry.Rank == 1)
+                                            {
+                                                <i class="bi bi-trophy-fill ms-2" style="color: #FFD700;" title="1st Place - Gold"></i>
+                                            }
+                                            else if (entry.Rank == 2)
+                                            {
+                                                <i class="bi bi-trophy-fill ms-2" style="color: #C0C0C0;" title="2nd Place - Silver"></i>
+                                            }
+                                            else if (entry.Rank == 3)
+                                            {
+                                                <i class="bi bi-trophy-fill ms-2" style="color: #CD7F32;" title="3rd Place - Bronze"></i>
+                                            }
                                         </td>
                                         <td class="text-center h5">@entry.TotalPoints</td>
                                         <td class="text-end text-muted">@entry.TieBreakerPoints</td>
