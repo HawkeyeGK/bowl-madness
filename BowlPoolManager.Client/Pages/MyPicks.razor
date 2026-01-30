@@ -693,9 +693,11 @@
             }
             
             // 1. Fetch Global Data
-            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");
+            // Fetch ALL pools and entries to support historical views
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
+            // Games only for CURRENT season (for Editor)
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={currentSeasonId}");
-            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyEntries?seasonId={currentSeasonId}");
+            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetMyEntries");
             
             await Task.WhenAll(poolsTask, gamesTask, entriesTask);
             
