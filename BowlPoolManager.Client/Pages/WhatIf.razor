@@ -757,6 +757,7 @@
     private void Recalculate()
     {
         projectedStandings = WhatIfScoringEngine.Calculate(games, filteredEntries, simulatedWinners);
+        StateHasChanged();
     }
 
     // --- STYLING HELPERS ---
