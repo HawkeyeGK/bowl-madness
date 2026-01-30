@@ -699,15 +699,44 @@
         if (string.IsNullOrEmpty(teamName) || !_feederGameIds.TryGetValue(game.Id, out var feederIds))
             return false;
         
+        // Check if this team is in the ORIGINAL feeder tree (not just current simulation)
+        // This prevents stale propagated team names from being added as "fixed teams"
         foreach (var feederId in feederIds)
         {
-            if (_simState.ValidEntrants.TryGetValue(feederId, out var feederEntrants))
+            if (_gameById.TryGetValue(feederId, out var feederGame))
             {
-                if (feederEntrants.Contains(teamName))
+                var originalTeams = GetAllOriginalTeams(feederGame);
+                if (originalTeams.Contains(teamName))
                     return true;
             }
         }
         return false;
+    }
+
+    /// <summary>
+    /// Gets all teams that could ever come from this game's bracket tree (original data, not simulation).
+    /// </summary>
+    private HashSet<string> GetAllOriginalTeams(BowlGame game)
+    {
+        var teams = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        
+        if (!IsStrictTBD(game.TeamHome)) teams.Add(game.TeamHome);
+        if (!IsStrictTBD(game.TeamAway)) teams.Add(game.TeamAway);
+        
+        // Recursively add teams from feeders
+        if (_feederGameIds.TryGetValue(game.Id, out var feederIds))
+        {
+            foreach (var feederId in feederIds)
+            {
+                if (_gameById.TryGetValue(feederId, out var feederGame))
+                {
+                    foreach (var t in GetAllOriginalTeams(feederGame))
+                        teams.Add(t);
+                }
+            }
+        }
+        
+        return teams;
     }
 
     private bool IsStrictTBD(string? name)
