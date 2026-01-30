@@ -264,9 +264,8 @@
                                         <div class="small fw-bold text-truncate" style="max-width: 60px;">@game.BowlName</div>
                                         <div class="badge bg-light text-secondary border">@game.PointValue</div>
                                         <div class="d-block mt-1" style="font-size: 0.65rem;">
-                                            @if(simulatedWinners.ContainsKey(game.Id))
+                                            @if(_simState.EffectiveWinners.TryGetValue(game.Id, out var w) && w != null)
                                             {
-                                                var w = simulatedWinners[game.Id];
                                                 <span class="badge bg-success text-white">@GetTeamAbbrev(w)</span>
                                             }
                                             else
@@ -352,7 +351,7 @@
                                 else
                                 {
                                     <select class="form-select form-select-sm p-1" style="font-size: 0.65rem;" 
-                                            value="@(simulatedWinners.ContainsKey(game.Id) ? simulatedWinners[game.Id] : "")"
+                                            value="@(_simState.EffectiveWinners.TryGetValue(game.Id, out var selected) && selected != null ? selected : "")"
                                             @onchange="@(e => SetSimWinner(game.Id, e.Value?.ToString()))">
                                         <option value="">?</option>
                                         @foreach(var teamName in options)
@@ -434,15 +433,33 @@
             .Select(x => x.Select(v => v.Value).ToList());
     }
     
-    // Simulation State
-    private Dictionary<string, string> simulatedWinners = new();
+    // ========== NEW SIMULATION STATE DESIGN ==========
+    
+    // User's explicit simulation choices (only what user has clicked)
+    private Dictionary<string, string> _userSimulations = new();
+    
+    // Pre-computed simulation state (recomputed on any change)
+    private class SimulationState
+    {
+        // For each game: which teams can compete (based on upstream outcomes)
+        public Dictionary<string, HashSet<string>> ValidEntrants { get; } = new();
+        
+        // For each game: the effective winner (null if undecided)
+        public Dictionary<string, string?> EffectiveWinners { get; } = new();
+    }
+    private SimulationState _simState = new();
+    
+    // Leaderboard projection
     private List<LeaderboardRow> projectedStandings = new();
     
     // Cache for efficient Team Info Lookup
     private Dictionary<string, TeamInfo> teamLookup = new(StringComparer.OrdinalIgnoreCase);
 
-    // Smart Bracket Map: Key = TargetGameId, Value = List of Games that feed into it
-    private ILookup<string, BowlGame>? _feederMap;
+    // Game lookup by ID for fast access
+    private Dictionary<string, BowlGame> _gameById = new();
+    
+    // Feeder map: Key = TargetGameId, Value = List of feeder game IDs
+    private Dictionary<string, List<string>> _feederGameIds = new();
 
     [SupplyParameterFromQuery(Name = "poolId")]
     public string? QueryPoolId { get; set; }
@@ -460,7 +477,7 @@
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={currentSeasonId}");
             var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetEntries?seasonId={currentSeasonId}");
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");
-            var myEntriesTask = FetchMyEntriesSafe(); // Fetch proactively for fallback logic
+            var myEntriesTask = FetchMyEntriesSafe();
 
             await Task.WhenAll(gamesTask, entriesTask, poolsTask, myEntriesTask);
 
@@ -473,68 +490,61 @@
             // 1. Filter Pools (Active Season Only AND Open)
             poolList = allPools.Where(p => !p.IsArchived && DateTime.UtcNow >= p.LockDate).ToList();
 
-            // 2. Build the Bracket Tree & Populate Team Lookup
-            _feederMap = allGames
-                .Where(g => !string.IsNullOrEmpty(g.NextGameId))
-                .ToLookup(g => g.NextGameId!);
-
-            foreach(var g in allGames)
+            // 2. Build lookup structures
+            _gameById = allGames.ToDictionary(g => g.Id);
+            
+            foreach (var g in allGames)
             {
+                if (!string.IsNullOrEmpty(g.NextGameId))
+                {
+                    if (!_feederGameIds.ContainsKey(g.NextGameId))
+                        _feederGameIds[g.NextGameId] = new List<string>();
+                    _feederGameIds[g.NextGameId].Add(g.Id);
+                }
+                
+                // Populate team lookup
                 if (!string.IsNullOrEmpty(g.TeamHome) && g.HomeTeamInfo != null) 
                     teamLookup[g.TeamHome] = g.HomeTeamInfo;
-                    
                 if (!string.IsNullOrEmpty(g.TeamAway) && g.AwayTeamInfo != null) 
                     teamLookup[g.TeamAway] = g.AwayTeamInfo;
             }
 
-            // 3. Pre-fill Simulation with Reality
-            foreach(var game in allGames.Where(g => g.Status == GameStatus.Final))
+            // 3. Initialize user simulations with reality (Final game winners)
+            foreach (var game in allGames.Where(g => g.Status == GameStatus.Final))
             {
                 var winner = GetRealWinner(game);
                 if (!string.IsNullOrEmpty(winner))
                 {
-                    simulatedWinners[game.Id] = winner;
+                    _userSimulations[game.Id] = winner;
                 }
             }
 
             // 4. Determine Current Pool (Smart Default Logic)
             BowlPool? targetPool = null;
 
-            // A. Query Param
             if (!string.IsNullOrEmpty(QueryPoolId))
-            {
                 targetPool = poolList.FirstOrDefault(p => p.Id == QueryPoolId);
-            }
 
-            // B. Local Storage
             if (targetPool == null)
             {
                 try
                 {
                     var savedPoolId = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "lastSelectedPoolId");
                     if (!string.IsNullOrEmpty(savedPoolId))
-                    {
                         targetPool = poolList.FirstOrDefault(p => p.Id == savedPoolId);
-                    }
                 }
-                catch { /* Ignore JS errors */ }
+                catch { }
             }
 
-            // C. My Entries (Most recent active pool I'm in)
             if (targetPool == null && myEntries.Any())
             {
                 var lastEntry = myEntries.OrderByDescending(e => e.CreatedOn).FirstOrDefault();
                 if (lastEntry != null)
-                {
                     targetPool = poolList.FirstOrDefault(p => p.Id == lastEntry.PoolId);
-                }
             }
 
-            // D. Fallback to First
             if (targetPool == null && poolList.Any())
-            {
                 targetPool = poolList.First();
-            }
 
             selectedPoolId = targetPool?.Id ?? "";
             
@@ -557,7 +567,7 @@
                 return await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyEntries?seasonId={currentSeasonId}") ?? new();
             }
         }
-        catch { /* Ignore auth errors */ }
+        catch { }
         return new();
     }
 
@@ -594,98 +604,110 @@
                 games = allGames.ToList();
             }
         }
-        Recalculate();
+        RecomputeSimulationState();
     }
 
-    // --- SMART BRACKET LOGIC ---
+    // ========== CORE SIMULATION LOGIC ==========
 
-    private List<string> GetSelectableTeams(BowlGame game)
+    /// <summary>
+    /// Recomputes the entire simulation state based on current user selections.
+    /// Processes games in topological order (feeders before downstream).
+    /// </summary>
+    private void RecomputeSimulationState()
     {
-        // Use "Entrants" (Inputs) so the list doesn't collapse after selecting a winner
-        var entrants = GetEntrantsForGame(game);
-        return entrants.OrderBy(t => t).ToList();
+        _simState = new SimulationState();
+        
+        // Process games in chronological order (which respects the bracket structure)
+        // Earlier games are feeders, later games are downstream
+        foreach (var game in games.OrderBy(g => g.StartTime))
+        {
+            ComputeGameState(game);
+        }
+        
+        // Recalculate leaderboard projections
+        projectedStandings = WhatIfScoringEngine.Calculate(games, filteredEntries, _simState.EffectiveWinners
+            .Where(kv => kv.Value != null)
+            .ToDictionary(kv => kv.Key, kv => kv.Value!));
+        
+        StateHasChanged();
     }
 
-    private IEnumerable<string> GetPotentialWinnersForGame(BowlGame game)
-    {
-        // Always compute valid entrants first (respects upstream simulation)
-        var validEntrants = GetEntrantsForGame(game).ToList();
-
-        // PRIORITY 1: User's explicit simulation choice (if valid)
-        if (simulatedWinners.TryGetValue(game.Id, out var simChoice))
-        {
-            if (validEntrants.Contains(simChoice, StringComparer.OrdinalIgnoreCase))
-            {
-                return new[] { simChoice };
-            }
-            // Sim choice is no longer valid (upstream changed) - fall through
-        }
-
-        // PRIORITY 2: Reality (For Final games, use real winner if still a valid entrant)
-        if (game.Status == GameStatus.Final)
-        {
-            var realWinner = GetRealWinner(game);
-            if (!string.IsNullOrEmpty(realWinner) && validEntrants.Contains(realWinner, StringComparer.OrdinalIgnoreCase))
-            {
-                return new[] { realWinner };
-            }
-        }
-
-        // PRIORITY 3: Undecided -> Return all valid entrants
-        return validEntrants;
-    }
-
-    private IEnumerable<string> GetEntrantsForGame(BowlGame game)
+    private void ComputeGameState(BowlGame game)
     {
         var entrants = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        // 1. Identify all teams that "belong" to the feeder tree (Inputs to the game)
-        // This helps us distinguish between a "Bye Week Fixed Team" and a "Stale Propagated Fixed Team"
-        var feederTreeTeams = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (_feederMap != null && _feederMap.Contains(game.Id))
+        
+        // 1. Add teams from feeder games (use their effective winners)
+        if (_feederGameIds.TryGetValue(game.Id, out var feederIds))
         {
-            foreach (var feeder in _feederMap[game.Id])
+            foreach (var feederId in feederIds)
             {
-                var below = GetReferenceEntrants(feeder);
-                foreach(var b in below) feederTreeTeams.Add(b);
+                // Get the effective winner of the feeder game
+                if (_simState.EffectiveWinners.TryGetValue(feederId, out var feederWinner) && feederWinner != null)
+                {
+                    entrants.Add(feederWinner);
+                }
+                else
+                {
+                    // Feeder game is undecided - add all its entrants as potential
+                    if (_simState.ValidEntrants.TryGetValue(feederId, out var feederEntrants))
+                    {
+                        foreach (var e in feederEntrants) entrants.Add(e);
+                    }
+                }
             }
         }
-
-        // A. Fixed Teams - Filtered
-        // Only include Fixed Teams if they are NOT present in the feeder tree/inputs.
-        if (!IsStrictTBD(game.TeamHome) && !feederTreeTeams.Contains(game.TeamHome)) 
+        
+        // 2. Add fixed teams (teams that don't come from feeders)
+        var hasFeederForHome = HasFeederProvidingTeam(game, game.TeamHome);
+        var hasFeederForAway = HasFeederProvidingTeam(game, game.TeamAway);
+        
+        if (!IsStrictTBD(game.TeamHome) && !hasFeederForHome)
             entrants.Add(game.TeamHome);
-
-        if (!IsStrictTBD(game.TeamAway) && !feederTreeTeams.Contains(game.TeamAway)) 
+        if (!IsStrictTBD(game.TeamAway) && !hasFeederForAway)
             entrants.Add(game.TeamAway);
-
-        // B. Feeder Games (Winners)
-        if (_feederMap != null && _feederMap.Contains(game.Id))
+        
+        _simState.ValidEntrants[game.Id] = entrants;
+        
+        // 3. Determine effective winner
+        string? effectiveWinner = null;
+        
+        // Priority 1: User's explicit simulation (if still valid)
+        if (_userSimulations.TryGetValue(game.Id, out var userChoice))
         {
-            foreach (var feeder in _feederMap[game.Id])
+            if (entrants.Contains(userChoice))
             {
-                var incoming = GetPotentialWinnersForGame(feeder);
-                foreach (var team in incoming) entrants.Add(team);
+                effectiveWinner = userChoice;
+            }
+            // else: user's choice is no longer valid, treat as undecided
+        }
+        
+        // Priority 2: Reality (for Final games, if real winner is still valid)
+        if (effectiveWinner == null && game.Status == GameStatus.Final)
+        {
+            var realWinner = GetRealWinner(game);
+            if (!string.IsNullOrEmpty(realWinner) && entrants.Contains(realWinner))
+            {
+                effectiveWinner = realWinner;
             }
         }
-
-        return entrants;
+        
+        _simState.EffectiveWinners[game.Id] = effectiveWinner;
     }
 
-    private IEnumerable<string> GetReferenceEntrants(BowlGame game) 
+    private bool HasFeederProvidingTeam(BowlGame game, string? teamName)
     {
-        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrEmpty(teamName) || !_feederGameIds.TryGetValue(game.Id, out var feederIds))
+            return false;
         
-        if (!IsStrictTBD(game.TeamHome)) set.Add(game.TeamHome);
-        if (!IsStrictTBD(game.TeamAway)) set.Add(game.TeamAway);
-
-        if (_feederMap != null && _feederMap.Contains(game.Id)) {
-             foreach(var f in _feederMap[game.Id]) {
-                 var below = GetReferenceEntrants(f);
-                 foreach(var b in below) set.Add(b);
-             }
+        foreach (var feederId in feederIds)
+        {
+            if (_simState.ValidEntrants.TryGetValue(feederId, out var feederEntrants))
+            {
+                if (feederEntrants.Contains(teamName))
+                    return true;
+            }
         }
-        return set;
+        return false;
     }
 
     private bool IsStrictTBD(string? name)
@@ -697,111 +719,93 @@
 
     private void ToggleSimWinner(string gameId, string team)
     {
-        if (simulatedWinners.ContainsKey(gameId) && simulatedWinners[gameId] == team)
+        if (_userSimulations.TryGetValue(gameId, out var current) && current == team)
         {
-            // If we uncheck a winner, remove from dict.
-            simulatedWinners.Remove(gameId);
+            _userSimulations.Remove(gameId);
         }
         else
         {
-            simulatedWinners[gameId] = team;
+            _userSimulations[gameId] = team;
         }
 
-        // Clear downstream selections that may now be invalid
-        foreach (var downstreamId in GetDownstreamGameIds(gameId))
-        {
-            simulatedWinners.Remove(downstreamId);
-        }
+        // Clear downstream user choices (they depend on this game's outcome)
+        ClearDownstreamChoices(gameId);
         
-        Recalculate();
+        RecomputeSimulationState();
     }
 
     private void SetSimWinner(string gameId, string? team)
     {
         if (string.IsNullOrEmpty(team))
-            simulatedWinners.Remove(gameId);
+            _userSimulations.Remove(gameId);
         else
-            simulatedWinners[gameId] = team;
+            _userSimulations[gameId] = team;
             
-        // Clear downstream selections that may now be invalid
-        foreach (var downstreamId in GetDownstreamGameIds(gameId))
-        {
-            simulatedWinners.Remove(downstreamId);
-        }
-
-        Recalculate();
+        ClearDownstreamChoices(gameId);
+        RecomputeSimulationState();
     }
 
-    private IEnumerable<string> GetDownstreamGameIds(string gameId)
+    private void ClearDownstreamChoices(string gameId)
     {
-        var game = allGames.FirstOrDefault(g => g.Id == gameId);
-        if (game == null || string.IsNullOrEmpty(game.NextGameId)) return Enumerable.Empty<string>();
+        if (!_gameById.TryGetValue(gameId, out var game) || string.IsNullOrEmpty(game.NextGameId))
+            return;
         
-        var downstream = new List<string> { game.NextGameId };
-        downstream.AddRange(GetDownstreamGameIds(game.NextGameId));
-        return downstream;
+        _userSimulations.Remove(game.NextGameId);
+        ClearDownstreamChoices(game.NextGameId);
     }
 
     private void ResetSimulation()
     {
-        simulatedWinners.Clear();
-        // Restore Reality
-        foreach(var game in games.Where(g => g.Status == GameStatus.Final))
+        _userSimulations.Clear();
+        
+        // Restore reality for Final games
+        foreach (var game in games.Where(g => g.Status == GameStatus.Final))
         {
             var w = GetRealWinner(game);
-            if (!string.IsNullOrEmpty(w)) simulatedWinners[game.Id] = w;
+            if (!string.IsNullOrEmpty(w)) 
+                _userSimulations[game.Id] = w;
         }
-        Recalculate();
+        
+        RecomputeSimulationState();
     }
 
-    private void Recalculate()
-    {
-        projectedStandings = WhatIfScoringEngine.Calculate(games, filteredEntries, simulatedWinners);
-        StateHasChanged();
-    }
+    // --- SIMPLE STYLING HELPERS (read from pre-computed state) ---
 
-    // --- STYLING HELPERS ---
-
-    // Logic to only show "Reset" if we have deviated from reality
     private bool HasActiveSimulation
     {
         get
         {
-            foreach(var kvp in simulatedWinners)
+            foreach (var kvp in _userSimulations)
             {
-                var game = games.FirstOrDefault(g => g.Id == kvp.Key);
-                if (game == null) continue;
+                if (!_gameById.TryGetValue(kvp.Key, out var game)) continue;
                 
-                // If we predicted a future game, that's active.
+                // If we predicted a future game, that's active
                 if (game.Status != GameStatus.Final) return true;
                 
-                // If we changed history, that's active.
+                // If we changed history, that's active
                 if (GetRealWinner(game) != kvp.Value) return true;
             }
-            // If we have FEWER items than finalized games (unselected a final game), that's also a deviation
-            // But simplest check matches 99% of use cases.
             return false;
         }
     }
 
+    private List<string> GetSelectableTeams(BowlGame game)
+    {
+        if (_simState.ValidEntrants.TryGetValue(game.Id, out var entrants))
+            return entrants.OrderBy(t => t).ToList();
+        return new List<string>();
+    }
+
     private string GetSimClass(string gameId, string team, List<string> validOptions)
     {
-        // 1. Check if we have a simulated winner
-        if (simulatedWinners.TryGetValue(gameId, out var simPick))
+        if (_simState.EffectiveWinners.TryGetValue(gameId, out var winner) && winner != null)
         {
-            // 2. Validate: Is the stored winner actually a valid option right now?
-            // If I picked "Team A", but "Team A" was eliminated upstream, 
-            // validOptions will NOT contain "Team A". 
-            // In that case, we treat the game as Undecided (no styles).
-            if (validOptions.Contains(simPick, StringComparer.OrdinalIgnoreCase))
+            if (validOptions.Contains(winner, StringComparer.OrdinalIgnoreCase))
             {
-                // The pick is valid. Apply Win/Loss styles.
-                return simPick == team ? "active-win" : "active-loss";
+                return string.Equals(winner, team, StringComparison.OrdinalIgnoreCase) ? "active-win" : "active-loss";
             }
         }
-        
-        // No valid winner selected -> Default style (Selectable)
-        return "bg-white"; 
+        return "bg-white";
     }
 
     private string GetRealWinner(BowlGame game)
@@ -818,27 +822,20 @@
     {
         if (string.IsNullOrEmpty(pick)) return "";
         
-        // Check if the picked team is still a valid entrant (not eliminated upstream)
-        var validEntrants = GetEntrantsForGame(game).ToList();
-        bool isEliminated = !validEntrants.Any(e => string.Equals(e, pick, StringComparison.OrdinalIgnoreCase));
-        
-        // If the team has been eliminated upstream, show red
-        if (isEliminated)
+        // Check if the picked team is a valid entrant for this game
+        if (!_simState.ValidEntrants.TryGetValue(game.Id, out var entrants) || 
+            !entrants.Contains(pick))
         {
-            return "cell-loss";
+            return "cell-loss"; // Eliminated upstream
         }
         
-        // Check if a winner has been determined for this game (simulation or reality)
-        var potentialWinners = GetPotentialWinnersForGame(game).ToList();
-        
-        // If there's exactly one potential winner, a winner has been determined
-        if (potentialWinners.Count == 1)
+        // Check if there's an effective winner
+        if (_simState.EffectiveWinners.TryGetValue(game.Id, out var winner) && winner != null)
         {
-            string winner = potentialWinners[0];
             return string.Equals(pick, winner, StringComparison.OrdinalIgnoreCase) ? "cell-win" : "cell-loss";
         }
         
-        // Game is undecided and pick is not eliminated - neutral
+        // Undecided and pick is valid
         return "";
     }
     
@@ -853,12 +850,8 @@
         if (string.IsNullOrEmpty(teamName)) return "";
         if (teamLookup.TryGetValue(teamName, out var info) && !string.IsNullOrEmpty(info.Abbreviation)) 
             return info.Abbreviation;
-            
-        // Fallback: Use first 3 chars or predefined map if needed, 
-        // but typically all teams in DB have abbrevs.
-        // If TBD, return TBD
-        if (teamName.Length > 4 && !teamName.Contains(" ")) return teamName.Substring(0, 3).ToUpper();
-        
-        return teamName; // Return full name if short enough or TBD
+        if (teamName.Length > 4 && !teamName.Contains(" ")) 
+            return teamName.Substring(0, 3).ToUpper();
+        return teamName;
     }
 }
