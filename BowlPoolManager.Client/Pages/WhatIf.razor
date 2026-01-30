@@ -13,6 +13,9 @@
 
 <PageTitle>Path to Victory</PageTitle>
 
+@using BowlPoolManager.Client.Components
+@using BowlPoolManager.Client.Helpers
+
 <style>
     /* 1. SCROLL CONTAINER */
     .matrix-container {
@@ -635,33 +638,24 @@
 
     private IEnumerable<string> GetEntrantsForGame(BowlGame game)
     {
-        var entrants = new HashSet<string>();
+        var entrants = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // Check if this game has feeder games
-        bool hasFeederGames = _feederMap != null && _feederMap.Contains(game.Id);
+        // A. Fixed Teams (Check ALWAYS, not just if no feeders)
+        // This handles "Bye" scenarios where one team is fixed (e.g. "Texas") and the other is a feeder.
+        // We exclude placeholders like "Winner of X" or "TBD".
+        if (!VisualHelper.IsTBD(game.TeamHome)) 
+            entrants.Add(game.TeamHome);
 
-        // A. Fixed Teams (only if no feeder games)
-        // For playoff games with feeders, teams are determined by feeder winners (real or simulated),
-        // not by the propagated TeamHome/TeamAway which may be stale.
-        if (!hasFeederGames)
-        {
-            if (!string.IsNullOrEmpty(game.TeamHome) && !game.TeamHome.Equals("TBD", StringComparison.OrdinalIgnoreCase))
-                entrants.Add(game.TeamHome);
-                
-            if (!string.IsNullOrEmpty(game.TeamAway) && !game.TeamAway.Equals("TBD", StringComparison.OrdinalIgnoreCase))
-                entrants.Add(game.TeamAway);
-        }
+        if (!VisualHelper.IsTBD(game.TeamAway)) 
+            entrants.Add(game.TeamAway);
 
         // B. Feeder Games (Recursive)
-        if (hasFeederGames)
+        if (_feederMap != null && _feederMap.Contains(game.Id))
         {
-            if (_feederMap != null && _feederMap.Contains(game.Id))
+            foreach (var feeder in _feederMap[game.Id])
             {
-                foreach (var feeder in _feederMap[game.Id])
-                {
-                    var incoming = GetPotentialWinnersForGame(feeder);
-                    foreach (var team in incoming) entrants.Add(team);
-                }
+                var incoming = GetPotentialWinnersForGame(feeder);
+                foreach (var team in incoming) entrants.Add(team);
             }
         }
 
