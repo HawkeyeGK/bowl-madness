@@ -204,15 +204,29 @@
         </div>
 
         @* RIGHT SIDE: Actions *@
-        <div>
-             @if (HasActiveSimulation)
+        <div class="d-flex gap-2">
+             @if (HasActiveSimulation && !isPrintView)
              {
                 <button class="btn btn-outline-danger btn-sm" @onclick="ResetSimulation">
                     <i class="bi bi-arrow-counterclockwise"></i> Reset to Reality
                 </button>
              }
+             
+             <button class="btn btn-sm @(isPrintView ? "btn-secondary" : "btn-outline-secondary") d-print-none" 
+                     @onclick="() => isPrintView = !isPrintView">
+                 <i class="bi @(isPrintView ? "bi-table" : "bi-printer")"></i> 
+                 @(isPrintView ? "Exit Print View" : "Printer Friendly View")
+             </button>
         </div>
     </div>
+    
+    @if (isPrintView)
+    {
+        <div class="d-print-none alert alert-info py-2 mb-3">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            <strong>Printer Friendly Mode Active:</strong> The table has been split into smaller chunks to fit on standard paper. Use <code>Ctrl+P</code> to print.
+        </div>
+    }
 
     @if (isLoading)
     {
@@ -226,6 +240,65 @@
             <i class="bi bi-hourglass-split display-1 text-secondary opacity-50"></i>
             <h2 class="mt-3 text-secondary">Awaiting Kickoff</h2>
             <p class="lead text-muted">Path to Victory unlocks when the first pool of the season opens.</p>
+        </div>
+    }
+    else if (isPrintView)
+    {
+        @* PRINT VIEW: Split Table *@
+        <div class="print-container">
+            @foreach (var chunk in GetGameChunks())
+            {
+                <div class="mb-4 break-after-page">
+                    <table class="table table-bordered table-sm matrix-table custom-print-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 150px;">Player</th>
+                                @foreach (var game in chunk)
+                                {
+                                    <th class="text-center">
+                                        <div class="small fw-bold text-truncate" style="max-width: 60px;">@game.BowlName</div>
+                                        <div class="badge bg-light text-secondary border">@game.PointValue</div>
+                                        <div class="d-block mt-1" style="font-size: 0.65rem;">
+                                            @if(simulatedWinners.ContainsKey(game.Id))
+                                            {
+                                                var w = simulatedWinners[game.Id];
+                                                <span class="badge bg-success text-white">@GetTeamAbbrev(w)</span>
+                                            }
+                                            else
+                                            {
+                                                <span>-</span>
+                                            }
+                                        </div>
+                                    </th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in projectedStandings)
+                            {
+                                <tr>
+                                    <td class="fw-bold">
+                                        <div class="d-flex justify-content-between">
+                                            <span class="text-truncate" style="max-width: 110px;">@row.Entry.PlayerName</span>
+                                            <span class="badge bg-primary rounded-pill">@row.Score</span>
+                                        </div>
+                                    </td>
+                                    @foreach (var game in chunk)
+                                    {
+                                        var pick = row.Entry.Picks != null && row.Entry.Picks.ContainsKey(game.Id) ? row.Entry.Picks[game.Id] : "";
+                                        <td class="text-center @GetCellClass(game, pick)">
+                                            @if (!string.IsNullOrEmpty(pick))
+                                            {
+                                                <span class="fw-bold" style="font-size: 0.7rem;">@GetTeamAbbrev(pick)</span>
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
         </div>
     }
     else
@@ -343,6 +416,18 @@
     // Filtered State
     private string selectedPoolId = "";
     private List<BracketEntry> filteredEntries = new();
+    
+    // Print View State
+    private bool isPrintView = false;
+    private const int PRINT_CHUNK_SIZE = 15;
+
+    private IEnumerable<List<BowlGame>> GetGameChunks()
+    {
+        return games
+            .Select((x, i) => new { Index = i, Value = x })
+            .GroupBy(x => x.Index / PRINT_CHUNK_SIZE)
+            .Select(x => x.Select(v => v.Value).ToList());
+    }
     
     // Simulation State
     private Dictionary<string, string> simulatedWinners = new();
