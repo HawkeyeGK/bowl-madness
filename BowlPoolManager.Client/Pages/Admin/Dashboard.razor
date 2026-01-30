@@ -3,6 +3,7 @@
 @using BowlPoolManager.Core
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "SuperAdmin,Admin")]
+@inject HttpClient Http
 
 <PageTitle>Admin Dashboard</PageTitle>
 
@@ -151,7 +152,67 @@
             </div>
         </div>
 
+        @* --- SYSTEM MAINTENANCE --- *@
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body text-center">
+                    <i class="bi bi-hdd-network display-4 text-danger mb-3"></i>
+                    <h5 class="card-title">System Maintenance</h5>
+                    <p class="card-text text-muted small">Initialize database resources.</p>
+                    <button class="btn btn-warning" @onclick="InitializeDb" disabled="@isInitializing">
+                        @if (isInitializing)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            <span> Initializing...</span>
+                        }
+                        else
+                        {
+                            <span>Initialize Database</span>
+                        }
+                    </button>
+                     @if (!string.IsNullOrEmpty(initializationMessage))
+                    {
+                        <div class="mt-2 text-success small fw-bold">@initializationMessage</div>
+                    }
+                </div>
+            </div>
+        </div>
+
             </div>
         </AuthorizeView>
     </div>
 </div>
+
+@code {
+    private bool isInitializing = false;
+    private string? initializationMessage;
+
+    private async Task InitializeDb()
+    {
+        isInitializing = true;
+        initializationMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var response = await Http.PostAsync("api/Admin/Initialize", null);
+            if (response.IsSuccessStatusCode)
+            {
+                initializationMessage = "Success! Database initialized.";
+            }
+            else
+            {
+               initializationMessage = $"Error: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            initializationMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isInitializing = false;
+            StateHasChanged();
+        }
+    }
+}
