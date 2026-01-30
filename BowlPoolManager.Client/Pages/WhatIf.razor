@@ -483,15 +483,23 @@
     {
         var entrants = new HashSet<string>();
 
-        // A. Fixed Teams
-        if (!string.IsNullOrEmpty(game.TeamHome) && !game.TeamHome.Equals("TBD", StringComparison.OrdinalIgnoreCase))
-            entrants.Add(game.TeamHome);
-            
-        if (!string.IsNullOrEmpty(game.TeamAway) && !game.TeamAway.Equals("TBD", StringComparison.OrdinalIgnoreCase))
-            entrants.Add(game.TeamAway);
+        // Check if this game has feeder games
+        bool hasFeederGames = _feederMap != null && _feederMap.Contains(game.Id);
+
+        // A. Fixed Teams (only if no feeder games)
+        // For playoff games with feeders, teams are determined by feeder winners (real or simulated),
+        // not by the propagated TeamHome/TeamAway which may be stale.
+        if (!hasFeederGames)
+        {
+            if (!string.IsNullOrEmpty(game.TeamHome) && !game.TeamHome.Equals("TBD", StringComparison.OrdinalIgnoreCase))
+                entrants.Add(game.TeamHome);
+                
+            if (!string.IsNullOrEmpty(game.TeamAway) && !game.TeamAway.Equals("TBD", StringComparison.OrdinalIgnoreCase))
+                entrants.Add(game.TeamAway);
+        }
 
         // B. Feeder Games (Recursive)
-        if (_feederMap != null && _feederMap.Contains(game.Id))
+        if (hasFeederGames)
         {
             foreach (var feeder in _feederMap[game.Id])
             {
