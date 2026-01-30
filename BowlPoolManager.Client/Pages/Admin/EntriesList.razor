@@ -115,7 +115,7 @@
                                     <td>@DateTimeHelper.ToCentral(entry.CreatedOn).ToString("g")</td>
                                     <td class="text-end">
                                         <div class="btn-group btn-group-sm">
-                                            <a href="/admin/entry/@entry.Id" class="btn btn-outline-primary">Edit</a>
+                                            <a href="/admin/entry/@entry.Id?seasonId=@entry.SeasonId" class="btn btn-outline-primary">Edit</a>
                                             <button class="btn btn-outline-danger" @onclick="() => DeleteEntry(entry)">Delete</button>
                                         </div>
                                     </td>

@@ -558,7 +558,7 @@
         isSaving = true;
         try
         {
-            var response = await Http.DeleteAsync($"api/DeleteEntry?id={entry.Id}");
+            var response = await Http.DeleteAsync($"api/DeleteEntry/{entry.Id}?seasonId={entry.SeasonId}");
             if (response.IsSuccessStatusCode)
             {
                 myEntries.Remove(entry);

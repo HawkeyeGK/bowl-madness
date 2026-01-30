@@ -11,6 +11,7 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject IJSRuntime JS 
+@inject BowlPoolManager.Client.Services.ISeasonService SeasonService 
 
 <PageTitle>@(string.IsNullOrEmpty(EntryId) ? "New" : "Edit") Bracket Entry</PageTitle>
 
@@ -262,6 +263,7 @@
 
 @code {
     [Parameter] public string? EntryId { get; set; }
+    [SupplyParameterFromQuery] public string? SeasonId { get; set; }
 
     private List<BowlGame> allGames = new();
     private List<BowlPool> pools = new();
@@ -304,9 +306,19 @@
         try
         {
             isLoading = true;
-            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
-            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
-            var usersTask = Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers"); // Fetch Users
+
+            // Resolve Season Context
+            string targetSeasonId = SeasonId ?? "";
+            if (string.IsNullOrEmpty(targetSeasonId))
+            {
+                var currentSeason = await SeasonService.GetCurrentSeasonAsync();
+                targetSeasonId = currentSeason?.Id ?? "";
+            }
+
+            // Append seasonId to calls
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={targetSeasonId}");
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={targetSeasonId}");
+            var usersTask = Http.GetFromJsonAsync<List<UserProfile>>($"api/GetUsers"); // Users are global
             
             await Task.WhenAll(gamesTask, poolsTask, usersTask);
             
@@ -316,7 +328,8 @@
 
             if (!string.IsNullOrEmpty(EntryId))
             {
-                var existingEntry = await Http.GetFromJsonAsync<BracketEntry>($"api/GetEntry?id={EntryId}");
+                // CRITICAL FIX: Pass seasonId to GetEntry
+                var existingEntry = await Http.GetFromJsonAsync<BracketEntry>($"api/GetEntry?id={EntryId}&seasonId={targetSeasonId}");
                 if (existingEntry != null)
                 {
                     entry = existingEntry;
@@ -329,6 +342,9 @@
             }
             else
             {
+                // New Entry Setup
+                entry.SeasonId = targetSeasonId; // Ensure new entry has season context
+
                 // Set default pool if only one active exists
                 var activePools = pools.Where(p => !p.IsArchived).ToList();
                 if (activePools.Count == 1) entry.PoolId = activePools[0].Id;
@@ -458,7 +474,9 @@
         if (confirmed) {
             isSaving = true;
             try {
-                var response = await Http.DeleteAsync($"api/DeleteEntry/{EntryId}");
+                // Use entry.SeasonId if available, otherwise fallback to current context
+                string sid = !string.IsNullOrEmpty(entry.SeasonId) ? entry.SeasonId : (SeasonId ?? "");
+                var response = await Http.DeleteAsync($"api/DeleteEntry/{EntryId}?seasonId={sid}");
                 if (response.IsSuccessStatusCode) { Nav.NavigateTo("/admin/entries"); } else { errorMessage = "Error deleting entry."; }
             } catch(Exception ex) { errorMessage = $"Error: {ex.Message}"; } finally { isSaving = false; }
         }

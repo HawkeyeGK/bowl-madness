@@ -350,7 +350,7 @@ else
         {
             try 
             {
-                userEntry = await Http.GetFromJsonAsync<BracketEntry>($"api/GetEntry?id={EntryId}");
+                userEntry = await Http.GetFromJsonAsync<BracketEntry>($"api/GetEntry?id={EntryId}&seasonId={currentSeasonId}");
             }
             catch { }
         }
