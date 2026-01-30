@@ -1,6 +1,5 @@
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using BowlPoolManager.Core;
@@ -19,8 +18,8 @@ namespace BowlPoolManager.Api.Functions.Admin
         }
 
         [Function("InitializeDatabase")]
-        public async Task<IActionResult> InitializeDatabase(
-            [HttpTrigger(AuthorizationLevel.Admin, "post", Route = "Admin/Initialize")] HttpRequest req)
+        public async Task<HttpResponseData> InitializeDatabase(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "Admin/Initialize")] HttpRequestData req)
         {
             _logger.LogInformation("Initializing Database Infrastructure...");
 
@@ -38,12 +37,16 @@ namespace BowlPoolManager.Api.Functions.Admin
                 await db.CreateContainerIfNotExistsAsync(Constants.Database.ConfigurationContainer, Constants.Database.DefaultPartitionKey);
 
                 _logger.LogInformation("Database infrastructure initialized successfully.");
-                return new OkObjectResult("Database infrastructure initialized successfully.");
+                var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
+                await response.WriteStringAsync("Database infrastructure initialized successfully.");
+                return response;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error initializing database infrastructure.");
-                return new StatusCodeResult(StatusCodes.Status500InternalServerError);
+                var errorResponse = req.CreateResponse(System.Net.HttpStatusCode.InternalServerError);
+                await errorResponse.WriteStringAsync("Error initializing database infrastructure.");
+                return errorResponse;
             }
         }
     }
