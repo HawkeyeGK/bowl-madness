@@ -1,11 +1,11 @@
 ﻿@page "/"
 @page "/leaderboard"
 @using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core.Dtos
 @using BowlPoolManager.Core
 @using BowlPoolManager.Client.Services
 @inject ISeasonService SeasonService
 
-@using BowlPoolManager.Core.Helpers
 @using Microsoft.AspNetCore.Components.Authorization
 @inject HttpClient Http
 @inject AuthenticationStateProvider AuthStateProvider
@@ -110,25 +110,21 @@
                         <tbody>
                             @foreach (var row in leaderboard)
                             {
-                                bool isRedacted = row.Entry.Picks == null;
+                                bool isLocked = currentPool != null && DateTime.UtcNow < currentPool.LockDate;
                                 <tr>
                                     <td class="ps-4 text-start">@row.Rank</td>
                                     <td class="fw-bold">
-                                        @if (currentPool != null && DateTime.UtcNow < currentPool.LockDate)
+                                        @if (isLocked)
                                         {
-                                            <span class="text-secondary" title="Picks Hidden until @currentPool.LockDate">
+                                            <span class="text-secondary" title="Picks Hidden until @currentPool!.LockDate">
                                                 <i class="bi bi-lock-fill text-muted me-1"></i>
-                                                @row.Entry.PlayerName
+                                                @row.PlayerName
                                             </span>
                                         }
                                         else
                                         {
-                                            <a href="entry/@row.Entry.Id" class="text-decoration-none text-dark">
-                                                @if (isRedacted)
-                                                {
-                                                    <i class="bi bi-lock-fill text-muted me-1" title="Picks Hidden"></i>
-                                                }
-                                                @row.Entry.PlayerName
+                                            <a href="entry/@row.Id" class="text-decoration-none text-dark">
+                                                @row.PlayerName
                                                 @if (isPoolFinal)
                                                 {
                                                     @if (row.Rank == 1)
@@ -156,19 +152,15 @@
                                     <td class="fw-bold text-muted">@row.MaxPossible</td>
                                     <td class="d-none d-sm-table-cell text-muted small">@row.CorrectPicks / @totalFinalGames</td>
                                     <td class="text-muted small d-none d-lg-table-cell">
-                                        @if (currentPool != null && DateTime.UtcNow < currentPool.LockDate)
+                                        @if (isLocked)
                                         {
                                             <span title="Hidden until picks lock" class="text-secondary opacity-50">
                                                 <i class="bi bi-eye-slash"></i>
                                             </span>
                                         }
-                                        else if (isRedacted)
-                                        {
-                                            <span>-</span>
-                                        }
                                         else
                                         {
-                                            @($"{row.Entry.TieBreakerPoints} pts")
+                                            @($"{row.TieBreakerPoints} pts")
                                         }
                                     </td>
                                 </tr>
@@ -202,11 +194,9 @@
     private bool isLoading = true;
     private List<BowlPool> pools = new();
     private BowlPool? currentPool;
-    private List<BowlGame> allSeasonGames = new();
-    private List<BowlGame> games = new();
-    private List<BracketEntry> entries = new();
-    private List<LeaderboardRow> leaderboard = new();
+    private List<LeaderboardDto> leaderboard = new();
     private int totalFinalGames = 0;
+    private int totalGames = 0;
     private bool isPoolFinal = false;
     private DateTime LastUpdate = DateTime.MinValue;
     private string currentSeasonId = "";
@@ -229,16 +219,12 @@
             currentSeasonId = currentSeason?.Id ?? "";
 
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");
-            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={currentSeasonId}");
             var myEntriesTask = FetchMyEntriesSafe();
             
-            await Task.WhenAll(poolsTask, gamesTask, myEntriesTask);
+            await Task.WhenAll(poolsTask, myEntriesTask);
             var allPools = await poolsTask ?? new();
-            allSeasonGames = await gamesTask ?? new();
-            // Initial Filtering will happen in LoadEntriesForPool
             
             var myEntries = await myEntriesTask;
-            // totalFinalGames will be calculated after filtering
 
             // Fetch the last update timestamp
             try {
@@ -294,7 +280,7 @@
 
             if (currentPool != null)
             {
-                await LoadEntriesForPool(currentPool.Id);
+                await LoadLeaderboardForPool(currentPool.Id);
             }
         }
         catch (Exception ex)
@@ -331,37 +317,50 @@
         {
             isLoading = true;
             await JSRuntime.InvokeVoidAsync("localStorage.setItem", "lastSelectedPoolId", currentPool.Id);
-            await LoadEntriesForPool(currentPool.Id);
+            await LoadLeaderboardForPool(currentPool.Id);
             isLoading = false;
         }
     }
 
-    private async Task LoadEntriesForPool(string poolId)
+    private async Task LoadLeaderboardForPool(string poolId)
     {
         try
         {
-            entries = await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetEntries?poolId={poolId}&seasonId={currentSeasonId}") ?? new();
+            // Call the new server-side GetLeaderboard API
+            var response = await Http.GetFromJsonAsync<LeaderboardResponse>(
+                $"api/GetLeaderboard?poolId={poolId}&seasonId={currentSeasonId}"
+            );
             
-            // FILTER GAMES FOR THIS POOL
-            if (currentPool != null && currentPool.GameIds != null && currentPool.GameIds.Any())
+            if (response != null)
             {
-               games = allSeasonGames.Where(g => currentPool.GameIds.Contains(g.Id)).ToList();
+                leaderboard = response.Leaderboard ?? new();
+                totalFinalGames = response.TotalFinalGames;
+                totalGames = leaderboard.Count > 0 ? leaderboard.Count : 0;
+                
+                // Determine if pool is final (all games complete)
+                // We can infer this from the data: if any entry has maxPossible == score for top player
+                // Or we need additional metadata - for now, estimate from the pool
+                isPoolFinal = totalFinalGames > 0 && leaderboard.All(r => r.MaxPossible == r.Score);
             }
             else
             {
-               games = allSeasonGames.ToList();
+                leaderboard = new();
+                totalFinalGames = 0;
             }
             
-            totalFinalGames = games.Count(g => g.Status == GameStatus.Final);
-            isPoolFinal = (games.Count > 0 && totalFinalGames == games.Count);
-            
-            leaderboard = ScoringEngine.Calculate(games, entries, currentPool);
             Sort(sortColumn, forceToggle: false);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error fetching entries: {ex.Message}");
+            Console.WriteLine($"Error fetching leaderboard: {ex.Message}");
         }
+    }
+    
+    // Response model for the GetLeaderboard API
+    private class LeaderboardResponse
+    {
+        public int TotalFinalGames { get; set; }
+        public List<LeaderboardDto>? Leaderboard { get; set; }
     }
 
     private void Sort(string column, bool forceToggle = true)
@@ -381,11 +380,11 @@
         switch (column)
         {
             case "Rank": leaderboard = isAscending ? leaderboard.OrderBy(r => r.Rank).ToList() : leaderboard.OrderByDescending(r => r.Rank).ToList(); break;
-            case "Player": leaderboard = isAscending ? leaderboard.OrderBy(r => r.Entry.PlayerName).ToList() : leaderboard.OrderByDescending(r => r.Entry.PlayerName).ToList(); break;
+            case "Player": leaderboard = isAscending ? leaderboard.OrderBy(r => r.PlayerName).ToList() : leaderboard.OrderByDescending(r => r.PlayerName).ToList(); break;
             case "Score": leaderboard = isAscending ? leaderboard.OrderBy(r => r.Score).ToList() : leaderboard.OrderByDescending(r => r.Score).ToList(); break;
             case "Max": leaderboard = isAscending ? leaderboard.OrderBy(r => r.MaxPossible).ToList() : leaderboard.OrderByDescending(r => r.MaxPossible).ToList(); break;
             case "Correct": leaderboard = isAscending ? leaderboard.OrderBy(r => r.CorrectPicks).ToList() : leaderboard.OrderByDescending(r => r.CorrectPicks).ToList(); break;
-            case "Tiebreaker": leaderboard = isAscending ? leaderboard.OrderBy(r => r.Entry.TieBreakerPoints).ToList() : leaderboard.OrderByDescending(r => r.Entry.TieBreakerPoints).ToList(); break;
+            case "Tiebreaker": leaderboard = isAscending ? leaderboard.OrderBy(r => r.TieBreakerPoints).ToList() : leaderboard.OrderByDescending(r => r.TieBreakerPoints).ToList(); break;
             case "Bowls": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.Standard]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.Standard]).ToList(); break;
             case "Round1": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.Round1]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.Round1]).ToList(); break;
             case "QuarterFinal": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.QuarterFinal]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.QuarterFinal]).ToList(); break;
