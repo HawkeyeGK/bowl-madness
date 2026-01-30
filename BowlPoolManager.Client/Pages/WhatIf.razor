@@ -817,25 +817,27 @@
     {
         if (string.IsNullOrEmpty(pick)) return "";
         
-        // Check if the picked team is still a valid entrant (not eliminated)
-        var validEntrants = GetPotentialWinnersForGame(game).ToList();
+        // Check if the picked team is still a valid entrant (not eliminated upstream)
+        var validEntrants = GetEntrantsForGame(game).ToList();
         bool isEliminated = !validEntrants.Any(e => string.Equals(e, pick, StringComparison.OrdinalIgnoreCase));
         
-        // If the team has been eliminated, show red even if no winner selected yet
+        // If the team has been eliminated upstream, show red
         if (isEliminated)
         {
             return "cell-loss";
         }
         
-        // Check if a winner has been selected for this game
-        string winner = "";
-        if (simulatedWinners.ContainsKey(game.Id)) winner = simulatedWinners[game.Id];
-
-        if (!string.IsNullOrEmpty(winner))
+        // Check if a winner has been determined for this game (simulation or reality)
+        var potentialWinners = GetPotentialWinnersForGame(game).ToList();
+        
+        // If there's exactly one potential winner, a winner has been determined
+        if (potentialWinners.Count == 1)
         {
+            string winner = potentialWinners[0];
             return string.Equals(pick, winner, StringComparison.OrdinalIgnoreCase) ? "cell-win" : "cell-loss";
         }
         
+        // Game is undecided and pick is not eliminated - neutral
         return "";
     }
     
