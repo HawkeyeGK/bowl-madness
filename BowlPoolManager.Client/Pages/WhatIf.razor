@@ -116,10 +116,71 @@
 
     .team-logo-sm { width: 18px; height: 18px; object-fit: contain; margin-right: 2px; }
     .team-abbrev { font-size: 0.75rem; font-weight: bold; }
+
+    @media print {
+        @page { size: landscape; margin: 0.5cm; }
+        
+        /* Hide Navigation & Layout */
+        .sidebar, .top-row, .navbar, header, footer { display: none !important; }
+        
+        /* Layout Resets */
+        .container-fluid {
+            width: 100% !important;
+            max-width: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        /* Matrix Container: Remove scroll & constraints */
+        .matrix-container {
+            height: auto !important;
+            overflow: visible !important;
+            border: none !important;
+            width: 100% !important;
+            max-width: none !important;
+            display: block !important;
+        }
+
+        /* Table: Allow full width & wrapping */
+        .matrix-table {
+            width: 100% !important;
+            table-layout: auto !important;
+        }
+
+        /* Cells & Headers: Reduce size & remove stickiness */
+        .matrix-table th, 
+        .matrix-table td {
+            position: static !important; /* Remove sticky */
+            font-size: 8pt !important;   /* Reduce text size */
+            padding: 1px !important;     /* Tighter padding */
+            width: auto !important;      /* Allow automatic sizing */
+            min-width: 0 !important;
+            max-width: none !important; /* Uncap width */
+            border: 1px solid #000 !important; /* High contrast borders */
+        }
+        
+        /* Remove specific sticky styles */
+        .sticky-col, .sticky-col-header {
+            position: static !important;
+            border: 1px solid #000 !important;
+            box-shadow: none !important;
+        }
+
+        /* Visual Tweaks for Print */
+        .team-logo-sm { width: 12px !important; height: 12px !important; margin-right: 1px !important; }
+        .team-abbrev { font-size: 7pt !important; }
+        .badge { border: none !important; padding: 0 !important; font-size: 7pt !important; }
+        
+        /* Force background colors */
+        .cell-win, .cell-loss, .active-win, .active-loss {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+    }
 </style>
 
 <div class="container-fluid mt-3 px-4">
-    <div class="d-flex justify-content-between align-items-end mb-3">
+    <div class="d-flex justify-content-between align-items-end mb-3 d-print-none">
         
         @* LEFT SIDE: Title + Pool Selector *@
         <div class="d-flex flex-column gap-2">
