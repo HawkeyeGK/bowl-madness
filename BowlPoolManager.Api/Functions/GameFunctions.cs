@@ -119,14 +119,15 @@ namespace BowlPoolManager.Api.Functions
              var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
              if (!authResult.IsValid) return authResult.ErrorResponse!;
 
-             if (string.IsNullOrEmpty(gameId))
+             var seasonId = req.Query["seasonId"];
+             if (string.IsNullOrEmpty(gameId) || string.IsNullOrEmpty(seasonId))
              {
                  var badRequest = req.CreateResponse(HttpStatusCode.BadRequest);
-                 await badRequest.WriteStringAsync("Game ID is required");
+                 await badRequest.WriteStringAsync("Game ID and Season ID are required");
                  return badRequest;
              }
 
-             await _gameRepo.DeleteGameAsync(gameId);
+             await _gameRepo.DeleteGameAsync(gameId, seasonId);
              return req.CreateResponse(HttpStatusCode.OK);
         }
 

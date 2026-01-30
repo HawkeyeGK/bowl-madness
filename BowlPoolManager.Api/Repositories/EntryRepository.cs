@@ -23,24 +23,14 @@ namespace BowlPoolManager.Api.Repositories
             return await QueryAsync<BracketEntry>(new QueryDefinition(sql));
         }
 
-        public async Task<BracketEntry?> GetEntryAsync(string id)
+        public async Task<BracketEntry?> GetEntryAsync(string id, string seasonId)
         {
-             var sql = "SELECT * FROM c WHERE c.id = @id";
-             var queryDef = new QueryDefinition(sql).WithParameter("@id", id);
-             var results = await QueryAsync<BracketEntry>(queryDef);
-             return results.FirstOrDefault();
+             return await GetDocumentAsync<BracketEntry>(id, seasonId);
         }
 
-        public async Task DeleteEntryAsync(string id)
+        public async Task DeleteEntryAsync(string id, string seasonId)
         {
-             var sql = "SELECT * FROM c WHERE c.id = @id";
-             var queryDef = new QueryDefinition(sql).WithParameter("@id", id);
-             var results = await QueryAsync<BracketEntry>(queryDef);
-             var entry = results.FirstOrDefault();
-             if (entry != null)
-             {
-                 await DeleteDocumentAsync<BracketEntry>(id, entry.SeasonId);
-             }
+             await DeleteDocumentAsync<BracketEntry>(id, seasonId);
         }
 
         public async Task<List<BracketEntry>> GetEntriesForUserAsync(string userId, string poolId)

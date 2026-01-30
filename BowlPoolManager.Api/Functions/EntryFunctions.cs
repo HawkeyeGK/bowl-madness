@@ -64,9 +64,10 @@ namespace BowlPoolManager.Api.Functions
         public async Task<HttpResponseData> GetEntry([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
             var id = req.Query["id"];
-            if (string.IsNullOrEmpty(id)) return req.CreateResponse(HttpStatusCode.BadRequest);
+            var seasonId = req.Query["seasonId"];
+            if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(seasonId)) return req.CreateResponse(HttpStatusCode.BadRequest);
 
-            var entry = await _entryRepo.GetEntryAsync(id);
+            var entry = await _entryRepo.GetEntryAsync(id, seasonId);
             
             if (entry == null) return req.CreateResponse(HttpStatusCode.NotFound);
 
@@ -129,7 +130,7 @@ namespace BowlPoolManager.Api.Functions
                 BracketEntry? existingEntry = null;
                 if (!string.IsNullOrEmpty(entry.Id))
                 {
-                    existingEntry = await _entryRepo.GetEntryAsync(entry.Id);
+                    existingEntry = await _entryRepo.GetEntryAsync(entry.Id, pool.SeasonId);
                     if (existingEntry != null && existingEntry.UserId != principal.UserId && !isAdmin)
                     {
                         var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
@@ -246,14 +247,22 @@ namespace BowlPoolManager.Api.Functions
                     return unauth;
                 }
 
-                if (string.IsNullOrEmpty(id)) 
-                {
-                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
-                    await badReq.WriteStringAsync("Missing ID parameter.");
-                    return badReq;
-                }
+             if (string.IsNullOrEmpty(id)) 
+             {
+                 var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                 await badReq.WriteStringAsync("Missing ID parameter.");
+                 return badReq;
+             }
 
-                var entry = await _entryRepo.GetEntryAsync(id);
+             var seasonId = req.Query["seasonId"];
+             if (string.IsNullOrEmpty(seasonId))
+             {
+                  var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                  await badReq.WriteStringAsync("Season ID is required");
+                  return badReq;
+             }
+
+             var entry = await _entryRepo.GetEntryAsync(id, seasonId);
                 if (entry == null) 
                 {
                     var notFound = req.CreateResponse(HttpStatusCode.NotFound);
@@ -284,7 +293,7 @@ namespace BowlPoolManager.Api.Functions
                     }
                 }
 
-                await _entryRepo.DeleteEntryAsync(id);
+                await _entryRepo.DeleteEntryAsync(id, seasonId);
                 return req.CreateResponse(HttpStatusCode.OK);
             }
             catch (Exception ex)
@@ -335,7 +344,15 @@ namespace BowlPoolManager.Api.Functions
                     return badReq;
                 }
 
-                var entry = await _entryRepo.GetEntryAsync(id);
+                var seasonId = query["seasonId"];
+                if (string.IsNullOrEmpty(seasonId))
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("Season ID is required");
+                    return badReq;
+                }
+
+                var entry = await _entryRepo.GetEntryAsync(id, seasonId);
                 if (entry == null)
                 {
                     var notFound = req.CreateResponse(HttpStatusCode.NotFound);

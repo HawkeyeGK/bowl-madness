@@ -21,16 +21,9 @@ namespace BowlPoolManager.Api.Repositories
             return await GetListAsync<BowlGame>(Constants.DocumentTypes.BowlGame);
         }
         
-        public async Task DeleteGameAsync(string gameId)
+        public async Task DeleteGameAsync(string gameId, string seasonId)
         {
-             var sql = "SELECT * FROM c WHERE c.id = @id";
-             var queryDef = new QueryDefinition(sql).WithParameter("@id", gameId);
-             var games = await QueryAsync<BowlGame>(queryDef);
-             var game = games.FirstOrDefault();
-             if (game != null)
-             {
-                 await DeleteDocumentAsync<BowlGame>(gameId, game.SeasonId);
-             }
+             await DeleteDocumentAsync<BowlGame>(gameId, seasonId);
         }
     }
 }
