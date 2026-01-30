@@ -654,10 +654,10 @@
 
         // A. Fixed Teams - Filtered
         // Only include Fixed Teams if they are NOT present in the feeder tree/inputs.
-        if (!VisualHelper.IsTBD(game.TeamHome) && !feederTreeTeams.Contains(game.TeamHome)) 
+        if (!IsStrictTBD(game.TeamHome) && !feederTreeTeams.Contains(game.TeamHome)) 
             entrants.Add(game.TeamHome);
 
-        if (!VisualHelper.IsTBD(game.TeamAway) && !feederTreeTeams.Contains(game.TeamAway)) 
+        if (!IsStrictTBD(game.TeamAway) && !feederTreeTeams.Contains(game.TeamAway)) 
             entrants.Add(game.TeamAway);
 
         // B. Feeder Games (Winners)
@@ -677,8 +677,8 @@
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         
-        if (!VisualHelper.IsTBD(game.TeamHome)) set.Add(game.TeamHome);
-        if (!VisualHelper.IsTBD(game.TeamAway)) set.Add(game.TeamAway);
+        if (!IsStrictTBD(game.TeamHome)) set.Add(game.TeamHome);
+        if (!IsStrictTBD(game.TeamAway)) set.Add(game.TeamAway);
 
         if (_feederMap != null && _feederMap.Contains(game.Id)) {
              foreach(var f in _feederMap[game.Id]) {
@@ -687,6 +687,11 @@
              }
         }
         return set;
+    }
+
+    private bool IsStrictTBD(string? name)
+    {
+        return string.IsNullOrEmpty(name) || name.Equals("TBD", StringComparison.OrdinalIgnoreCase);
     }
 
     // --- INTERACTION ---
