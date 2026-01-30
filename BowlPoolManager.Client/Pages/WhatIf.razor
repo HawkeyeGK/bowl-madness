@@ -640,22 +640,35 @@
     {
         var entrants = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // A. Fixed Teams (Check ALWAYS, not just if no feeders)
-        // This handles "Bye" scenarios where one team is fixed (e.g. "Texas") and the other is a feeder.
-        // We exclude placeholders like "Winner of X" or "TBD".
-        if (!VisualHelper.IsTBD(game.TeamHome)) 
-            entrants.Add(game.TeamHome);
-
-        if (!VisualHelper.IsTBD(game.TeamAway)) 
-            entrants.Add(game.TeamAway);
-
-        // B. Feeder Games (Recursive)
+        // Check if this game has feeder games
+        int feederCount = 0;
         if (_feederMap != null && _feederMap.Contains(game.Id))
         {
-            foreach (var feeder in _feederMap[game.Id])
+            feederCount = _feederMap[game.Id].Count();
+        }
+
+        // A. Fixed Teams
+        // We only include fixed teams if the game is NOT fully fed by previous games (e.g. Byes).
+        // If a game has 2 feeders, we ignore the DB's fixed teams (which might be stale propagation).
+        if (feederCount < 2)
+        {
+            if (!VisualHelper.IsTBD(game.TeamHome)) 
+                entrants.Add(game.TeamHome);
+
+            if (!VisualHelper.IsTBD(game.TeamAway)) 
+                entrants.Add(game.TeamAway);
+        }
+
+        // B. Feeder Games (Recursive)
+        if (feederCount > 0)
+        {
+            if (_feederMap != null && _feederMap.Contains(game.Id))
             {
-                var incoming = GetPotentialWinnersForGame(feeder);
-                foreach (var team in incoming) entrants.Add(team);
+                foreach (var feeder in _feederMap[game.Id])
+                {
+                    var incoming = GetPotentialWinnersForGame(feeder);
+                    foreach (var team in incoming) entrants.Add(team);
+                }
             }
         }
 
