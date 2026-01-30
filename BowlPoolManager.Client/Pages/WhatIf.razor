@@ -608,34 +608,26 @@
 
     private IEnumerable<string> GetPotentialWinnersForGame(BowlGame game)
     {
-        // PRIORITY 1: Reality (For Final games, the real winner is always authoritative)
-        if (game.Status == GameStatus.Final)
-        {
-            var realWinner = GetRealWinner(game);
-            if (!string.IsNullOrEmpty(realWinner))
-            {
-                // Check if user has overridden reality with a simulation
-                if (simulatedWinners.TryGetValue(game.Id, out var simPick))
-                {
-                    // Validate the sim pick is one of the two original teams
-                    var gameTeams = new[] { game.TeamHome, game.TeamAway };
-                    if (gameTeams.Contains(simPick, StringComparer.OrdinalIgnoreCase))
-                    {
-                        return new[] { simPick };
-                    }
-                }
-                // Default: Return the real winner
-                return new[] { realWinner };
-            }
-        }
-
-        // PRIORITY 2: Simulation (For non-final games)
+        // Always compute valid entrants first (respects upstream simulation)
         var validEntrants = GetEntrantsForGame(game).ToList();
+
+        // PRIORITY 1: User's explicit simulation choice (if valid)
         if (simulatedWinners.TryGetValue(game.Id, out var simChoice))
         {
             if (validEntrants.Contains(simChoice, StringComparer.OrdinalIgnoreCase))
             {
                 return new[] { simChoice };
+            }
+            // Sim choice is no longer valid (upstream changed) - fall through
+        }
+
+        // PRIORITY 2: Reality (For Final games, use real winner if still a valid entrant)
+        if (game.Status == GameStatus.Final)
+        {
+            var realWinner = GetRealWinner(game);
+            if (!string.IsNullOrEmpty(realWinner) && validEntrants.Contains(realWinner, StringComparer.OrdinalIgnoreCase))
+            {
+                return new[] { realWinner };
             }
         }
 
