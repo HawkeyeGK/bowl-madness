@@ -8,6 +8,7 @@ using System.Text.Json;
 using BowlPoolManager.Api.Helpers;
 using BowlPoolManager.Api.Repositories;
 using BowlPoolManager.Core.Helpers;
+using BowlPoolManager.Core.Validation;
 
 namespace BowlPoolManager.Api.Functions
 {
@@ -138,50 +139,12 @@ namespace BowlPoolManager.Api.Functions
                     }
                 }
 
-                if (DateTime.UtcNow > pool.LockDate && !isAdmin)
+                var validationResult = EntryUpdateValidator.ValidateUpdate(pool, existingEntry, entry, isAdmin);
+                if (!validationResult.IsValid)
                 {
-                    // ALLOW Name Edits until Concluded
-                    if (pool.IsConcluded || pool.IsArchived)
-                    {
-                        var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
-                        await badReq.WriteStringAsync("This pool is concluded. No changes allowed.");
-                        return badReq;
-                    }
-
-                    // Must be an existing entry (cannot join after lock)
-                    if (existingEntry == null)
-                    {
-                        var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
-                        await badReq.WriteStringAsync("This pool is locked. No new entries allowed.");
-                        return badReq;
-                    }
-
-                    // Check for illegal changes (Picks or Tiebreaker)
-                    bool tiebreakerChanged = existingEntry.TieBreakerPoints != entry.TieBreakerPoints;
-                    
-                    var oldPicks = existingEntry.Picks ?? new Dictionary<string, string>();
-                    var newPicks = entry.Picks ?? new Dictionary<string, string>();
-                    
-                    bool picksChanged = oldPicks.Count != newPicks.Count;
-                    if (!picksChanged)
-                    {
-                        foreach (var kv in oldPicks)
-                        {
-                            if (!newPicks.TryGetValue(kv.Key, out var newVal) || 
-                                !string.Equals(newVal, kv.Value, StringComparison.OrdinalIgnoreCase))
-                            {
-                                picksChanged = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (tiebreakerChanged || picksChanged)
-                    {
-                        var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
-                        await badReq.WriteStringAsync("Cannot change Picks or Tiebreaker after pool is locked.");
-                        return badReq;
-                    }
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync(validationResult.ErrorMessage);
+                    return badReq;
                 }
 
                 // AUDIT LOG LOGIC
