@@ -707,19 +707,20 @@
     {
         if (simulatedWinners.ContainsKey(gameId) && simulatedWinners[gameId] == team)
         {
-            // If we uncheck a winner, we need to verify if the game is Final.
-            // If Final, we should revert to the Real winner (or keep it selected)
-            // But simplified: Toggle Off removes from dict.
+            // If we uncheck a winner, remove from dict.
             simulatedWinners.Remove(gameId);
-            
-            // If game is final, re-add real winner so it doesn't look empty? 
-            // Or let it be empty (undecided)?
-            // User requested: "behave same as incomplete". Incomplete can be untoggled.
         }
         else
         {
             simulatedWinners[gameId] = team;
         }
+
+        // Clear downstream selections that may now be invalid
+        foreach (var downstreamId in GetDownstreamGameIds(gameId))
+        {
+            simulatedWinners.Remove(downstreamId);
+        }
+        
         Recalculate();
     }
 
@@ -730,7 +731,23 @@
         else
             simulatedWinners[gameId] = team;
             
+        // Clear downstream selections that may now be invalid
+        foreach (var downstreamId in GetDownstreamGameIds(gameId))
+        {
+            simulatedWinners.Remove(downstreamId);
+        }
+
         Recalculate();
+    }
+
+    private IEnumerable<string> GetDownstreamGameIds(string gameId)
+    {
+        var game = allGames.FirstOrDefault(g => g.Id == gameId);
+        if (game == null || string.IsNullOrEmpty(game.NextGameId)) return Enumerable.Empty<string>();
+        
+        var downstream = new List<string> { game.NextGameId };
+        downstream.AddRange(GetDownstreamGameIds(game.NextGameId));
+        return downstream;
     }
 
     private void ResetSimulation()
