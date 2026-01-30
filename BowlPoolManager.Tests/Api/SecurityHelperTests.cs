@@ -1,6 +1,7 @@
 using Xunit;
 using FluentAssertions;
 using BowlPoolManager.Api.Helpers;
+using BowlPoolManager.Core.Domain;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker;
 using Moq;
@@ -75,5 +76,71 @@ namespace BowlPoolManager.Tests.Api
             // Assert
             result.Should().BeNull();
         }
+
+        #region IsAdmin Tests
+
+        [Fact]
+        public void IsAdmin_ShouldReturnTrue_ForSuperAdmin()
+        {
+            // Arrange
+            var user = new UserProfile { AppRole = BowlPoolManager.Core.Constants.Roles.SuperAdmin };
+
+            // Act
+            var result = SecurityHelper.IsAdmin(user);
+
+            // Assert
+            result.Should().BeTrue();
+        }
+
+        [Fact]
+        public void IsAdmin_ShouldReturnTrue_ForAdmin()
+        {
+            // Arrange
+            var user = new UserProfile { AppRole = BowlPoolManager.Core.Constants.Roles.Admin };
+
+            // Act
+            var result = SecurityHelper.IsAdmin(user);
+
+            // Assert
+            result.Should().BeTrue();
+        }
+
+        [Fact]
+        public void IsAdmin_ShouldReturnFalse_ForPlayer()
+        {
+            // Arrange
+            var user = new UserProfile { AppRole = BowlPoolManager.Core.Constants.Roles.Player };
+
+            // Act
+            var result = SecurityHelper.IsAdmin(user);
+
+            // Assert
+            result.Should().BeFalse();
+        }
+
+        [Fact]
+        public void IsAdmin_ShouldReturnFalse_ForNullUser()
+        {
+            // Act
+            var result = SecurityHelper.IsAdmin(null);
+
+            // Assert
+            result.Should().BeFalse();
+        }
+
+        [Fact]
+        public void IsAdmin_ShouldReturnFalse_ForUserWithEmptyRole()
+        {
+            // Arrange
+            var user = new UserProfile { AppRole = string.Empty };
+
+            // Act
+            var result = SecurityHelper.IsAdmin(user);
+
+            // Assert
+            result.Should().BeFalse();
+        }
+
+        #endregion
     }
 }

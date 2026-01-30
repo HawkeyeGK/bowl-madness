@@ -231,7 +231,22 @@
                 <div class="card mb-4 shadow-sm">
                     <div class="card-body">
                         <label class="form-label fw-bold">Bracket Name</label>
-                         <InputText @bind-Value="activeEntry.PlayerName" class="form-control" disabled="@IsEntryLocked" placeholder="Give this bracket a unique name" />
+                        <div class="input-group">
+                             <InputText @bind-Value="activeEntry.PlayerName" class="form-control" disabled="@(!CanEditName)" placeholder="Give this bracket a unique name" />
+                             @if (IsEntryLocked && CanEditName)
+                             {
+                                 <button class="btn btn-primary" type="submit" disabled="@isSaving">
+                                     @if (isSaving)
+                                     {
+                                        <span class="spinner-border spinner-border-sm"></span>
+                                     }
+                                     else
+                                     {
+                                        <i class="bi bi-save-fill"></i> <span>Save Name</span>
+                                     }
+                                 </button>
+                             }
+                        </div>
                         <ValidationMessage For="@(() => activeEntry.PlayerName)" />
                     </div>
                 </div>
@@ -409,6 +424,7 @@
     // Helpers for Editor
     private BowlPool? EntryPool => pools.FirstOrDefault(p => p.Id == activeEntry.PoolId);
     private bool IsEntryLocked => EntryPool != null && DateTime.UtcNow > EntryPool.LockDate;
+    private bool CanEditName => EntryPool == null || !EntryPool.IsConcluded;
 
     protected override async Task OnInitializedAsync()
     {
@@ -602,7 +618,7 @@
         var missingGames = currentGames.Where(g => !activeEntry.Picks.ContainsKey(g.Id) || string.IsNullOrEmpty(activeEntry.Picks[g.Id]))
                                 .OrderBy(g => g.StartTime)
                                 .ToList();
-        if (missingGames.Any())
+        if (missingGames.Any() && !IsEntryLocked)
         {
             string gameList = string.Join(", ", missingGames.Select(g => g.BowlName));
             TriggerToast($"Please select a winner for: {gameList}", false);

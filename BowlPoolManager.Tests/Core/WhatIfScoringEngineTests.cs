@@ -118,5 +118,102 @@ namespace BowlPoolManager.Tests.Core
             results[1].Entry.PlayerName.Should().Be("Bob");
             results[1].Rank.Should().Be(2);
         }
+
+        #region Edge Case Tests
+
+        [Fact]
+        public void Calculate_ShouldSkipEntriesWithNullPicks()
+        {
+            // Arrange
+            var games = new List<BowlGame>
+            {
+                new BowlGame { Id = "g1", TeamHome = "A", TeamAway = "B", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 10 }
+            };
+
+            var entries = new List<BracketEntry>
+            {
+                new BracketEntry { Id = "e1", PlayerName = "Normal", Picks = new Dictionary<string, string> { { "g1", "A" } } },
+                new BracketEntry { Id = "e2", PlayerName = "Redacted", Picks = null } // Should be skipped
+            };
+
+            // Act
+            var results = WhatIfScoringEngine.Calculate(games, entries, new Dictionary<string, string>());
+
+            // Assert - Redacted entry should be skipped entirely
+            results.Should().HaveCount(1);
+            results[0].Entry.PlayerName.Should().Be("Normal");
+        }
+
+        [Fact]
+        public void Calculate_ShouldHandleEmptySimulatedWinners()
+        {
+            // Arrange
+            var games = new List<BowlGame>
+            {
+                new BowlGame { Id = "g1", TeamHome = "A", TeamAway = "B", TeamHomeScore = 20, TeamAwayScore = 10, Status = GameStatus.Final, PointValue = 10 }
+            };
+
+            var entry = new BracketEntry
+            {
+                Id = "e1",
+                PlayerName = "Test",
+                Picks = new Dictionary<string, string> { { "g1", "A" } }
+            };
+
+            // Act - No simulations at all
+            var results = WhatIfScoringEngine.Calculate(games, new List<BracketEntry> { entry }, new Dictionary<string, string>());
+
+            // Assert - Should use real results
+            results[0].Score.Should().Be(10);
+        }
+
+        [Fact]
+        public void Calculate_ShouldHandleInProgressGamesWithNoSimulation()
+        {
+            // Arrange
+            var games = new List<BowlGame>
+            {
+                new BowlGame { Id = "g1", TeamHome = "A", TeamAway = "B", Status = GameStatus.InProgress, PointValue = 10 }
+            };
+
+            var entry = new BracketEntry
+            {
+                Id = "e1",
+                PlayerName = "Test",
+                Picks = new Dictionary<string, string> { { "g1", "A" } }
+            };
+
+            // Act
+            var results = WhatIfScoringEngine.Calculate(games, new List<BracketEntry> { entry }, new Dictionary<string, string>());
+
+            // Assert - Game undecided, pick alive, should count toward max
+            results[0].Score.Should().Be(0);
+            results[0].MaxPossible.Should().Be(10);
+        }
+
+        [Fact]
+        public void Calculate_ShouldNotEliminateTBDTeams()
+        {
+            // Arrange - Game with TBD team (playoff placeholder)
+            var games = new List<BowlGame>
+            {
+                new BowlGame { Id = "g1", TeamHome = "Winner R1", TeamAway = "TBD", TeamHomeScore = 20, TeamAwayScore = 10, Status = GameStatus.Final, PointValue = 10 }
+            };
+
+            var entry = new BracketEntry
+            {
+                Id = "e1",
+                PlayerName = "Test",
+                Picks = new Dictionary<string, string> { { "g1", "Winner R1" } }
+            };
+
+            // Act
+            var results = WhatIfScoringEngine.Calculate(games, new List<BracketEntry> { entry }, new Dictionary<string, string>());
+
+            // Assert
+            results[0].Score.Should().Be(10);
+        }
+
+        #endregion
     }
 }
