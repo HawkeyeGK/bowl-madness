@@ -63,7 +63,8 @@ namespace BowlPoolManager.Api.Services
             if (!linkedGames.Any()) return;
 
             var apiGames = await _cfbdService.GetScoreboardGamesAsync();
-            bool anyChanged = false;
+            var batchUpdates = new List<BowlGame>(); // Collect all updates here
+            string? seasonId = linkedGames.FirstOrDefault()?.SeasonId; // Assumes all games in list share seasonId
 
             foreach (var localGame in linkedGames)
             {
@@ -134,17 +135,22 @@ namespace BowlPoolManager.Api.Services
 
                 if (gameChanged)
                 {
-                    // Call the Repository instead of the generic service
-                    await _gameRepo.UpdateGameAsync(localGame);
+                     // Add to batch if not already there
+                    if (!batchUpdates.Contains(localGame))
+                    {
+                        batchUpdates.Add(localGame);
+                    }
                     
-                    // Trigger Propagation immediately using the current list as context
-                    await PropagateWinner(localGame, games);
-                    
-                    anyChanged = true;
+                    // Trigger Propagation immediately using the current list as context, adding cascading updates to batchUpdates
+                    PropagateWinner(localGame, games, batchUpdates);
                 }
             }
 
-            if (anyChanged) _logger.LogInformation("Scores and status updated successfully.");
+            if (batchUpdates.Any() && !string.IsNullOrEmpty(seasonId))
+            {
+                _logger.LogInformation($"Scores updated. Saving {batchUpdates.Count} games in a transaction.");
+                await _gameRepo.UpdateGamesAsBatchAsync(batchUpdates, seasonId);
+            }
         }
 
         public async Task ProcessGameUpdateAsync(BowlGame game)
@@ -198,16 +204,25 @@ namespace BowlPoolManager.Api.Services
                 }
             }
             
-            // 2. Persist the primary update (now with preserved propagation)
-            await _gameRepo.UpdateGameAsync(game);
+            // 2. Prepare batch updates
+            var batchUpdates = new List<BowlGame>();
+            batchUpdates.Add(game);
 
             // 3. Check for propagation requirements (this game propagates to others)
             if (!string.IsNullOrEmpty(game.NextGameId))
             {
-                // Refresh allGames to include our update
-                allGames = await _gameRepo.GetGamesAsync(game.SeasonId);
-                await PropagateWinner(game, allGames);
+                // Refresh allGames to include our update (conceptually, we already have it in local var 'game')
+                // But we need to make sure 'game' is in 'allGames' or handled correctly.
+                // 'allGames' currently holds the OLD version of 'game'.
+                // So let's update 'allGames' with our new 'game' so propagation context is correct.
+                var index = allGames.FindIndex(g => g.Id == game.Id);
+                if (index != -1) allGames[index] = game;
+
+                PropagateWinner(game, allGames, batchUpdates);
             }
+            
+            // 4. Persist all changes in one batch
+            await _gameRepo.UpdateGamesAsBatchAsync(batchUpdates, game.SeasonId);
         }
         
         /// <summary>
@@ -245,23 +260,34 @@ namespace BowlPoolManager.Api.Services
 
             _logger.LogInformation($"ForcePropagateAllAsync: Processing {completedGames.Count} completed games for season {seasonId}");
 
+            var batchUpdates = new List<BowlGame>();
+
             foreach (var game in completedGames)
             {
                 if (!string.IsNullOrEmpty(game.NextGameId))
                 {
                     // Use the SAME list for all calls - modifications are in-memory and carried forward
-                    await PropagateWinner(game, allGames);
+                    PropagateWinner(game, allGames, batchUpdates);
                 }
+            }
+            
+            if (batchUpdates.Any())
+            {
+                _logger.LogInformation($"ForcePropagateAllAsync: Saving {batchUpdates.Count} propagated updates.");
+                await _gameRepo.UpdateGamesAsBatchAsync(batchUpdates, seasonId);
             }
             
             _logger.LogInformation($"ForcePropagateAllAsync: Completed propagation for season {seasonId}");
         }
 
-        private async Task PropagateWinner(BowlGame completedGame, List<BowlGame> context)
+        private void PropagateWinner(BowlGame completedGame, List<BowlGame> context, List<BowlGame> pendingUpdates)
         {
             if (string.IsNullOrEmpty(completedGame.NextGameId)) return;
 
-            var nextGame = context.FirstOrDefault(g => string.Equals(g.Id, completedGame.NextGameId, StringComparison.OrdinalIgnoreCase));
+            // Important: Always look in pendingUpdates first for the latest version of the game
+            var nextGame = pendingUpdates.FirstOrDefault(g => string.Equals(g.Id, completedGame.NextGameId, StringComparison.OrdinalIgnoreCase))
+                           ?? context.FirstOrDefault(g => string.Equals(g.Id, completedGame.NextGameId, StringComparison.OrdinalIgnoreCase));
+
             if (nextGame == null)
             {
                 _logger.LogWarning($"PropagateWinner: Could not find NextGame with Id '{completedGame.NextGameId}' for CompletedGame '{completedGame.BowlName}'");
@@ -406,10 +432,16 @@ namespace BowlPoolManager.Api.Services
 
             if (changed)
             {
-                await _gameRepo.UpdateGameAsync(nextGame);
+                // Add to pending updates if not already there
+                if (!pendingUpdates.Contains(nextGame))
+                {
+                    pendingUpdates.Add(nextGame);
+                }
+                
                 _logger.LogInformation($"PropagateWinner: Updated NextGame '{nextGame.BowlName}' {nextGame.TeamHome} vs {nextGame.TeamAway}");
+                
                 // Recursive propagation!
-                await PropagateWinner(nextGame, context);
+                PropagateWinner(nextGame, context, pendingUpdates);
             }
         }
 

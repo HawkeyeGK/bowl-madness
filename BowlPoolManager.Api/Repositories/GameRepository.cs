@@ -25,5 +25,23 @@ namespace BowlPoolManager.Api.Repositories
         {
              await DeleteDocumentAsync<BowlGame>(gameId, seasonId);
         }
+
+        public async Task UpdateGamesAsBatchAsync(List<BowlGame> games, string seasonId)
+        {
+            if (games == null || !games.Any()) return;
+
+            var batch = _container.CreateTransactionalBatch(new PartitionKey(seasonId));
+            foreach (var game in games)
+            {
+                batch.UpsertItem(game);
+            }
+
+            using var response = await batch.ExecuteAsync();
+            if (!response.IsSuccessStatusCode)
+            {
+                // In a real app, we might log details or retry, but for now throwing ensures we know it failed.
+                throw new Exception($"Transactional batch failed with status code {response.StatusCode}: {response.ErrorMessage}");
+            }
+        }
     }
 }
