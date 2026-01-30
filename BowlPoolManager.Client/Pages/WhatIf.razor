@@ -640,39 +640,53 @@
     {
         var entrants = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // Check if this game has feeder games
-        int feederCount = 0;
+        // 1. Identify all teams that "belong" to the feeder tree (Inputs to the game)
+        // This helps us distinguish between a "Bye Week Fixed Team" and a "Stale Propagated Fixed Team"
+        var feederTreeTeams = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (_feederMap != null && _feederMap.Contains(game.Id))
         {
-            feederCount = _feederMap[game.Id].Count();
-        }
-
-        // A. Fixed Teams
-        // We only include fixed teams if the game is NOT fully fed by previous games (e.g. Byes).
-        // If a game has 2 feeders, we ignore the DB's fixed teams (which might be stale propagation).
-        if (feederCount < 2)
-        {
-            if (!VisualHelper.IsTBD(game.TeamHome)) 
-                entrants.Add(game.TeamHome);
-
-            if (!VisualHelper.IsTBD(game.TeamAway)) 
-                entrants.Add(game.TeamAway);
-        }
-
-        // B. Feeder Games (Recursive)
-        if (feederCount > 0)
-        {
-            if (_feederMap != null && _feederMap.Contains(game.Id))
+            foreach (var feeder in _feederMap[game.Id])
             {
-                foreach (var feeder in _feederMap[game.Id])
-                {
-                    var incoming = GetPotentialWinnersForGame(feeder);
-                    foreach (var team in incoming) entrants.Add(team);
-                }
+                var below = GetReferenceEntrants(feeder);
+                foreach(var b in below) feederTreeTeams.Add(b);
+            }
+        }
+
+        // A. Fixed Teams - Filtered
+        // Only include Fixed Teams if they are NOT present in the feeder tree/inputs.
+        if (!VisualHelper.IsTBD(game.TeamHome) && !feederTreeTeams.Contains(game.TeamHome)) 
+            entrants.Add(game.TeamHome);
+
+        if (!VisualHelper.IsTBD(game.TeamAway) && !feederTreeTeams.Contains(game.TeamAway)) 
+            entrants.Add(game.TeamAway);
+
+        // B. Feeder Games (Winners)
+        if (_feederMap != null && _feederMap.Contains(game.Id))
+        {
+            foreach (var feeder in _feederMap[game.Id])
+            {
+                var incoming = GetPotentialWinnersForGame(feeder);
+                foreach (var team in incoming) entrants.Add(team);
             }
         }
 
         return entrants;
+    }
+
+    private IEnumerable<string> GetReferenceEntrants(BowlGame game) 
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        
+        if (!VisualHelper.IsTBD(game.TeamHome)) set.Add(game.TeamHome);
+        if (!VisualHelper.IsTBD(game.TeamAway)) set.Add(game.TeamAway);
+
+        if (_feederMap != null && _feederMap.Contains(game.Id)) {
+             foreach(var f in _feederMap[game.Id]) {
+                 var below = GetReferenceEntrants(f);
+                 foreach(var b in below) set.Add(b);
+             }
+        }
+        return set;
     }
 
     // --- INTERACTION ---
