@@ -2,9 +2,11 @@
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
 @using BowlPoolManager.Core.Helpers
+@using BowlPoolManager.Client.Services
 
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.JSInterop
+@inject ISeasonService SeasonService
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 @inject AuthenticationStateProvider AuthStateProvider
@@ -441,14 +443,20 @@
 
     [SupplyParameterFromQuery(Name = "poolId")]
     public string? QueryPoolId { get; set; }
+    
+    private string currentSeasonId = "";
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
-            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries");
-            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
+            // 0. Fetch Current Season
+            var currentSeason = await SeasonService.GetCurrentSeasonAsync();
+            currentSeasonId = currentSeason?.Id ?? "";
+
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={currentSeasonId}");
+            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetEntries?seasonId={currentSeasonId}");
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");
             var myEntriesTask = FetchMyEntriesSafe(); // Fetch proactively for fallback logic
 
             await Task.WhenAll(gamesTask, entriesTask, poolsTask, myEntriesTask);
@@ -543,7 +551,7 @@
             var auth = await AuthStateProvider.GetAuthenticationStateAsync();
             if (auth.User.Identity?.IsAuthenticated == true)
             {
-                return await Http.GetFromJsonAsync<List<BracketEntry>>("api/GetMyEntries") ?? new();
+                return await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyEntries?seasonId={currentSeasonId}") ?? new();
             }
         }
         catch { /* Ignore auth errors */ }

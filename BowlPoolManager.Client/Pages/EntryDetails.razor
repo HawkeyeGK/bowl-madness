@@ -2,6 +2,8 @@
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
 @using BowlPoolManager.Core.Helpers
+@using BowlPoolManager.Client.Services
+@inject ISeasonService SeasonService
 @inject HttpClient Http
 
 <div class="container-fluid mt-3 px-4 pb-5">
@@ -277,6 +279,9 @@
     private List<BowlGame> games = new();
     private int currentScore = 0;
     private int maxPossible = 0;
+    
+    // NEW
+    private string currentSeasonId = "";
 
     private HashSet<string> eliminatedTeams = new(StringComparer.OrdinalIgnoreCase);
     private BowlPool? currentPool;
@@ -285,9 +290,13 @@
     {
         try
         {
-            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
-            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetEntries");
-            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
+            // 0. Fetch Current Season
+            var currentSeason = await SeasonService.GetCurrentSeasonAsync();
+            currentSeasonId = currentSeason?.Id ?? "";
+
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={currentSeasonId}");
+            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetEntries?seasonId={currentSeasonId}");
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");
             await Task.WhenAll(gamesTask, entriesTask, poolsTask);
 
             // 1. Get All Data

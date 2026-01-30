@@ -693,9 +693,9 @@
             }
             
             // 1. Fetch Global Data
-            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
-            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
-            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetMyEntries");
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={currentSeasonId}");
+            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyEntries?seasonId={currentSeasonId}");
             
             await Task.WhenAll(poolsTask, gamesTask, entriesTask);
             

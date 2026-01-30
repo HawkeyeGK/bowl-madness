@@ -4,7 +4,7 @@ namespace BowlPoolManager.Client.Services
 {
     public interface IPoolService
     {
-        Task<List<BowlPool>> GetPoolsAsync();
+        Task<List<BowlPool>> GetPoolsAsync(string? seasonId = null);
         Task<BowlPool?> GetPoolAsync(string poolId);
         Task<BowlPool?> CreatePoolAsync(BowlPool pool);
 

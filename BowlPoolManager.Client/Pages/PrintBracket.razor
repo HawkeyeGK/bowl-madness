@@ -1,8 +1,10 @@
 @page "/print-bracket"
 @page "/print-bracket/{EntryId}"
 @layout BowlPoolManager.Client.Layout.PrintLayout
+@inject ISeasonService SeasonService
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
+@using BowlPoolManager.Client.Services
 
 @inject HttpClient Http
 
@@ -246,13 +248,20 @@ else
     private List<BowlGame> quarterGames = new();
     private List<BowlGame> semiGames = new();
     private List<BowlGame> champGames = new();
+    
+    // NEW
+    private string currentSeasonId = "";
 
     protected override async Task OnInitializedAsync()
     {
         try 
         {
-            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
-            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
+            // 0. Fetch Current Season
+            var currentSeason = await SeasonService.GetCurrentSeasonAsync();
+            currentSeasonId = currentSeason?.Id ?? "";
+
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={currentSeasonId}");
             var entryTask = FetchEntry();
             var myEntriesTask = FetchMyEntriesSafe(); // Needed for fallback logic if EntryId is null
 
@@ -317,7 +326,7 @@ else
         {
              // We can check local storage or auth state if needed, but the API handles the auth check
              // This needs to be safe because the user might not be logged in
-             return await Http.GetFromJsonAsync<List<BracketEntry>>("api/GetMyEntries") ?? new();
+             return await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyEntries?seasonId={currentSeasonId}") ?? new();
         }
         catch { return new(); }
     }

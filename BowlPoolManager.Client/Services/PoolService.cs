@@ -12,9 +12,14 @@ namespace BowlPoolManager.Client.Services
             _http = http;
         }
 
-        public async Task<List<BowlPool>> GetPoolsAsync()
+        public async Task<List<BowlPool>> GetPoolsAsync(string? seasonId = null)
         {
-            return await _http.GetFromJsonAsync<List<BowlPool>>("api/GetPools") ?? new List<BowlPool>();
+            var url = "api/GetPools";
+            if (!string.IsNullOrEmpty(seasonId))
+            {
+                url += $"?seasonId={seasonId}";
+            }
+            return await _http.GetFromJsonAsync<List<BowlPool>>(url) ?? new List<BowlPool>();
         }
 
         public async Task<BowlPool?> GetPoolAsync(string poolId)

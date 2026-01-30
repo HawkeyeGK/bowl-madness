@@ -2,6 +2,8 @@
 @page "/leaderboard"
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
+@using BowlPoolManager.Client.Services
+@inject ISeasonService SeasonService
 
 @using BowlPoolManager.Core.Helpers
 @using Microsoft.AspNetCore.Components.Authorization
@@ -207,6 +209,7 @@
     private int totalFinalGames = 0;
     private bool isPoolFinal = false;
     private DateTime LastUpdate = DateTime.MinValue;
+    private string currentSeasonId = "";
     
     // Sorting
     private string sortColumn = "Score";
@@ -220,9 +223,13 @@
         try
         {
             isLoading = true;
-            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>("api/GetPools");
-            // Fetching games triggers the lazy update
-            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
+            
+            // 0. Fetch Current Season
+            var currentSeason = await SeasonService.GetCurrentSeasonAsync();
+            currentSeasonId = currentSeason?.Id ?? "";
+
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={currentSeasonId}");
             var myEntriesTask = FetchMyEntriesSafe();
             
             await Task.WhenAll(poolsTask, gamesTask, myEntriesTask);
@@ -307,7 +314,7 @@
             var auth = await AuthStateProvider.GetAuthenticationStateAsync();
             if (auth.User.Identity?.IsAuthenticated == true)
             {
-                return await Http.GetFromJsonAsync<List<BracketEntry>>("api/GetMyEntries") ?? new();
+                return await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyEntries?seasonId={currentSeasonId}") ?? new();
             }
         }
         catch { /* Ignore auth errors on public page */ }
@@ -333,7 +340,7 @@
     {
         try
         {
-            entries = await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetEntries?poolId={poolId}") ?? new();
+            entries = await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetEntries?poolId={poolId}&seasonId={currentSeasonId}") ?? new();
             
             // FILTER GAMES FOR THIS POOL
             if (currentPool != null && currentPool.GameIds != null && currentPool.GameIds.Any())
