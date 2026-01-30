@@ -11,19 +11,27 @@ namespace BowlPoolManager.Api.Repositories
 
         public async Task AddEntryAsync(BracketEntry entry) => await UpsertDocumentAsync(entry, entry.SeasonId);
 
-        public async Task<List<BracketEntry>> GetEntriesAsync(string seasonId, string? poolId = null)
+        public async Task<List<BracketEntry>> GetEntriesAsync(string? seasonId = null, string? poolId = null)
         {
-            var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BracketEntry}' AND c.seasonId = @seasonId";
+            var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BracketEntry}'";
+            if (!string.IsNullOrEmpty(seasonId))
+            {
+                sql += " AND c.seasonId = @seasonId";
+            }
+
             QueryDefinition queryDef;
 
             if (!string.IsNullOrEmpty(poolId))
             {
                 sql += " AND c.poolId = @poolId";
-                queryDef = new QueryDefinition(sql).WithParameter("@seasonId", seasonId).WithParameter("@poolId", poolId);
+                queryDef = new QueryDefinition(sql);
+                if (!string.IsNullOrEmpty(seasonId)) queryDef.WithParameter("@seasonId", seasonId);
+                queryDef.WithParameter("@poolId", poolId);
             }
             else
             {
-                queryDef = new QueryDefinition(sql).WithParameter("@seasonId", seasonId);
+                queryDef = new QueryDefinition(sql);
+                if (!string.IsNullOrEmpty(seasonId)) queryDef.WithParameter("@seasonId", seasonId);
             }
             
             return await QueryAsync<BracketEntry>(queryDef, seasonId);
@@ -39,19 +47,31 @@ namespace BowlPoolManager.Api.Repositories
              await DeleteDocumentAsync<BracketEntry>(id, seasonId);
         }
 
-        public async Task<List<BracketEntry>> GetEntriesForUserAsync(string userId, string seasonId, string? poolId = null)
+        public async Task<List<BracketEntry>> GetEntriesForUserAsync(string userId, string? seasonId = null, string? poolId = null)
         {
-            var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BracketEntry}' AND c.userId = @userId AND c.seasonId = @seasonId";
+            var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BracketEntry}' AND c.userId = @userId";
+
+            if (!string.IsNullOrEmpty(seasonId))
+            {
+                sql += " AND c.seasonId = @seasonId";
+            }
+
             QueryDefinition queryDef;
 
             if (!string.IsNullOrEmpty(poolId))
             {
                 sql += " AND c.poolId = @poolId";
-                queryDef = new QueryDefinition(sql).WithParameter("@userId", userId).WithParameter("@seasonId", seasonId).WithParameter("@poolId", poolId);
+                queryDef = new QueryDefinition(sql);
+                queryDef.WithParameter("@userId", userId); 
+                
+                if (!string.IsNullOrEmpty(seasonId)) queryDef.WithParameter("@seasonId", seasonId);
+                queryDef.WithParameter("@poolId", poolId);
             }
             else
             {
-                queryDef = new QueryDefinition(sql).WithParameter("@userId", userId).WithParameter("@seasonId", seasonId);
+                queryDef = new QueryDefinition(sql);
+                queryDef.WithParameter("@userId", userId);
+                if (!string.IsNullOrEmpty(seasonId)) queryDef.WithParameter("@seasonId", seasonId);
             }
             return await QueryAsync<BracketEntry>(queryDef, seasonId);
         }

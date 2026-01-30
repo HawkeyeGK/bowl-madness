@@ -10,10 +10,17 @@ namespace BowlPoolManager.Api.Repositories
         public PoolRepository(CosmosClient cosmosClient) : base(cosmosClient, Constants.Database.SeasonsContainer) { }
 
         public async Task AddPoolAsync(BowlPool pool) => await UpsertDocumentAsync(pool, pool.SeasonId);
-        public async Task<List<BowlPool>> GetPoolsAsync(string seasonId)
+        public async Task<List<BowlPool>> GetPoolsAsync(string? seasonId = null)
         {
-            var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BowlPool}' AND c.seasonId = @seasonId";
-            var queryDef = new QueryDefinition(sql).WithParameter("@seasonId", seasonId);
+            var sql = $"SELECT * FROM c WHERE c.type = '{Constants.DocumentTypes.BowlPool}'";
+            QueryDefinition queryDef = new QueryDefinition(sql);
+
+            if (!string.IsNullOrEmpty(seasonId))
+            {
+                sql += " AND c.seasonId = @seasonId";
+                queryDef = new QueryDefinition(sql).WithParameter("@seasonId", seasonId);
+            }
+            
             return await QueryAsync<BowlPool>(queryDef, seasonId);
         }
         

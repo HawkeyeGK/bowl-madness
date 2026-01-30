@@ -5,10 +5,10 @@ namespace BowlPoolManager.Api.Repositories
     public interface IEntryRepository
     {
         Task AddEntryAsync(BracketEntry entry);
-        Task<List<BracketEntry>> GetEntriesAsync(string seasonId, string? poolId = null);
+        Task<List<BracketEntry>> GetEntriesAsync(string? seasonId = null, string? poolId = null);
         Task<BracketEntry?> GetEntryAsync(string id, string seasonId);
         Task DeleteEntryAsync(string id, string seasonId);
-        Task<List<BracketEntry>> GetEntriesForUserAsync(string userId, string seasonId, string? poolId = null);
+        Task<List<BracketEntry>> GetEntriesForUserAsync(string userId, string? seasonId = null, string? poolId = null);
         Task<bool> IsBracketNameTakenAsync(string poolId, string bracketName, string? excludeId = null);
     }
 }

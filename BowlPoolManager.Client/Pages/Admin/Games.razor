@@ -479,7 +479,7 @@
 
         try
         {
-            var response = await Http.DeleteAsync($"api/DeleteGame/{game.Id}");
+            var response = await Http.DeleteAsync($"api/DeleteGame/{game.Id}?seasonId={game.SeasonId}");
             if (response.IsSuccessStatusCode)
             {
                 await LoadGames();

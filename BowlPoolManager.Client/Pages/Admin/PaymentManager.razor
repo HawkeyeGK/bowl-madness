@@ -251,7 +251,7 @@
             entry.IsPaid = isPaid;
 
             // Call API
-            var response = await Http.PostAsync($"api/SetEntryPaidStatus?id={entry.Id}&isPaid={isPaid}", null);
+            var response = await Http.PostAsync($"api/SetEntryPaidStatus?id={entry.Id}&isPaid={isPaid}&seasonId={entry.SeasonId}", null);
             if (!response.IsSuccessStatusCode)
             {
                 // Revert on failure

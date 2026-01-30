@@ -39,12 +39,7 @@ namespace BowlPoolManager.Api.Functions
             var poolId = req.Query["poolId"];
             var seasonId = req.Query["seasonId"];
 
-            if (string.IsNullOrEmpty(seasonId))
-            {
-                var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badReq.WriteStringAsync("Season ID is required");
-                return badReq;
-            }
+            // Optional: if (string.IsNullOrEmpty(seasonId)) ...
 
             var entries = await _entryRepo.GetEntriesAsync(seasonId, poolId);
             
@@ -62,12 +57,7 @@ namespace BowlPoolManager.Api.Functions
             var poolId = req.Query["poolId"] ?? ""; // SAFE COALESCE
             var seasonId = req.Query["seasonId"];
 
-             if (string.IsNullOrEmpty(seasonId))
-            {
-                var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badReq.WriteStringAsync("Season ID is required");
-                return badReq;
-            }
+            // Optional: if (string.IsNullOrEmpty(seasonId)) ...
 
             var entries = await _entryRepo.GetEntriesForUserAsync(principal.UserId, seasonId, poolId);
             

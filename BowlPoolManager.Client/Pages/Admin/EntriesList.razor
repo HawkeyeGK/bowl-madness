@@ -229,7 +229,7 @@
         bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete the bracket for '{entry.PlayerName}'?");
         if (confirmed)
         {
-            var response = await Http.DeleteAsync($"api/DeleteEntry/{entry.Id}");
+            var response = await Http.DeleteAsync($"api/DeleteEntry/{entry.Id}?seasonId={entry.SeasonId}");
             if (response.IsSuccessStatusCode)
             {
                 await LoadData();
