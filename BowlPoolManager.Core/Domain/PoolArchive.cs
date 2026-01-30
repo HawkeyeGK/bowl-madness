@@ -21,6 +21,10 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("seasonId")]
         public string SeasonId { get; set; } = string.Empty;
 
+        [JsonProperty("season")]
+        [JsonPropertyName("season")]
+        public int Season { get; set; }
+
         [JsonProperty("archivedOn")]
         [JsonPropertyName("archivedOn")]
         public DateTime ArchivedOn { get; set; } = DateTime.UtcNow;

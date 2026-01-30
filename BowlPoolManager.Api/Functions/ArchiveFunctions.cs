@@ -72,6 +72,7 @@ namespace BowlPoolManager.Api.Functions
                 PoolId = pool.Id,
                 PoolName = pool.Name,
                 SeasonId = pool.SeasonId,
+                Season = pool.Season,
                 ArchivedOn = DateTime.UtcNow
             };
 
