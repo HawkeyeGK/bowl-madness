@@ -173,11 +173,11 @@
         <div class="mt-3 text-center text-muted small">
              @if (LastUpdate != DateTime.MinValue)
              {
-                 <span><i class="bi bi-info-circle"></i> Leaderboard updates automatically &bull; Last update: @DateTimeHelper.ToCentral(LastUpdate).ToString("MMM d, h:mm tt") CT</span>
+                 <span><i class="bi bi-info-circle"></i> Refresh to update &bull; Last update: @DateTimeHelper.ToCentral(LastUpdate).ToString("MMM d, h:mm tt") CT</span>
              }
              else
              {
-                 <span><i class="bi bi-info-circle"></i> Leaderboard updates automatically</span>
+                 <span><i class="bi bi-info-circle"></i> Refresh to update</span>
              }
              <div class="mt-1"><i class="bi bi-lock-fill"></i> indicates picks are hidden until the pool unlocks.</div>
         </div>
