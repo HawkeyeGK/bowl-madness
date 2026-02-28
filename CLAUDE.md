@@ -84,4 +84,4 @@ HTTP-triggered functions in `BowlPoolManager.Api/Functions/`. All triggers use `
 - Framework: xUnit with FluentAssertions and Moq.
 - Test files mirror the source: `BowlPoolManager.Tests/Core/` tests Core helpers; `BowlPoolManager.Tests/Api/` tests API helpers.
 - The test project references both `BowlPoolManager.Api` and `BowlPoolManager.Core`.
-- All projects target `net10.0`.
+- **Target framework split**: `Api` and `Core` target `net8.0` — required by the Azure Functions hosting environment (max supported: net9.0). `Client` and `Tests` target `net10.0`. A net10.0 project can reference net8.0 assemblies, so this compiles and runs cleanly.
