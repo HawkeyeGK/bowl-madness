@@ -139,42 +139,10 @@ Four projects in one solution (`BowlPoolManager.sln`):
 | `BowlPoolManager.Client` | net10.0 | Blazor WebAssembly | Front-end SPA |
 | `BowlPoolManager.Tests` | net10.0 | xUnit test project | Tests for Core and Api logic |
 
-## Architecture Summary
-
-### Data Layer (CosmosDB)
-All repositories extend `CosmosRepositoryBase` ([BowlPoolManager.Api/Infrastructure/CosmosRepositoryBase.cs](BowlPoolManager.Api/Infrastructure/CosmosRepositoryBase.cs)), which wraps upsert, get, query, and delete against a named CosmosDB container. The `CosmosClient` is configured as a singleton in [BowlPoolManager.Api/Program.cs](BowlPoolManager.Api/Program.cs) with `CamelCase` serialization policy.
-
-**Containers** (defined in `Constants.Database`):
-- `Players` — user profiles
-- `Seasons` — games and pools, partitioned by `seasonId`
-- `Picks` — bracket entries
-- `PoolArchives` — concluded pool snapshots
-- `Configuration` — team configs (e.g., partition key `"Config_Teams_FBS"`)
-
-### API Layer (Azure Functions)
-HTTP-triggered functions in `BowlPoolManager.Api/Functions/`. All triggers use `AuthorizationLevel.Anonymous`; security is enforced manually via `SecurityHelper.ValidateSuperAdminAsync()` at the start of restricted endpoints. The `x-ms-client-principal` base64 header (injected by Azure Static Web Apps) is parsed by `SecurityHelper.ParseSwaHeader()`.
-
-### Client Layer (Blazor WASM)
-- **Authentication**: `StaticWebAppsAuthenticationStateProvider` (custom, in `Security/`) reads the `/.auth/me` endpoint.
-- **State management**: `AppState` (scoped service) exposes `event Action? OnChange` — components subscribe to it and call `StateHasChanged()` on change.
-- **Domain services**: `PoolService`, `SeasonService`, `ConfigurationService` are scoped and handle all HTTP calls to the API.
-
-### Scoring Logic (Core)
-- `ScoringEngine` ([BowlPoolManager.Core/Helpers/ScoringEngine.cs](BowlPoolManager.Core/Helpers/ScoringEngine.cs)): Calculates real leaderboard rankings from actual game results. Supports configurable tiebreakers (`CorrectPickCount` or `ScoreDelta`) via `BowlPool.PrimaryTieBreaker`/`SecondaryTieBreaker`.
-- `WhatIfScoringEngine` ([BowlPoolManager.Core/Helpers/WhatIfScoringEngine.cs](BowlPoolManager.Core/Helpers/WhatIfScoringEngine.cs)): Simulates outcomes by merging a `simulatedWinners` dictionary over real results — used by the "Path to Victory" (`/what-if`) page.
-
-## Key Patterns & Constraints
-
-- **Serialization**: Domain models carry both `[JsonProperty]` (Newtonsoft) and `[JsonPropertyName]` (System.Text.Json) attributes to remain compatible across the stack. The CosmosDB SDK uses System.Text.Json with CamelCase. Do not remove either attribute family from domain models.
-- **Shared models only in Core**: Never duplicate model definitions between projects.
-- **Cosmos queries must include partition key** where possible. Batch operations must target a single `PartitionKey`.
-- **DateTime**: Always use `DateTime.UtcNow`; treat all `DateTime` values as UTC.
-- **Security**: Call `SecurityHelper.ValidateSuperAdminAsync()` at the top of any restricted function before executing business logic.
-- **Database initialization**: Triggered manually via the Admin Dashboard (`InfrastructureFunctions.cs`), not at startup.
-
 ## Testing
 
 - Framework: xUnit with FluentAssertions and Moq.
 - Test files mirror the source: `BowlPoolManager.Tests/Core/` tests Core helpers; `BowlPoolManager.Tests/Api/` tests API helpers.
 - The test project references both `BowlPoolManager.Api` and `BowlPoolManager.Core`.
-- **Target framework split**: `Api` and `Core` target `net8.0`; `Client` and `Tests` target `net10.0`. A net10.0 project can reference net8.0 assemblies, so this compiles and runs cleanly. The Api is capped at net9.0 max — not because of Azure Functions (which supports net10), but because the **Azure Static Web Apps Oryx build system** (used to build and deploy the API) does not yet support net10.0.
+- Method naming: `MethodName_ShouldExpectedBehavior_WhenCondition` (e.g. `Calculate_ShouldReturnCorrectScore_ForFinalGames`).
+- Always use FluentAssertions (`result.Should().Be(...)`). Use Moq for all dependencies.

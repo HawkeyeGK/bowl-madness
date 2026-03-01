@@ -74,14 +74,21 @@ To maintain architectural purity, follow these rules:
 - **Security Check**: For restricted endpoints, call `SecurityHelper.ValidateSuperAdminAsync(req, _userRepo)` as the very first statement before any business logic executes.
 - **Database Initialization**: Container creation and schema setup are triggered manually via the Admin Dashboard (`InfrastructureFunctions.cs`). Do not add startup initialization logic.
 
-## 6. Cross-Project Dependencies
+## 6. Scoring Logic (Core)
+
+Two pure calculation engines live in `BowlPoolManager.Core/Helpers/`:
+
+- **`ScoringEngine`** ([BowlPoolManager.Core/Helpers/ScoringEngine.cs](BowlPoolManager.Core/Helpers/ScoringEngine.cs)): Calculates real leaderboard rankings from actual game results. Supports configurable tiebreakers (`CorrectPickCount` or `ScoreDelta`) via `BowlPool.PrimaryTieBreaker`/`SecondaryTieBreaker`.
+- **`WhatIfScoringEngine`** ([BowlPoolManager.Core/Helpers/WhatIfScoringEngine.cs](BowlPoolManager.Core/Helpers/WhatIfScoringEngine.cs)): Simulates outcomes by merging a `simulatedWinners` dictionary over real results — used by the "Path to Victory" (`/what-if`) page.
+
+## 8. Cross-Project Dependencies
 
 - `BowlPoolManager.Client` depends directly on `BowlPoolManager.Core`.
 - `BowlPoolManager.Api` depends directly on `BowlPoolManager.Core`.
 - `BowlPoolManager.Tests` references both `BowlPoolManager.Api` and `BowlPoolManager.Core`.
 - The Client never directly references the API or data packages; communication is strictly over HTTP. The API hides CosmosDB completely from the Core models.
 
-## 7. Target Framework & Build Constraints
+## 9. Target Framework & Build Constraints
 
 | Project | Target Framework |
 |---|---|
