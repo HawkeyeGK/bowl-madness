@@ -214,6 +214,51 @@ namespace BowlPoolManager.Tests.Core
             results[0].Score.Should().Be(10);
         }
 
+        [Fact]
+        public void Calculate_ShouldIgnoreSimulations_ForUnknownGameId()
+        {
+            // A gameId in simulatedWinners that doesn't exist in games should be silently ignored.
+            var games = new List<BowlGame>
+            {
+                new BowlGame { Id = "g1", TeamHome = "A", TeamAway = "B", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 10 }
+            };
+
+            var entry = new BracketEntry
+            {
+                Id = "e1",
+                PlayerName = "Test",
+                Picks = new Dictionary<string, string> { { "g1", "A" } }
+            };
+
+            // "ghost-id" is not in games — should not affect scoring
+            var simulated = new Dictionary<string, string> { { "ghost-id", "SomeTeam" } };
+
+            var results = WhatIfScoringEngine.Calculate(games, new List<BracketEntry> { entry }, simulated);
+
+            results[0].Score.Should().Be(10); // Real result used for g1
+        }
+
+        [Fact]
+        public void Calculate_ShouldUseCaseInsensitivePickMatching_WhenScoring()
+        {
+            // Picks stored with different casing should still be matched correctly.
+            var games = new List<BowlGame>
+            {
+                new BowlGame { Id = "g1", TeamHome = "Ohio State", TeamAway = "Michigan", TeamHomeScore = 42, TeamAwayScore = 27, Status = GameStatus.Final, PointValue = 10 }
+            };
+
+            var entry = new BracketEntry
+            {
+                Id = "e1",
+                PlayerName = "Test",
+                Picks = new Dictionary<string, string> { { "g1", "OHIO STATE" } } // Uppercase
+            };
+
+            var results = WhatIfScoringEngine.Calculate(games, new List<BracketEntry> { entry }, new Dictionary<string, string>());
+
+            results[0].Score.Should().Be(10);
+        }
+
         #endregion
     }
 }

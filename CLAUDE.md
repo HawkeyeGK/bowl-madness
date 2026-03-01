@@ -6,7 +6,38 @@ See [ARCHITECTURAL_CONTEXT.md](ARCHITECTURAL_CONTEXT.md) for full architectural 
 
 ## Infrastructure & Deployment
 
-Hosted on Azure Static Web Apps (Central US). Deployments trigger automatically via GitHub Actions on merge to `main`. Do not suggest manual deployment steps.
+Hosted on Azure Static Web Apps (Central US). Deployments trigger automatically via GitHub Actions on push to `main`.
+
+**Deployment is explicitly controlled — never push to `main` unless the user asks.** Work is committed locally or pushed to a feature branch. Only merge/push to `main` when the user says they are ready to deploy.
+
+## Git Workflow
+
+### Branches
+- **Direct to `main` is the default.** Commit directly on `main` for small, self-contained changes.
+- Use a feature branch for changes that are large, multi-step, or otherwise significant (e.g., new features, refactors touching multiple files, anything that would be risky to partially deploy). Suggest a feature branch proactively when a task meets this bar.
+- Branch naming: `feature/<short-description>` (e.g., `feature/add-payment-export`).
+
+### Commit Messages — GitHub Issue Linking
+Every commit must reference the GitHub issue it belongs to. Use the issue number in the commit message body:
+- To **reference** an issue (without closing it): include `#123` in the message.
+- To **close** an issue on merge to `main`: use a closing keyword — `Closes #123`, `Fixes #123`, or `Resolves #123` — in the commit message body.
+
+Example commit message:
+```
+Add CSV export for payment manager
+
+Adds a download button to the Payment Manager page that exports
+the current filtered view as a CSV file.
+
+Closes #42
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+```
+
+### Pushing and Deploying
+- **Never push to `main` (or merge a feature branch into `main`) without explicit instruction.** Commits accumulate locally or on a feature branch until the user says they are ready to deploy.
+- When the user confirms they are ready to deploy: push `main` directly, or merge the feature branch first (`git checkout main && git merge feature/<name>`) then push.
+- Pushing a feature branch does not trigger a deployment.
 
 ## Available CLI Tools
 

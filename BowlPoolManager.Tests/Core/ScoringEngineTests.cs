@@ -75,71 +75,21 @@ namespace BowlPoolManager.Tests.Core
         public void Calculate_ShouldRankByScoreDesc_ThenByCorrectPicksDesc()
         {
             // Arrange
-            // Game 1: Pts 10. Winner A.
-            // Game 2: Pts 5. Winner C.
+            // Game 1: 10 pts. Game 2 & 3: 5 pts each.
+            // FewPicks: picks game 1 only  → 10 pts, 1 correct pick.
+            // ManyPicks: picks games 2 & 3 → 10 pts, 2 correct picks.
+            // Both tie on score; default primary tiebreaker (CorrectPickCount) puts ManyPicks first.
             var games = new List<BowlGame>
             {
-                new BowlGame { Id = "1", TeamHome = "A", TeamAway = "B", TeamHomeScore = 20, TeamAwayScore = 10, Status = GameStatus.Final, PointValue = 10 },
-                new BowlGame { Id = "2", TeamHome = "C", TeamAway = "D", TeamHomeScore = 20, TeamAwayScore = 10, Status = GameStatus.Final, PointValue = 5 }
-            };
-
-            // Entry 1: 15 Pts (Both Correct) - Rank 1
-            // Entry 2: 10 Pts (Game 1 Correct)
-            // Entry 3: 10 Pts (Game 1 Correct) - Tie with Entry 2
-            // Entry 4: 10 Pts (Game 2 Correct? Impossible to get 10pts with just game 2) -> Let's say Entry 4 picked Game 1 Incorrectly, Game 2 Incorrectly? No.
-            // Let's make a better scenario.
-            
-            // Re-Arrange
-            // Game 1: 10 pts
-            // Game 2: 10 pts
-            games = new List<BowlGame>
-            {
-                new BowlGame { Id = "1", TeamHome = "A", TeamAwayScore = 0, TeamHomeScore = 10, Status = GameStatus.Final, PointValue = 10 },
-                new BowlGame { Id = "2", TeamHome = "B", TeamAwayScore = 0, TeamHomeScore = 10, Status = GameStatus.Final, PointValue = 10 },
-                new BowlGame { Id = "3", TeamHome = "C", TeamAwayScore = 0, TeamHomeScore = 10, Status = GameStatus.Final, PointValue = 5 }, // Tiebreaker extra game
+                new BowlGame { Id = "1", TeamHome = "W", TeamHomeScore = 10, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10 },
+                new BowlGame { Id = "2", TeamHome = "W", TeamHomeScore = 10, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 5 },
+                new BowlGame { Id = "3", TeamHome = "W", TeamHomeScore = 10, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 5 },
             };
 
             var entries = new List<BracketEntry>
             {
-                // User A: 20 Pts (2 Correct).
-                new BracketEntry { Id = "A", PlayerName = "A", Picks = new Dictionary<string, string> { { "1", "A" }, { "2", "B" }, { "3", "X" } } },
-                
-                // User B: 20 Pts (3 Correct). (Got 1(10) + 2(10)? No, that's 20. + 3(5) = 25. 
-                // Let's make User B: 10 + 5 + 5 = 20 pts? 
-                
-                // Simpler Scenario:
-                // Game 1 (10pts), Game 2 (10pts).
-                // User A: Correct 1, Correct 2. Total 20. Picks 2.
-                // User B: Correct 1 Only. Total 10. Picks 1.
-                // User C: Correct 2 Only. Total 10. Picks 1.
-                
-                // Needed: User D has SAME SCORE as User C, but MORE PICKS?
-                // Game 3 (1pt).
-                // User D: Incorrect 1(10), Incorrect 2(10). Correct 3(1). Total 1?
-                // It's hard to have same score but different pick counts unless point values vary.
-                
-                // Scenario:
-                // Game 1: 10 Pts.
-                // Game 2: 5 Pts.
-                // Game 3: 5 Pts.
-                
-                // User High: Get Game 1 (10pts). 1 Correct.
-                // User Low: Get Game 2 (5) + Game 3 (5). 10 Pts. 2 Correct.
-                
-                // Expected: User Low > User High because 2 Correct > 1 Correct.
-            };
-
-             games = new List<BowlGame>
-            {
-                new BowlGame { Id = "1", TeamHome="W", TeamHomeScore=10, TeamAwayScore=0, Status=GameStatus.Final, PointValue=10 },
-                new BowlGame { Id = "2", TeamHome="W", TeamHomeScore=10, TeamAwayScore=0, Status=GameStatus.Final, PointValue=5 },
-                new BowlGame { Id = "3", TeamHome="W", TeamHomeScore=10, TeamAwayScore=0, Status=GameStatus.Final, PointValue=5 },
-            };
-
-            entries = new List<BracketEntry>
-            {
-                new BracketEntry { Id = "FewPicks", PlayerName = "FewPicks", Picks = new Dictionary<string, string> { { "1", "W" } } }, // 10 pts, 1 correct
-                new BracketEntry { Id = "ManyPicks", PlayerName = "ManyPicks", Picks = new Dictionary<string, string> { { "2", "W" }, { "3", "W" } } }, // 10 pts, 2 correct
+                new BracketEntry { Id = "FewPicks",  PlayerName = "FewPicks",  Picks = new Dictionary<string, string> { { "1", "W" } } },
+                new BracketEntry { Id = "ManyPicks", PlayerName = "ManyPicks", Picks = new Dictionary<string, string> { { "2", "W" }, { "3", "W" } } },
             };
 
             // Act
@@ -147,31 +97,29 @@ namespace BowlPoolManager.Tests.Core
 
             // Assert
             results.Should().HaveCount(2);
-            results[0].Entry.PlayerName.Should().Be("ManyPicks"); // Rank 1
+            results[0].Entry.PlayerName.Should().Be("ManyPicks");
             results[0].Rank.Should().Be(1);
-
-            results[1].Entry.PlayerName.Should().Be("FewPicks"); // Rank 2
-            results[1].Rank.Should().Be(2); 
-            // Note: If logic was just score, they'd be tied rank.
+            results[1].Entry.PlayerName.Should().Be("FewPicks");
+            results[1].Rank.Should().Be(2);
         }
 
         [Fact]
         public void Calculate_ShouldRankByTiebreaker_OnlyIfGameFinal()
         {
             // Arrange
-            // Game T (Tiebreaker): Score 50.
+            // Game T is Final: "W" wins (30-20), total score = 50.
+            // Both users picked "W" correctly (10 pts each, 1 correct pick each).
+            // Close predicted 40 → delta 10; Far predicted 70 → delta 20.
+            // With default secondary tiebreaker (ScoreDelta), smaller delta wins.
             var games = new List<BowlGame>
             {
-                new BowlGame { Id = "T", TeamHome="W", TeamHomeScore=25, TeamAwayScore=25, Status=GameStatus.Final, PointValue=10 },
+                new BowlGame { Id = "T", TeamHome = "W", TeamHomeScore = 30, TeamAwayScore = 20, Status = GameStatus.Final, PointValue = 10 },
             };
 
-            // Two users, exact same score (10) and Picks (1).
-            // User Close: Pred 40 (Delta 10).
-            // User Far: Pred 70 (Delta 20).
             var entries = new List<BracketEntry>
             {
-                new BracketEntry { Id = "Far", PlayerName = "Far", TieBreakerPoints=70, Picks = new Dictionary<string, string> { { "T", "W" } } }, // Delta 20
-                new BracketEntry { Id = "Close", PlayerName = "Close", TieBreakerPoints=40, Picks = new Dictionary<string, string> { { "T", "W" } } }, // Delta 10
+                new BracketEntry { Id = "Far",   PlayerName = "Far",   TieBreakerPoints = 70, Picks = new Dictionary<string, string> { { "T", "W" } } }, // delta 20
+                new BracketEntry { Id = "Close", PlayerName = "Close", TieBreakerPoints = 40, Picks = new Dictionary<string, string> { { "T", "W" } } }, // delta 10
             };
 
             // Act
@@ -205,8 +153,96 @@ namespace BowlPoolManager.Tests.Core
 
             // Assert
             results[0].Rank.Should().Be(1);
-            results[1].Rank.Should().Be(1); // Should break tie yet
+            results[1].Rank.Should().Be(1); // Should NOT break the tie yet
         }
+
+        #region Additional Ranking and Edge Case Coverage
+
+        [Fact]
+        public void Calculate_ShouldSortByNameAscending_WhenAllMetricsAreEqual()
+        {
+            // Two entries identical on score, correct picks, and tiebreaker delta — fallback is alphabetical name.
+            var game = new BowlGame { Id = "g1", TeamHome = "W", TeamAway = "L", TeamHomeScore = 10, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10, Round = PlayoffRound.Standard };
+            var tb   = new BowlGame { Id = "tb", TeamHomeScore = 5, TeamAwayScore = 5, Status = GameStatus.Final };
+            var games = new List<BowlGame> { game, tb };
+
+            var zebra = new BracketEntry { PlayerName = "Zebra", TieBreakerPoints = 10, Picks = new Dictionary<string, string> { { "g1", "W" } } };
+            var apple = new BracketEntry { PlayerName = "Apple", TieBreakerPoints = 10, Picks = new Dictionary<string, string> { { "g1", "W" } } };
+
+            var results = ScoringEngine.Calculate(games, new List<BracketEntry> { zebra, apple }, new BowlPool { TieBreakerGameId = "tb" });
+
+            results[0].Entry.PlayerName.Should().Be("Apple");
+            results[1].Entry.PlayerName.Should().Be("Zebra");
+            results[0].Rank.Should().Be(1);
+            results[1].Rank.Should().Be(1); // same rank — all metrics tied
+        }
+
+        [Fact]
+        public void Calculate_ShouldIncludeInProgressGame_InMaxPossible_WhenPickedTeamIsAlive()
+        {
+            // InProgress games fall into the same "not Final" branch as Scheduled games.
+            // A team that hasn't been eliminated still counts toward max possible.
+            var games = new List<BowlGame>
+            {
+                new BowlGame { Id = "g1", TeamHome = "A", TeamAway = "B", Status = GameStatus.InProgress, PointValue = 15 }
+            };
+
+            var entry = new BracketEntry
+            {
+                Id = "e1",
+                PlayerName = "Test",
+                Picks = new Dictionary<string, string> { { "g1", "A" } }
+            };
+
+            var results = ScoringEngine.Calculate(games, new List<BracketEntry> { entry });
+
+            results[0].Score.Should().Be(0);
+            results[0].MaxPossible.Should().Be(15);
+        }
+
+        [Fact]
+        public void Calculate_ShouldHandleGameWithZeroPointValue()
+        {
+            var games = new List<BowlGame>
+            {
+                new BowlGame { Id = "g1", TeamHome = "A", TeamAway = "B", TeamHomeScore = 10, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 0, Round = PlayoffRound.Standard }
+            };
+
+            var entry = new BracketEntry
+            {
+                Id = "e1",
+                PlayerName = "Test",
+                Picks = new Dictionary<string, string> { { "g1", "A" } } // Correct, but worth 0 points
+            };
+
+            var results = ScoringEngine.Calculate(games, new List<BracketEntry> { entry });
+
+            results[0].Score.Should().Be(0);
+            results[0].CorrectPicks.Should().Be(1); // Still recorded as a correct pick
+            results[0].MaxPossible.Should().Be(0);
+        }
+
+        [Fact]
+        public void Calculate_ShouldHandleAllRedactedEntries()
+        {
+            var games = new List<BowlGame>
+            {
+                new BowlGame { Id = "g1", TeamHome = "A", TeamAway = "B", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 10 }
+            };
+
+            var entries = new List<BracketEntry>
+            {
+                new BracketEntry { Id = "e1", PlayerName = "Redacted1", Picks = null },
+                new BracketEntry { Id = "e2", PlayerName = "Redacted2", Picks = null }
+            };
+
+            var results = ScoringEngine.Calculate(games, entries);
+
+            results.Should().HaveCount(2);
+            results.Should().OnlyContain(r => r.Score == 0 && r.MaxPossible == 0);
+        }
+
+        #endregion
 
         #region Edge Case Tests
 

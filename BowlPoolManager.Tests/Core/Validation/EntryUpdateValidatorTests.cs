@@ -37,7 +37,7 @@ namespace BowlPoolManager.Tests.Core.Validation
             var existing = CreateEntry();
             var updated = CreateEntry();
             updated.TieBreakerPoints = 99; // Changed
-            updated.Picks["game-1"] = "TeamB"; // Changed
+            updated.Picks!["game-1"] = "TeamB"; // Changed
 
             var result = EntryUpdateValidator.ValidateUpdate(pool, existing, updated, isAdmin: false);
 
@@ -76,7 +76,7 @@ namespace BowlPoolManager.Tests.Core.Validation
             var pool = CreatePool(isLocked: true, isConcluded: false);
             var existing = CreateEntry();
             var updated = CreateEntry();
-            updated.Picks["game-1"] = "TeamB"; // Changed
+            updated.Picks!["game-1"] = "TeamB"; // Changed
 
             var result = EntryUpdateValidator.ValidateUpdate(pool, existing, updated, isAdmin: false);
 
@@ -90,7 +90,7 @@ namespace BowlPoolManager.Tests.Core.Validation
             var pool = CreatePool(isLocked: true, isConcluded: false);
             var existing = CreateEntry();
             var updated = CreateEntry();
-            updated.Picks.Add("game-2", "New Pick"); // Added
+            updated.Picks!.Add("game-2", "New Pick"); // Added
 
             var result = EntryUpdateValidator.ValidateUpdate(pool, existing, updated, isAdmin: false);
 
@@ -135,6 +135,56 @@ namespace BowlPoolManager.Tests.Core.Validation
 
             result.IsValid.Should().BeFalse();
             result.ErrorMessage.Should().Contain("new entries");
+        }
+
+        [Fact]
+        public void ValidateUpdate_ArchivedPool_RejectsChanges_WhenNotConcluded()
+        {
+            // IsArchived=true alone (IsConcluded=false) is sufficient to block all changes.
+            var pool = new BowlPool
+            {
+                LockDate = DateTime.UtcNow.AddDays(-1),
+                IsArchived = true,
+                IsConcluded = false
+            };
+            var existing = CreateEntry("Old Name");
+            var updated  = CreateEntry("New Name");
+
+            var result = EntryUpdateValidator.ValidateUpdate(pool, existing, updated, isAdmin: false);
+
+            result.IsValid.Should().BeFalse();
+            result.ErrorMessage.Should().Contain("concluded");
+        }
+
+        [Fact]
+        public void ValidateUpdate_Admin_CanEditArchivedPool()
+        {
+            var pool = new BowlPool
+            {
+                LockDate = DateTime.UtcNow.AddDays(-1),
+                IsArchived = true,
+                IsConcluded = false
+            };
+            var existing = CreateEntry();
+            var updated  = CreateEntry();
+            updated.TieBreakerPoints = 999;
+
+            var result = EntryUpdateValidator.ValidateUpdate(pool, existing, updated, isAdmin: true);
+
+            result.IsValid.Should().BeTrue();
+        }
+
+        [Fact]
+        public void ValidateUpdate_PoolLocked_BothPicksNull_TreatedAsUnchanged()
+        {
+            // Null Picks on both old and new are both normalised to empty dicts — treated as no change.
+            var pool = CreatePool(isLocked: true, isConcluded: false);
+            var existing = new BracketEntry { Id = "entry-1", PlayerName = "Same Name", TieBreakerPoints = 50, Picks = null };
+            var updated  = new BracketEntry { Id = "entry-1", PlayerName = "Same Name", TieBreakerPoints = 50, Picks = null };
+
+            var result = EntryUpdateValidator.ValidateUpdate(pool, existing, updated, isAdmin: false);
+
+            result.IsValid.Should().BeTrue();
         }
     }
 }
