@@ -39,6 +39,68 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 - When the user confirms they are ready to deploy: push `main` directly, or merge the feature branch first (`git checkout main && git merge feature/<name>`) then push.
 - Pushing a feature branch does not trigger a deployment.
 
+## Development Workflow
+
+### Guiding Principle: Accuracy Over Speed
+
+**Both the main workflow and all sub-agents are expected to pause and ask for clarification whenever intent, scope, or approach is ambiguous.** Making a wrong assumption — especially in a multi-step plan — can be far more costly to unwind than the time it takes to ask a targeted question. No agent or workflow step should proceed on a guess when a question would resolve it. This applies equally to implementation decisions, test expectations, review findings with multiple valid fixes, and deployment scope.
+
+Two tracks, chosen based on the scope of the change.
+
+### Track A — Tactical (small, self-contained changes)
+
+Use for bug fixes, minor UI changes, config updates, or anything confined to one or two files with no architectural impact.
+
+```
+Implement → Build Validator → Commit
+```
+
+Code Review is optional on this track. Invoke it when the change touches any of: Core domain models, CosmosDB queries, `SecurityHelper` / auth logic, `DateTime` handling, partition key usage, or JSON serialization attributes.
+
+### Track B — Phased Implementation (large features, multi-step plans)
+
+Use for new features, significant refactors, or anything multi-step such as the March Madness extension. Each phase follows this cycle:
+
+```
+[In-conversation] Phase planning & scoping
+        ↓
+Implement phase deliverables
+        ↓
+Build Validator        ← must pass before continuing
+        ↓
+QA Agent               ← writes/updates tests, runs full suite
+        ↓
+Code Review Agent      ← architecture compliance and quality check
+        ↓
+[Checkpoint] Review with user → approve or revise
+        ↓
+Commit (references GitHub issue in message body)
+        ↓
+[Repeat for next phase]
+        ↓
+[All phases done] Deploy on user's explicit instruction
+        ↓
+Deployment Validator   ← post-deploy smoke test across roles
+```
+
+**Checkpoint criteria** — a phase must satisfy all of these before advancing:
+- `dotnet build` succeeds with no errors
+- All tests pass
+- New business logic has test coverage (QA Agent approved)
+- No blocking findings from Code Review Agent
+- User has reviewed and approved
+
+### Sub-Agents
+
+Agent prompts live in [.claude/agents/](.claude/agents/). Invoke them via the Agent tool, passing the agent's `.md` file as its system prompt.
+
+| Agent | File | When to invoke |
+|---|---|---|
+| Build Validator | `.claude/agents/build-validator.md` | After every implementation step on both tracks |
+| QA Agent | `.claude/agents/qa-agent.md` | At each Track B phase checkpoint |
+| Code Review Agent | `.claude/agents/code-review.md` | At each Track B phase checkpoint; optionally on Track A for high-risk changes |
+| Deployment Validator | `.claude/agents/deployment-validator.md` | After every production deployment |
+
 ## Available CLI Tools
 
 - **Azure CLI** (`az`) — authenticated for the project subscription
@@ -70,12 +132,12 @@ cd BowlPoolManager.Client && dotnet run
 
 Four projects in one solution (`BowlPoolManager.sln`):
 
-| Project | Type | Purpose |
-|---|---|---|
-| `BowlPoolManager.Core` | Class library | Shared domain models, DTOs, scoring engines, constants |
-| `BowlPoolManager.Api` | Azure Functions v4 (.NET 8 isolated) | REST API / serverless back-end |
-| `BowlPoolManager.Client` | Blazor WebAssembly (.NET 8) | Front-end SPA |
-| `BowlPoolManager.Tests` | xUnit test project | Tests for Core and Api logic |
+| Project | Target | Type | Purpose |
+|---|---|---|---|
+| `BowlPoolManager.Core` | net8.0 | Class library | Shared domain models, DTOs, scoring engines, constants |
+| `BowlPoolManager.Api` | net8.0 | Azure Functions v4 isolated | REST API / serverless back-end |
+| `BowlPoolManager.Client` | net10.0 | Blazor WebAssembly | Front-end SPA |
+| `BowlPoolManager.Tests` | net10.0 | xUnit test project | Tests for Core and Api logic |
 
 ## Architecture Summary
 
