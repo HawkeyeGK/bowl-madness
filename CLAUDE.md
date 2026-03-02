@@ -146,3 +146,7 @@ Four projects in one solution (`BowlPoolManager.sln`):
 - The test project references both `BowlPoolManager.Api` and `BowlPoolManager.Core`.
 - Method naming: `MethodName_ShouldExpectedBehavior_WhenCondition` (e.g. `Calculate_ShouldReturnCorrectScore_ForFinalGames`).
 - Always use FluentAssertions (`result.Should().Be(...)`). Use Moq for all dependencies.
+
+## Terminal Environment
+Running on Windows with PowerShell. Use PowerShell-compatible 
+commands, not Bash syntax.
