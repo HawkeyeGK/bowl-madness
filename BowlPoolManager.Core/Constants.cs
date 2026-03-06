@@ -35,6 +35,8 @@ namespace BowlPoolManager.Core
             // NEW
             public const string BracketEntry = "BracketEntry";
             public const string TeamConfig = "TeamConfig";
+            public const string HoopsGame = "HoopsGame";
+            public const string HoopsPool = "HoopsPool";
         }
     }
 }

@@ -159,10 +159,10 @@ else
                  <strong>Standard Bowls:</strong> Circle the winner (@GetPointValue(false) pt each).<br/>
                 <strong>Playoffs:</strong> Write winners on lines in NEXT bracket.<br/>
                 <strong>Scoring:</strong> 
-                First Round: @GetPointValue(true, PlayoffRound.Round1) |
-                Quarterfinals: @GetPointValue(true, PlayoffRound.QuarterFinal) | 
-                Semifinals: @GetPointValue(true, PlayoffRound.SemiFinal) | 
-                Championship: @GetPointValue(true, PlayoffRound.Championship) pts.
+                First Round: @GetPointValue(true, TournamentRound.Round1) |
+                Quarterfinals: @GetPointValue(true, TournamentRound.QuarterFinal) | 
+                Semifinals: @GetPointValue(true, TournamentRound.SemiFinal) | 
+                Championship: @GetPointValue(true, TournamentRound.Championship) pts.
             </div>
             
             <div class="tiebreaker-row">
@@ -374,15 +374,15 @@ else
         games = games.Where(g => g.SeasonId == currentPool.SeasonId).ToList();
 
         standardGames = games.Where(g => !g.IsPlayoff).OrderBy(g => g.StartTime).ToList();
-        champGames = games.Where(g => g.IsPlayoff && g.Round == PlayoffRound.Championship).OrderBy(g => g.StartTime).ToList();
-        semiGames = SortRoundByNext(PlayoffRound.SemiFinal, champGames);
-        quarterGames = SortRoundByNext(PlayoffRound.QuarterFinal, semiGames);
-        round1Games = SortRoundByNext(PlayoffRound.Round1, quarterGames);
+        champGames = games.Where(g => g.IsPlayoff && g.Round == TournamentRound.Championship).OrderBy(g => g.StartTime).ToList();
+        semiGames = SortRoundByNext(TournamentRound.SemiFinal, champGames);
+        quarterGames = SortRoundByNext(TournamentRound.QuarterFinal, semiGames);
+        round1Games = SortRoundByNext(TournamentRound.Round1, quarterGames);
         
         StateHasChanged();
     }
 
-    private List<BowlGame> SortRoundByNext(PlayoffRound currentRound, List<BowlGame> nextRoundSorted)
+    private List<BowlGame> SortRoundByNext(TournamentRound currentRound, List<BowlGame> nextRoundSorted)
     {
         var roundGames = games!.Where(g => g.IsPlayoff && g.Round == currentRound).ToList();
         return roundGames.OrderBy(g => 
@@ -453,7 +453,7 @@ else
     }
 
     private string RenderSlot(string? teamName) => string.IsNullOrEmpty(teamName) ? "_________________" : teamName;
-    private string GetPointValue(bool isPlayoff, PlayoffRound? round = null)
+    private string GetPointValue(bool isPlayoff, TournamentRound? round = null)
     {
         if (games == null) return "0";
         BowlGame? sample = !isPlayoff 

@@ -14,8 +14,8 @@ namespace BowlPoolManager.Tests.Core
             // Arrange
             var games = new List<BowlGame>
             {
-                new BowlGame { Id = "1", TeamHome = "A", TeamAway = "B", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 10, Round = PlayoffRound.Standard },
-                new BowlGame { Id = "2", TeamHome = "C", TeamAway = "D", TeamHomeScore = 2, TeamAwayScore = 3, Status = GameStatus.Final, PointValue = 5, Round = PlayoffRound.Standard }
+                new BowlGame { Id = "1", TeamHome = "A", TeamAway = "B", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 10, Round = TournamentRound.Standard },
+                new BowlGame { Id = "2", TeamHome = "C", TeamAway = "D", TeamHomeScore = 2, TeamAwayScore = 3, Status = GameStatus.Final, PointValue = 5, Round = TournamentRound.Standard }
             };
 
             var entry = new BracketEntry
@@ -162,7 +162,7 @@ namespace BowlPoolManager.Tests.Core
         public void Calculate_ShouldSortByNameAscending_WhenAllMetricsAreEqual()
         {
             // Two entries identical on score, correct picks, and tiebreaker delta — fallback is alphabetical name.
-            var game = new BowlGame { Id = "g1", TeamHome = "W", TeamAway = "L", TeamHomeScore = 10, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10, Round = PlayoffRound.Standard };
+            var game = new BowlGame { Id = "g1", TeamHome = "W", TeamAway = "L", TeamHomeScore = 10, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10, Round = TournamentRound.Standard };
             var tb   = new BowlGame { Id = "tb", TeamHomeScore = 5, TeamAwayScore = 5, Status = GameStatus.Final };
             var games = new List<BowlGame> { game, tb };
 
@@ -205,7 +205,7 @@ namespace BowlPoolManager.Tests.Core
         {
             var games = new List<BowlGame>
             {
-                new BowlGame { Id = "g1", TeamHome = "A", TeamAway = "B", TeamHomeScore = 10, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 0, Round = PlayoffRound.Standard }
+                new BowlGame { Id = "g1", TeamHome = "A", TeamAway = "B", TeamHomeScore = 10, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 0, Round = TournamentRound.Standard }
             };
 
             var entry = new BracketEntry
@@ -313,9 +313,9 @@ namespace BowlPoolManager.Tests.Core
             // Arrange
             var games = new List<BowlGame>
             {
-                new BowlGame { Id = "s1", TeamHome = "A", TeamAway = "B", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 5, Round = PlayoffRound.Standard },
-                new BowlGame { Id = "q1", TeamHome = "C", TeamAway = "D", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 10, Round = PlayoffRound.QuarterFinal },
-                new BowlGame { Id = "sf1", TeamHome = "E", TeamAway = "F", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 20, Round = PlayoffRound.SemiFinal }
+                new BowlGame { Id = "s1", TeamHome = "A", TeamAway = "B", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 5, Round = TournamentRound.Standard },
+                new BowlGame { Id = "q1", TeamHome = "C", TeamAway = "D", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 10, Round = TournamentRound.QuarterFinal },
+                new BowlGame { Id = "sf1", TeamHome = "E", TeamAway = "F", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 20, Round = TournamentRound.SemiFinal }
             };
 
             var entry = new BracketEntry
@@ -335,10 +335,10 @@ namespace BowlPoolManager.Tests.Core
 
             // Assert
             results[0].Score.Should().Be(35); // 5 + 10 + 20
-            results[0].RoundScores[PlayoffRound.Standard].Should().Be(5);
-            results[0].RoundScores[PlayoffRound.QuarterFinal].Should().Be(10);
-            results[0].RoundScores[PlayoffRound.SemiFinal].Should().Be(20);
-            results[0].RoundScores[PlayoffRound.Championship].Should().Be(0);
+            results[0].RoundScores[TournamentRound.Standard].Should().Be(5);
+            results[0].RoundScores[TournamentRound.QuarterFinal].Should().Be(10);
+            results[0].RoundScores[TournamentRound.SemiFinal].Should().Be(20);
+            results[0].RoundScores[TournamentRound.Championship].Should().Be(0);
         }
 
         [Fact]
@@ -392,7 +392,7 @@ namespace BowlPoolManager.Tests.Core
             results[0].Score.Should().Be(0);
             results[0].MaxPossible.Should().Be(0);
             results[0].RoundScores.Should().NotBeNull();
-            results[0].RoundScores[PlayoffRound.Standard].Should().Be(0);
+            results[0].RoundScores[TournamentRound.Standard].Should().Be(0);
         }
 
         #endregion
@@ -403,8 +403,8 @@ namespace BowlPoolManager.Tests.Core
         public void Calculate_ShouldSortByScore_ThenPicks_ThenDelta_ByDefault()
         {
             // Arrange
-            var game1 = new BowlGame { Id = "g1", TeamHome = "H", TeamAway = "A", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 10, Round = PlayoffRound.Standard };
-            var game2 = new BowlGame { Id = "g2", TeamHome = "H2", TeamAway = "A2", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 10, Round = PlayoffRound.Standard };
+            var game1 = new BowlGame { Id = "g1", TeamHome = "H", TeamAway = "A", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 10, Round = TournamentRound.Standard };
+            var game2 = new BowlGame { Id = "g2", TeamHome = "H2", TeamAway = "A2", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 10, Round = TournamentRound.Standard };
             
             // Tiebreaker Game (Total Points = 15)
             var tbGame = new BowlGame { Id = "tb", TeamHome = "TBH", TeamAway = "TBA", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final };
@@ -445,9 +445,9 @@ namespace BowlPoolManager.Tests.Core
         public void Calculate_ShouldPrioritizeDelta_WhenConfigured()
         {
             // Arrange
-            var g1 = new BowlGame { Id = "g1", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 20, Round = PlayoffRound.Standard };
-            var g2 = new BowlGame { Id = "g2", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10, Round = PlayoffRound.Standard };
-            var g3 = new BowlGame { Id = "g3", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10, Round = PlayoffRound.Standard };
+            var g1 = new BowlGame { Id = "g1", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 20, Round = TournamentRound.Standard };
+            var g2 = new BowlGame { Id = "g2", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10, Round = TournamentRound.Standard };
+            var g3 = new BowlGame { Id = "g3", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10, Round = TournamentRound.Standard };
 
             var tb = new BowlGame { Id = "tb", TeamHomeScore = 10, TeamAwayScore = 10, Status = GameStatus.Final }; // Total 20
 
@@ -492,9 +492,9 @@ namespace BowlPoolManager.Tests.Core
         {
              // Same setup as above, but with default config (Picks first)
              
-            var g1 = new BowlGame { Id = "g1", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 20, Round = PlayoffRound.Standard };
-            var g2 = new BowlGame { Id = "g2", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10, Round = PlayoffRound.Standard };
-            var g3 = new BowlGame { Id = "g3", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10, Round = PlayoffRound.Standard };
+            var g1 = new BowlGame { Id = "g1", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 20, Round = TournamentRound.Standard };
+            var g2 = new BowlGame { Id = "g2", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10, Round = TournamentRound.Standard };
+            var g3 = new BowlGame { Id = "g3", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10, Round = TournamentRound.Standard };
 
             var tb = new BowlGame { Id = "tb", TeamHomeScore = 10, TeamAwayScore = 10, Status = GameStatus.Final }; // Total 20
             var games = new List<BowlGame> { g1, g2, g3, tb };
@@ -530,7 +530,7 @@ namespace BowlPoolManager.Tests.Core
         [Fact]
         public void Calculate_ShouldAssignRanksCorrectly_WithTiesOnAllMetrics()
         {
-             var g1 = new BowlGame { Id = "g1", TeamHome = "H", TeamAway = "A", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 10, Round = PlayoffRound.Standard };
+             var g1 = new BowlGame { Id = "g1", TeamHome = "H", TeamAway = "A", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 10, Round = TournamentRound.Standard };
              var tb = new BowlGame { Id = "tb", TeamHomeScore = 10, TeamAwayScore = 10, Status = GameStatus.Final }; // Total 20
              var games = new List<BowlGame> { g1, tb };
 

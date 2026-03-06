@@ -44,6 +44,6 @@ namespace BowlPoolManager.Core.Dtos
 
         [JsonProperty("roundScores")]
         [JsonPropertyName("roundScores")]
-        public Dictionary<PlayoffRound, int> RoundScores { get; set; } = new();
+        public Dictionary<TournamentRound, int> RoundScores { get; set; } = new();
     }
 }

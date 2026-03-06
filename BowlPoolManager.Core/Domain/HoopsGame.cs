@@ -1,10 +1,9 @@
 using System.Text.Json.Serialization;
 using Newtonsoft.Json;
-using BowlPoolManager.Core;
 
 namespace BowlPoolManager.Core.Domain
 {
-    public class BowlGame : IScorable
+    public class HoopsGame : IScorable
     {
         [JsonProperty("id")]
         [JsonPropertyName("id")]
@@ -14,19 +13,20 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("seasonId")]
         public string SeasonId { get; set; } = string.Empty;
 
-        [JsonProperty("bowlName")]
-        [JsonPropertyName("bowlName")]
-        public string BowlName { get; set; } = string.Empty;
+        [JsonProperty("round")]
+        [JsonPropertyName("round")]
+        public TournamentRound Round { get; set; } = TournamentRound.RoundOf64;
+
+        [JsonProperty("region")]
+        [JsonPropertyName("region")]
+        public string? Region { get; set; }
 
         // --- EXTERNAL LINKAGE ---
         [JsonProperty("externalId")]
         [JsonPropertyName("externalId")]
         public string? ExternalId { get; set; }
 
-        // BRIDGE FIELDS
-        // These store the exact API Team Name that corresponds to the local team.
-        // ApiHomeTeam -> The API name for the team stored in 'TeamHome'
-        // ApiAwayTeam -> The API name for the team stored in 'TeamAway'
+        // BRIDGE FIELDS (for team name mismatches with the external API)
         [JsonProperty("apiHomeTeam")]
         [JsonPropertyName("apiHomeTeam")]
         public string? ApiHomeTeam { get; set; }
@@ -34,17 +34,11 @@ namespace BowlPoolManager.Core.Domain
         [JsonProperty("apiAwayTeam")]
         [JsonPropertyName("apiAwayTeam")]
         public string? ApiAwayTeam { get; set; }
-        // ------------------------
-
-        [JsonProperty("startTime")]
-        [JsonPropertyName("startTime")]
-        public DateTime StartTime { get; set; } = DateTime.UtcNow;
 
         [JsonProperty("gameStatus")]
         [JsonPropertyName("gameStatus")]
         public GameStatus Status { get; set; } = GameStatus.Scheduled;
 
-        // NEW FIELD: Stores "3rd • 10:30", "Final", etc.
         [JsonProperty("gameDetail")]
         [JsonPropertyName("gameDetail")]
         public string? GameDetail { get; set; }
@@ -58,6 +52,10 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("teamHomeId")]
         public int? TeamHomeId { get; set; }
 
+        [JsonProperty("teamHomeSeed")]
+        [JsonPropertyName("teamHomeSeed")]
+        public int? TeamHomeSeed { get; set; }
+
         [JsonProperty("homeTeamInfo")]
         [JsonPropertyName("homeTeamInfo")]
         public TeamInfo? HomeTeamInfo { get; set; }
@@ -70,18 +68,13 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("teamAwayId")]
         public int? TeamAwayId { get; set; }
 
-        [JsonProperty("awayTeamInfo")]
-        [JsonPropertyName("awayTeamInfo")]
-        public TeamInfo? AwayTeamInfo { get; set; }
-
-        // SEEDS
-        [JsonProperty("teamHomeSeed")]
-        [JsonPropertyName("teamHomeSeed")]
-        public int? TeamHomeSeed { get; set; }
-
         [JsonProperty("teamAwaySeed")]
         [JsonPropertyName("teamAwaySeed")]
         public int? TeamAwaySeed { get; set; }
+
+        [JsonProperty("awayTeamInfo")]
+        [JsonPropertyName("awayTeamInfo")]
+        public TeamInfo? AwayTeamInfo { get; set; }
 
         // SCORES
         [JsonProperty("teamHomeScore")]
@@ -92,72 +85,55 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("teamAwayScore")]
         public int? TeamAwayScore { get; set; }
 
-        // SCORING
+        // SCORING — defaults to 0 so missed hydration is immediately visible
         [JsonProperty("pointValue")]
         [JsonPropertyName("pointValue")]
-        public int PointValue { get; set; } = 1;
+        public int PointValue { get; set; } = 0;
 
-        [JsonProperty("isPlayoff")]
-        [JsonPropertyName("isPlayoff")]
-        public bool IsPlayoff { get; set; } = false;
-
-        [JsonProperty("round")]
-        [JsonPropertyName("round")]
-        public TournamentRound Round { get; set; } = TournamentRound.Standard;
-
+        // BRACKET WIRING
         [JsonProperty("nextGameId")]
         [JsonPropertyName("nextGameId")]
         public string? NextGameId { get; set; }
 
-        [JsonProperty("location")]
-        [JsonPropertyName("location")]
-        public string? Location { get; set; }
+        // --- COMPUTED HELPERS ---
 
-        [JsonProperty("television")]
-        [JsonPropertyName("television")]
-        public string? Television { get; set; }
-
-        // --- COMPUTED HELPERS (Logic Consolidation) ---
-        
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]
         public bool IsFinal => Status == GameStatus.Final;
 
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]
-        public string? WinningTeamName 
+        public string? WinningTeamName
         {
-            get 
+            get
             {
                 if (Status != GameStatus.Final) return null;
-                // Treat null score as 0 for comparison
                 int home = TeamHomeScore ?? 0;
                 int away = TeamAwayScore ?? 0;
-                
                 if (home > away) return TeamHome;
                 if (away > home) return TeamAway;
-                return null; // Tie or error
+                return null;
             }
         }
 
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]
-        public string? LosingTeamName 
+        public string? LosingTeamName
         {
-            get 
+            get
             {
                 if (Status != GameStatus.Final) return null;
                 int home = TeamHomeScore ?? 0;
                 int away = TeamAwayScore ?? 0;
-
                 if (home < away) return TeamHome;
                 if (away < home) return TeamAway;
                 return null;
             }
         }
 
+        // COSMOS DISCRIMINATOR
         [JsonProperty("type")]
         [JsonPropertyName("type")]
-        public string Type { get; set; } = Constants.DocumentTypes.BowlGame;
+        public string Type { get; set; } = Constants.DocumentTypes.HoopsGame;
     }
 }

@@ -1,10 +1,6 @@
-namespace BowlPoolManager.Client.Services;
+using BowlPoolManager.Core.Domain;
 
-public enum Sport
-{
-    Football,
-    Basketball
-}
+namespace BowlPoolManager.Client.Services;
 
 public interface ISiteContext
 {

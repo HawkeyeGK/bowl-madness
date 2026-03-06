@@ -129,10 +129,10 @@
                             <div class="col-md-3">
                                 <label for="round" class="form-label">Round</label>
                                 <InputSelect id="round" class="form-select" @bind-Value="newGame.Round">
-                                    <option value="@PlayoffRound.Round1">Round 1 (First Round)</option>
-                                    <option value="@PlayoffRound.QuarterFinal">Round 2 (Quarterfinals)</option>
-                                    <option value="@PlayoffRound.SemiFinal">Round 3 (Semifinals)</option>
-                                    <option value="@PlayoffRound.Championship">Round 4 (Championship)</option>
+                                    <option value="@TournamentRound.Round1">Round 1 (First Round)</option>
+                                    <option value="@TournamentRound.QuarterFinal">Round 2 (Quarterfinals)</option>
+                                    <option value="@TournamentRound.SemiFinal">Round 3 (Semifinals)</option>
+                                    <option value="@TournamentRound.Championship">Round 4 (Championship)</option>
                                 </InputSelect>
                             </div>
 
@@ -244,7 +244,7 @@
                                         <div><i class="bi bi-arrow-right"></i> @next.BowlName</div>
                                     }
                                 }
-                                else if (game.IsPlayoff && game.Round != PlayoffRound.Championship) 
+                                else if (game.IsPlayoff && game.Round != TournamentRound.Championship) 
                                 {
                                     <span class="badge bg-danger">Unlinked</span>
                                 }

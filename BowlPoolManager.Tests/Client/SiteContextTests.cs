@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.JSInterop;
 using BowlPoolManager.Client.Services;
+using BowlPoolManager.Core.Domain;
 
 namespace BowlPoolManager.Tests.Client
 {

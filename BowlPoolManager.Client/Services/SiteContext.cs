@@ -1,3 +1,4 @@
+using BowlPoolManager.Core.Domain;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.JSInterop;

@@ -99,5 +99,50 @@ namespace BowlPoolManager.Tests.Core
             var game = new BowlGame { Status = GameStatus.Scheduled };
             game.IsFinal.Should().BeFalse();
         }
+
+        // --- IScorable contract defaults ---
+
+        [Fact]
+        public void PointValue_ShouldDefaultToOne()
+        {
+            var game = new BowlGame();
+            game.PointValue.Should().Be(1);
+        }
+
+        [Fact]
+        public void Round_ShouldDefaultToStandard()
+        {
+            var game = new BowlGame();
+            game.Round.Should().Be(TournamentRound.Standard);
+        }
+
+        [Fact]
+        public void BowlGame_ShouldImplementIScorable()
+        {
+            var game = new BowlGame
+            {
+                Id = "test-id",
+                Status = GameStatus.Final,
+                PointValue = 3,
+                Round = TournamentRound.Championship,
+                TeamHome = "Ohio State",
+                TeamAway = "Notre Dame",
+                TeamHomeScore = 28,
+                TeamAwayScore = 14
+            };
+
+            IScorable scorable = game;
+
+            scorable.Id.Should().Be("test-id");
+            scorable.Status.Should().Be(GameStatus.Final);
+            scorable.PointValue.Should().Be(3);
+            scorable.Round.Should().Be(TournamentRound.Championship);
+            scorable.TeamHome.Should().Be("Ohio State");
+            scorable.TeamAway.Should().Be("Notre Dame");
+            scorable.TeamHomeScore.Should().Be(28);
+            scorable.TeamAwayScore.Should().Be(14);
+            scorable.IsFinal.Should().BeTrue();
+            scorable.WinningTeamName.Should().Be("Ohio State");
+        }
     }
 }

@@ -144,11 +144,11 @@
                                         }
                                     </td>
                                     <td class="fs-5 text-primary fw-bold">@row.Score</td>
-                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.Standard]</td>
-                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.Round1]</td>
-                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.QuarterFinal]</td>
-                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.SemiFinal]</td>
-                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[PlayoffRound.Championship]</td>
+                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[TournamentRound.Standard]</td>
+                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[TournamentRound.Round1]</td>
+                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[TournamentRound.QuarterFinal]</td>
+                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[TournamentRound.SemiFinal]</td>
+                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[TournamentRound.Championship]</td>
                                     <td class="fw-bold text-muted">@row.MaxPossible</td>
                                     <td class="d-none d-sm-table-cell text-muted small">@row.CorrectPicks / @totalFinalGames</td>
                                     <td class="text-muted small d-none d-lg-table-cell">
@@ -385,11 +385,11 @@
             case "Max": leaderboard = isAscending ? leaderboard.OrderBy(r => r.MaxPossible).ToList() : leaderboard.OrderByDescending(r => r.MaxPossible).ToList(); break;
             case "Correct": leaderboard = isAscending ? leaderboard.OrderBy(r => r.CorrectPicks).ToList() : leaderboard.OrderByDescending(r => r.CorrectPicks).ToList(); break;
             case "Tiebreaker": leaderboard = isAscending ? leaderboard.OrderBy(r => r.TieBreakerPoints).ToList() : leaderboard.OrderByDescending(r => r.TieBreakerPoints).ToList(); break;
-            case "Bowls": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.Standard]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.Standard]).ToList(); break;
-            case "Round1": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.Round1]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.Round1]).ToList(); break;
-            case "QuarterFinal": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.QuarterFinal]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.QuarterFinal]).ToList(); break;
-            case "SemiFinal": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.SemiFinal]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.SemiFinal]).ToList(); break;
-            case "Championship": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[PlayoffRound.Championship]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[PlayoffRound.Championship]).ToList(); break;
+            case "Bowls": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[TournamentRound.Standard]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[TournamentRound.Standard]).ToList(); break;
+            case "Round1": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[TournamentRound.Round1]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[TournamentRound.Round1]).ToList(); break;
+            case "QuarterFinal": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[TournamentRound.QuarterFinal]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[TournamentRound.QuarterFinal]).ToList(); break;
+            case "SemiFinal": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[TournamentRound.SemiFinal]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[TournamentRound.SemiFinal]).ToList(); break;
+            case "Championship": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[TournamentRound.Championship]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[TournamentRound.Championship]).ToList(); break;
         }
     }
 
