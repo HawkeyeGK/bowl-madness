@@ -1,4 +1,4 @@
-﻿@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
 @using System.Net.Http.Json
 @using BowlPoolManager.Client.Services
@@ -6,12 +6,13 @@
 @inject HttpClient Http
 @inject AuthenticationStateProvider AuthStateProvider
 @inject AppState AppState
+@inject ISiteContext SiteContext
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand d-flex align-items-center" href="">
-            <img src="favicon.png" width="48" height="48" class="me-2" alt="Bowl Madness" />
-            <span>Bowl Madness</span>
+            <img src="favicon.png" width="48" height="48" class="me-2" alt="@SiteName" />
+            <span>@SiteName</span>
         </a>
         <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
@@ -21,7 +22,7 @@
 
 <div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
     <nav class="flex-column">
-        
+
         @* 1. LEADERBOARD (Home) *@
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
@@ -61,7 +62,7 @@
             </NavLink>
         </div>
 
-        @* 4. PATH TO VICTORY (New Feature) *@
+        @* 4. PATH TO VICTORY *@
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="what-if">
                 <span class="bi bi-signpost-split me-2" aria-hidden="true"></span> Path to Victory
@@ -81,7 +82,7 @@
                 <span class="bi bi-clock-history me-2" aria-hidden="true"></span> History
             </NavLink>
         </div>
-        
+
         @* ADMIN SECTION *@
         <AuthorizeView Roles="SuperAdmin,Admin">
             <Authorized>
@@ -93,11 +94,31 @@
                         <span class="bi bi-speedometer2 me-2" aria-hidden="true"></span> Dashboard
                     </NavLink>
                 </div>
-                
-
-
             </Authorized>
         </AuthorizeView>
+
+        @* DEV SPORT TOGGLE (localhost only) *@
+        @if (SiteContext.IsDevMode)
+        {
+            <div class="nav-item px-3 mt-4">
+                <div class="text-white-50 small text-uppercase fw-bold px-3 mb-1">Dev: Sport</div>
+            </div>
+            <div class="nav-item px-3">
+                <button class="nav-link btn btn-link w-100 text-start @(SiteContext.ActiveSport == Sport.Football ? "active" : "")"
+                        @onclick:stopPropagation="true"
+                        @onclick="() => SiteContext.SetSportAsync(Sport.Football)">
+                    <span class="bi bi-football me-2" aria-hidden="true"></span> Football
+                </button>
+            </div>
+            <div class="nav-item px-3">
+                <button class="nav-link btn btn-link w-100 text-start @(SiteContext.ActiveSport == Sport.Basketball ? "active" : "")"
+                        @onclick:stopPropagation="true"
+                        @onclick="() => SiteContext.SetSportAsync(Sport.Basketball)">
+                    <span class="bi bi-dribbble me-2" aria-hidden="true"></span> Basketball
+                </button>
+            </div>
+        }
+
     </nav>
 </div>
 
@@ -105,15 +126,24 @@
     private bool collapseNavMenu = true;
     private string MyPicksText = "My Picks";
     private bool IsLive = false;
-    
+
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
     private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
 
+    private string SiteName => SiteContext.ActiveSport == Sport.Basketball ? "Hoops Madness" : "Bowl Madness";
+
     protected override async Task OnInitializedAsync()
     {
+        await SiteContext.InitializeAsync();
+        SiteContext.OnChange += OnSiteContextChanged;
         AppState.OnChange += StateHasChangedWrapper;
         await UpdateNavText();
         await CheckLiveStatus();
+    }
+
+    private void OnSiteContextChanged()
+    {
+        InvokeAsync(StateHasChanged);
     }
 
     private async void StateHasChangedWrapper()
@@ -133,7 +163,7 @@
                 MyPicksText = (myEntries == null || !myEntries.Any()) ? "Enter Your Picks" : "My Picks";
             }
         }
-        catch 
+        catch
         {
             MyPicksText = "My Picks";
         }
@@ -143,7 +173,6 @@
     {
         try
         {
-            // Lightweight check to see if any games are active
             var games = await Http.GetFromJsonAsync<List<BowlGame>>("api/GetGames");
             if (games != null && games.Any(g => g.Status == GameStatus.InProgress))
             {
@@ -152,13 +181,13 @@
         }
         catch (Exception ex)
         {
-            // Silent fail to avoid disrupting nav
             Console.WriteLine($"Live status check failed: {ex.Message}");
         }
     }
 
     public void Dispose()
     {
+        SiteContext.OnChange -= OnSiteContextChanged;
         AppState.OnChange -= StateHasChangedWrapper;
     }
 }

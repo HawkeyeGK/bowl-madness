@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\BowlPoolManager.Api\BowlPoolManager.Api.csproj" />
     <ProjectReference Include="..\BowlPoolManager.Core\BowlPoolManager.Core.csproj" />
+    <ProjectReference Include="..\BowlPoolManager.Client\BowlPoolManager.Client.csproj" />
   </ItemGroup>
 
 </Project>
