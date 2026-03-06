@@ -15,6 +15,9 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.
 builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, StaticWebAppsAuthenticationStateProvider>();
 
+// SITE CONTEXT
+builder.Services.AddScoped<ISiteContext, SiteContext>();
+
 // DOMAIN SERVICES
 builder.Services.AddScoped<IPoolService, PoolService>();
 builder.Services.AddScoped<ISeasonService, SeasonService>();
