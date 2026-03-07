@@ -54,6 +54,7 @@ builder.Services.AddSingleton<IHoopsPoolRepository, HoopsPoolRepository>();
 builder.Services.AddSingleton<IHoopsGameRepository, HoopsGameRepository>();
 builder.Services.AddSingleton<IBracketGeneratorService, BracketGeneratorService>();
 builder.Services.AddSingleton<IEntryRepository, EntryRepository>();
+builder.Services.AddSingleton<IHoopsEntryRepository, HoopsEntryRepository>();
 builder.Services.AddSingleton<IUserRepository, UserRepository>();
 builder.Services.AddSingleton<IArchiveRepository, ArchiveRepository>();
 builder.Services.AddSingleton<ISeasonRepository, SeasonRepository>();

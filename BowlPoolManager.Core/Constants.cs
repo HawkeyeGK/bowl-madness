@@ -43,6 +43,7 @@ namespace BowlPoolManager.Core
             public const string TeamConfig = "TeamConfig";
             public const string HoopsGame = "HoopsGame";
             public const string HoopsPool = "HoopsPool";
+            public const string HoopsBracketEntry = "HoopsBracketEntry";
         }
     }
 }

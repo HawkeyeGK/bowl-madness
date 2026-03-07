@@ -1,0 +1,181 @@
+@page "/admin/hoops/entries"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+
+@attribute [Authorize(Roles = "SuperAdmin,Admin")]
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject BowlPoolManager.Client.Services.ISeasonService SeasonService
+
+<PageTitle>Hoops Entries – Admin</PageTitle>
+
+<div class="container-fluid mt-3 px-4 pb-5">
+    <div class="d-flex justify-content-between align-items-end mb-3">
+        <h1 class="h3 fw-bold mb-0"><i class="bi bi-people text-primary"></i> Hoops Entries</h1>
+        <a href="/admin/hoops/entry" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Entry</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    @* Filters *@
+    <div class="row g-2 mb-3">
+        <div class="col-md-4">
+            <select class="form-select" @bind="selectedPoolId" @bind:after="ApplyFilter">
+                <option value="">All Pools</option>
+                @foreach (var p in pools)
+                {
+                    <option value="@p.Id">@p.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <input type="text" class="form-control" placeholder="Search bracket names…"
+                   @bind="searchText" @bind:after="ApplyFilter" />
+        </div>
+        <div class="col-auto">
+            <span class="form-text">@filtered.Count entries</span>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading…</span></div>
+        </div>
+    }
+    else if (!filtered.Any())
+    {
+        <div class="alert alert-info">No entries found.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Bracket Name</th>
+                        <th>Pool</th>
+                        <th>Owner</th>
+                        <th>Picks</th>
+                        <th>Paid</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in filtered)
+                    {
+                        var pool = pools.FirstOrDefault(p => p.Id == entry.PoolId);
+                        var owner = users.FirstOrDefault(u => u.Id == entry.UserId);
+                        int pickCount = entry.Picks?.Count ?? 0;
+                        <tr>
+                            <td class="fw-semibold">@entry.PlayerName</td>
+                            <td><span class="badge bg-secondary">@(pool?.Name ?? "–")</span></td>
+                            <td class="small text-muted">@(owner?.Email ?? entry.UserId)</td>
+                            <td>@pickCount</td>
+                            <td>
+                                @if (entry.IsPaid)
+                                {
+                                    <span class="badge bg-success">Paid</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark">Unpaid</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <a href="/admin/hoops/entry/@entry.Id?seasonId=@entry.SeasonId"
+                                   class="btn btn-sm btn-outline-primary me-1">
+                                    <i class="bi bi-pencil-square"></i>
+                                </a>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteEntry(entry)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<HoopsPool> pools = new();
+    private List<BracketEntry> allEntries = new();
+    private List<BracketEntry> filtered = new();
+    private List<UserProfile> users = new();
+    private string selectedPoolId = "";
+    private string searchText = "";
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var currentSeason = await SeasonService.GetCurrentSeasonAsync();
+            string sid = currentSeason?.Id ?? "";
+
+            var poolsTask = Http.GetFromJsonAsync<List<HoopsPool>>("api/GetHoopsPools");
+            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetHoopsEntries?seasonId={sid}");
+            var usersTask = Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers");
+
+            await Task.WhenAll(poolsTask, entriesTask, usersTask);
+
+            pools = await poolsTask ?? new();
+            allEntries = await entriesTask ?? new();
+            users = await usersTask ?? new();
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading data: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ApplyFilter()
+    {
+        filtered = allEntries
+            .Where(e => string.IsNullOrEmpty(selectedPoolId) || e.PoolId == selectedPoolId)
+            .Where(e => string.IsNullOrEmpty(searchText) ||
+                        e.PlayerName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(e => e.PlayerName)
+            .ToList();
+    }
+
+    private async Task DeleteEntry(BracketEntry entry)
+    {
+        bool confirmed = await JS.InvokeAsync<bool>("confirm",
+            $"Delete the entry '{entry.PlayerName}'? This cannot be undone.");
+        if (!confirmed) return;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/DeleteHoopsEntry/{entry.Id}?seasonId={entry.SeasonId}");
+            if (response.IsSuccessStatusCode)
+            {
+                allEntries.Remove(entry);
+                ApplyFilter();
+            }
+            else
+            {
+                var msg = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Delete failed: {msg}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+}

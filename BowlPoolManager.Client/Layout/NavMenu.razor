@@ -34,9 +34,18 @@
         <AuthorizeView>
             <Authorized>
                 <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="mypicks">
-                        <span class="bi bi-clipboard-check-fill me-2" aria-hidden="true"></span> @MyPicksText
-                    </NavLink>
+                    @if (SiteContext.ActiveSport == Sport.Basketball)
+                    {
+                        <NavLink class="nav-link" href="hoops/mypicks">
+                            <span class="bi bi-clipboard-check-fill me-2" aria-hidden="true"></span> @MyPicksText
+                        </NavLink>
+                    }
+                    else
+                    {
+                        <NavLink class="nav-link" href="mypicks">
+                            <span class="bi bi-clipboard-check-fill me-2" aria-hidden="true"></span> @MyPicksText
+                        </NavLink>
+                    }
                 </div>
             </Authorized>
             <NotAuthorized>
@@ -159,8 +168,16 @@
             var authState = await AuthStateProvider.GetAuthenticationStateAsync();
             if (authState.User.Identity?.IsAuthenticated ?? false)
             {
-                var myEntries = await Http.GetFromJsonAsync<List<BracketEntry>>("api/GetMyEntries");
-                MyPicksText = (myEntries == null || !myEntries.Any()) ? "Enter Your Picks" : "My Picks";
+                if (SiteContext.ActiveSport == Sport.Basketball)
+                {
+                    var myEntries = await Http.GetFromJsonAsync<List<BracketEntry>>("api/GetMyHoopsEntries");
+                    MyPicksText = (myEntries == null || !myEntries.Any()) ? "Enter Your Picks" : "My Picks";
+                }
+                else
+                {
+                    var myEntries = await Http.GetFromJsonAsync<List<BracketEntry>>("api/GetMyEntries");
+                    MyPicksText = (myEntries == null || !myEntries.Any()) ? "Enter Your Picks" : "My Picks";
+                }
             }
         }
         catch
