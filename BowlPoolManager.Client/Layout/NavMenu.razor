@@ -94,6 +94,14 @@
                         <span class="bi bi-speedometer2 me-2" aria-hidden="true"></span> Dashboard
                     </NavLink>
                 </div>
+                @if (SiteContext.ActiveSport == Sport.Basketball)
+                {
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="admin/hoops-pools">
+                            <span class="bi bi-collection-play me-2" aria-hidden="true"></span> Hoops Pools
+                        </NavLink>
+                    </div>
+                }
             </Authorized>
         </AuthorizeView>
 

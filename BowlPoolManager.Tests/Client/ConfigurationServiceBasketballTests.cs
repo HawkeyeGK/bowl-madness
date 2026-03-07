@@ -60,8 +60,8 @@ namespace BowlPoolManager.Tests.Client
         {
             var teams = new List<TeamInfo>
             {
-                new() { SchoolId = 1, School = "Duke", Mascot = "Blue Devils", Conference = "ACC" },
-                new() { SchoolId = 2, School = "Kansas", Mascot = "Jayhawks", Conference = "Big 12" }
+                new() { SchoolId = 1, School = "Duke", Mascot = "Blue Devils", Conference = "ACC", PrimaryLogoUrl = "https://a.espncdn.com/i/teamlogos/ncaa/500/150.png" },
+                new() { SchoolId = 2, School = "Kansas", Mascot = "Jayhawks", Conference = "Big 12", PrimaryLogoUrl = "https://a.espncdn.com/i/teamlogos/ncaa/500/2305.png" }
             };
             var (sut, _) = Build(HttpStatusCode.OK, SerializeConfig(teams));
 
@@ -79,7 +79,7 @@ namespace BowlPoolManager.Tests.Client
         {
             var teams = new List<TeamInfo>
             {
-                new() { SchoolId = 10, School = "UNC", Mascot = "Tar Heels", Conference = "ACC" }
+                new() { SchoolId = 10, School = "UNC", Mascot = "Tar Heels", Conference = "ACC", PrimaryLogoUrl = "https://a.espncdn.com/i/teamlogos/ncaa/500/153.png" }
             };
             var (sut, handler) = Build(HttpStatusCode.OK, SerializeConfig(teams));
 
