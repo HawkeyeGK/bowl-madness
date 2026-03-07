@@ -6,5 +6,6 @@ namespace BowlPoolManager.Api.Repositories
     {
         Task<TeamConfig?> GetTeamConfigAsync();
         Task<TeamConfig?> GetBasketballTeamConfigAsync();
+        Task SaveBasketballTeamConfigAsync(TeamConfig config);
     }
 }

@@ -2,7 +2,6 @@ using System.Net;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Azure.Cosmos;
 using BowlPoolManager.Core;
 using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Api.Services;
@@ -14,16 +13,16 @@ namespace BowlPoolManager.Api.Functions.Admin
     public class SyncBasketballTeams
     {
         private readonly IBasketballDataService _basketballService;
-        private readonly Container _container;
+        private readonly IConfigurationRepository _configRepo;
         private readonly ILogger<SyncBasketballTeams> _logger;
         private readonly IUserRepository _userRepo;
 
-        public SyncBasketballTeams(IBasketballDataService basketballService, CosmosClient cosmosClient, ILogger<SyncBasketballTeams> logger, IUserRepository userRepo)
+        public SyncBasketballTeams(IBasketballDataService basketballService, IConfigurationRepository configRepo, ILogger<SyncBasketballTeams> logger, IUserRepository userRepo)
         {
             _basketballService = basketballService;
+            _configRepo = configRepo;
             _logger = logger;
             _userRepo = userRepo;
-            _container = cosmosClient.GetContainer(Constants.Database.DbName, Constants.Database.ConfigurationContainer);
         }
 
         [Function("SyncBasketballTeams")]
@@ -42,6 +41,26 @@ namespace BowlPoolManager.Api.Functions.Admin
                 return badReq;
             }
 
+            // FBS auto-match: copy logos from matching FBS teams
+            var fbsConfig = await _configRepo.GetTeamConfigAsync();
+            if (fbsConfig?.Teams != null)
+            {
+                var fbsLookup = fbsConfig.Teams
+                    .Where(t => t.Logos != null && t.Logos.Any())
+                    .ToDictionary(t => t.School.Trim(), t => t, StringComparer.OrdinalIgnoreCase);
+
+                int matched = 0;
+                foreach (var team in teams)
+                {
+                    if (fbsLookup.TryGetValue(team.School.Trim(), out var fbsTeam))
+                    {
+                        team.Logos = fbsTeam.Logos;
+                        matched++;
+                    }
+                }
+                _logger.LogInformation("FBS auto-match enriched {Count} basketball teams with logos.", matched);
+            }
+
             var config = new TeamConfig
             {
                 Id = Constants.ConfigDocumentIds.BasketballTeamConfig,
@@ -51,7 +70,7 @@ namespace BowlPoolManager.Api.Functions.Admin
 
             try
             {
-                await _container.UpsertItemAsync(config, new PartitionKey(config.Id));
+                await _configRepo.SaveBasketballTeamConfigAsync(config);
                 _logger.LogInformation("Successfully synced {Count} basketball teams.", config.Teams.Count);
 
                 var response = req.CreateResponse(HttpStatusCode.OK);

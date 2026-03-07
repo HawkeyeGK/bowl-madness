@@ -17,9 +17,9 @@ builder.Services
     .AddApplicationInsightsTelemetryWorkerService()
     .ConfigureFunctionsApplicationInsights();
 
-builder.Services.AddHttpClient();
-builder.Services.AddSingleton<ICfbdService, CfbdService>();
-builder.Services.AddSingleton<IBasketballDataService, BasketballDataService>();
+builder.Services.AddHttpClient<ICfbdService, CfbdService>();
+builder.Services.AddHttpClient<IBasketballDataService, BasketballDataService>();
+builder.Services.AddHttpClient<IEspnDataService, EspnDataService>();
 builder.Services.AddSingleton<IGameScoringService, GameScoringService>();
 
 // --- REPOSITORIES & DATABASE ---

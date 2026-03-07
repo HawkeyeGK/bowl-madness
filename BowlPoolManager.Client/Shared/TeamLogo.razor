@@ -1,0 +1,41 @@
+@using BowlPoolManager.Core.Domain
+
+@if (!string.IsNullOrEmpty(Team?.PrimaryLogoUrl))
+{
+    <img src="@Team.PrimaryLogoUrl"
+         alt="@Team.DisplayName logo"
+         style="width: @SizePx; height: @SizePx; object-fit: contain;"
+         class="@CssClass" />
+}
+else
+{
+    <div style="width: @SizePx; height: @SizePx; background-color: #@(Team?.Color ?? "6c757d"); border-radius: 4px; display: flex; align-items: center; justify-content: center;"
+         title="@Team?.DisplayName"
+         class="@CssClass">
+        <span style="color: white; font-weight: bold; font-size: @AbbreviationFontSize; line-height: 1;">
+            @(Team?.Abbreviation?.Length > 0 ? Team.Abbreviation[..Math.Min(3, Team.Abbreviation.Length)] : "?")
+        </span>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public TeamInfo? Team { get; set; }
+
+    /// <summary>CSS size string for the logo container, e.g. "32px" or "48px"</summary>
+    [Parameter] public string SizePx { get; set; } = "32px";
+
+    [Parameter] public string CssClass { get; set; } = "";
+
+    private string AbbreviationFontSize => SizePx switch
+    {
+        var s when TryParseSize(s) >= 48 => "14px",
+        var s when TryParseSize(s) >= 32 => "11px",
+        _ => "9px"
+    };
+
+    private static int TryParseSize(string s)
+    {
+        var digits = new string(s.TakeWhile(char.IsDigit).ToArray());
+        return int.TryParse(digits, out var n) ? n : 0;
+    }
+}

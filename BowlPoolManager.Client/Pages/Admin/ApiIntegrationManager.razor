@@ -131,6 +131,39 @@
                 </div>
             </div>
         </div>
+
+        <!-- ESPN Logo Enrichment -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-light fw-bold">Logo Enrichment: ESPN</div>
+                <div class="card-body">
+                    <p class="card-text text-muted small mb-2">Fills in missing logos on basketball teams using ESPN's public API. Run after Basketball Team Sync. No API key required.</p>
+                    <p class="card-text">
+                        <a href="admin/logo-mapper" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-pencil-square me-1"></i> Manual Logo Mapper
+                        </a>
+                    </p>
+                    @if (!string.IsNullOrEmpty(EspnSyncResult))
+                    {
+                        <div class="alert alert-success py-1 px-2 small mb-0">@EspnSyncResult</div>
+                    }
+                </div>
+                <div class="card-footer bg-transparent border-top-0 pb-3 text-end">
+                    <button class="btn btn-primary" @onclick="SyncEspnLogos" disabled="@IsSyncingEspn">
+                        @if (IsSyncingEspn)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Syncing...</span>
+                        }
+                        else
+                        {
+                            <span class="bi bi-images me-2"></span>
+                            <span>Sync ESPN Logos</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Diagnostics Section -->
@@ -175,6 +208,8 @@
     private IntegrationStatusDto? Status;
     private bool IsSyncing = false;
     private bool IsSyncingBasketball = false;
+    private bool IsSyncingEspn = false;
+    private string EspnSyncResult = string.Empty;
     private bool IsRunningDiagnostic = false;
     private List<LogEntry> Logs = new();
 
@@ -230,6 +265,30 @@
         finally
         {
             IsSyncingBasketball = false;
+        }
+    }
+
+    private async Task SyncEspnLogos()
+    {
+        IsSyncingEspn = true;
+        EspnSyncResult = string.Empty;
+        try
+        {
+            var response = await Http.PostAsync("api/SyncEspnLogos", null);
+            if (response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                var result = JsonConvert.DeserializeAnonymousType(body, new { enrichedCount = 0, totalTeams = 0 });
+                EspnSyncResult = $"Enriched {result?.enrichedCount} of {result?.totalTeams} teams with ESPN logos.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error syncing ESPN logos: {ex.Message}");
+        }
+        finally
+        {
+            IsSyncingEspn = false;
         }
     }
 

@@ -18,5 +18,10 @@ namespace BowlPoolManager.Api.Repositories
         {
             return await GetDocumentAsync<TeamConfig>(Constants.ConfigDocumentIds.BasketballTeamConfig, Constants.ConfigDocumentIds.BasketballTeamConfig);
         }
+
+        public async Task SaveBasketballTeamConfigAsync(TeamConfig config)
+        {
+            await UpsertDocumentAsync(config, config.Id);
+        }
     }
 }

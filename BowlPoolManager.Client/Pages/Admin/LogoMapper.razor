@@ -1,0 +1,184 @@
+@page "/admin/logo-mapper"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core.Dtos
+@using Microsoft.AspNetCore.Authorization
+@using Newtonsoft.Json
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject HttpClient Http
+
+<PageTitle>Logo Mapper</PageTitle>
+
+<div class="container-fluid mt-3 px-4">
+    <div class="d-flex justify-content-between align-items-end mb-3">
+        <h1 class="h3 fw-bold mb-0">Basketball Logo Mapper</h1>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_statusMessage))
+    {
+        <div class="alert @_statusAlertClass alert-dismissible" role="alert">
+            @_statusMessage
+            <button type="button" class="btn-close" @onclick="() => _statusMessage = string.Empty"></button>
+        </div>
+    }
+
+    <div class="card mb-4">
+        <div class="card-header bg-light fw-bold">
+            Teams Missing Logos
+            @if (_teams != null)
+            {
+                <span class="badge bg-secondary ms-2">@_teams.Count without logos / @_totalTeams total</span>
+            }
+        </div>
+        <div class="card-body">
+            @if (_isLoading)
+            {
+                <div class="text-center py-4"><span class="spinner-border" role="status"></span></div>
+            }
+            else if (_teams == null || !_teams.Any())
+            {
+                <p class="text-success mb-0"><i class="bi bi-check-circle-fill me-2"></i>All teams have logos assigned.</p>
+            }
+            else
+            {
+                <p class="text-muted small mb-3">Enter a direct image URL for each team that is still missing a logo, then click <strong>Apply Mappings</strong>.</p>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>School</th>
+                                <th>Conference</th>
+                                <th>Abbreviation</th>
+                                <th>Logo URL</th>
+                                <th style="width: 80px;">Preview</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in _pendingMappings)
+                            {
+                                <tr>
+                                    <td>@row.Team.School</td>
+                                    <td>@row.Team.Conference</td>
+                                    <td>@row.Team.Abbreviation</td>
+                                    <td>
+                                        <input type="text" class="form-control form-control-sm"
+                                               placeholder="https://..."
+                                               @bind="row.LogoUrl" />
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(row.LogoUrl))
+                                        {
+                                            <img src="@row.LogoUrl" alt="preview" style="height: 32px; object-fit: contain;" />
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-end mt-3">
+                    <button class="btn btn-primary" @onclick="ApplyMappings" disabled="@_isSaving">
+                        @if (_isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <span>Apply Mappings</span>
+                        }
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<TeamInfo>? _teams;
+    private int _totalTeams;
+    private List<PendingMapping> _pendingMappings = new();
+    private bool _isLoading = true;
+    private bool _isSaving = false;
+    private string _statusMessage = string.Empty;
+    private string _statusAlertClass = "alert-info";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTeams();
+    }
+
+    private async Task LoadTeams()
+    {
+        _isLoading = true;
+        try
+        {
+            var config = await Http.GetFromJsonAsync<TeamConfig>("api/GetBasketballTeamConfig");
+            if (config != null)
+            {
+                _totalTeams = config.Teams.Count;
+                _teams = config.Teams.Where(t => string.IsNullOrEmpty(t.PrimaryLogoUrl)).ToList();
+                _pendingMappings = _teams.Select(t => new PendingMapping(t)).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading basketball teams: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ApplyMappings()
+    {
+        var toApply = _pendingMappings
+            .Where(m => !string.IsNullOrEmpty(m.LogoUrl))
+            .Select(m => new LogoMappingDto { SchoolId = m.Team.SchoolId, LogoUrl = m.LogoUrl })
+            .ToList();
+
+        if (!toApply.Any())
+        {
+            _statusMessage = "No URLs were entered.";
+            _statusAlertClass = "alert-warning";
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var json = JsonConvert.SerializeObject(toApply);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            var response = await Http.PostAsync("api/ApplyLogoMappings", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _statusMessage = $"Successfully applied {toApply.Count} logo mapping(s).";
+                _statusAlertClass = "alert-success";
+                await LoadTeams();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                _statusMessage = $"Error: {error}";
+                _statusAlertClass = "alert-danger";
+            }
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Unexpected error: {ex.Message}";
+            _statusAlertClass = "alert-danger";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private class PendingMapping
+    {
+        public TeamInfo Team { get; }
+        public string LogoUrl { get; set; } = string.Empty;
+        public PendingMapping(TeamInfo team) { Team = team; }
+    }
+}
