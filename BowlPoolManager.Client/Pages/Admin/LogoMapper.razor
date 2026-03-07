@@ -41,13 +41,9 @@
             else
             {
                 <p class="text-muted small mb-3">
-                    For each team, select the matching ESPN team from the dropdown. The logo will be previewed automatically.
-                    Click <strong>Apply Mappings</strong> when done.
+                    For each team, type a name in the search box to find the matching ESPN team. The logo will be
+                    previewed when selected. Click <strong>Apply Mappings</strong> when done.
                 </p>
-                @if (!_espnTeams.Any())
-                {
-                    <div class="alert alert-warning small">Could not load ESPN team list. Check that the API is reachable.</div>
-                }
                 <div class="table-responsive">
                     <table class="table table-sm align-middle">
                         <thead class="table-light">
@@ -64,16 +60,57 @@
                                 <tr>
                                     <td class="fw-semibold">@row.Team.School</td>
                                     <td class="text-muted small">@row.Team.Conference</td>
-                                    <td>
-                                        <select class="form-select form-select-sm"
-                                                value="@row.SelectedEspnSchoolId"
-                                                @onchange="e => OnEspnTeamSelected(row, e.Value?.ToString())">
-                                            <option value="">-- not mapped --</option>
-                                            @foreach (var espn in _espnTeams)
+                                    <td style="min-width: 280px;">
+                                        @if (row.SelectedEspnSchoolId != 0)
+                                        {
+                                            <span class="small fw-semibold">@row.SelectedDisplayName</span>
+                                            <button class="btn btn-link btn-sm p-0 ms-2 text-secondary"
+                                                    @onclick="() => ClearEspnSelection(row)">change</button>
+                                        }
+                                        else
+                                        {
+                                            <div class="input-group input-group-sm">
+                                                <input type="text" class="form-control form-control-sm"
+                                                       placeholder="Search ESPN..."
+                                                       @bind="row.SearchQuery"
+                                                       @bind:event="oninput"
+                                                       @onkeyup='async e => { if (e.Key == "Enter") await SearchEspnTeams(row); }' />
+                                                <button class="btn btn-outline-secondary btn-sm"
+                                                        @onclick="() => SearchEspnTeams(row)"
+                                                        disabled="@(row.IsSearching || row.SearchQuery.Length < 2)">
+                                                    @if (row.IsSearching)
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm" role="status"></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>Search</span>
+                                                    }
+                                                </button>
+                                            </div>
+                                            @if (row.SearchResults.Any())
                                             {
-                                                <option value="@espn.SchoolId">@espn.School @espn.Mascot</option>
+                                                <ul class="list-group mt-1" style="max-height: 160px; overflow-y: auto;">
+                                                    @foreach (var result in row.SearchResults)
+                                                    {
+                                                        <li class="list-group-item list-group-item-action py-1 px-2 small"
+                                                            style="cursor: pointer;"
+                                                            @onclick="() => SelectEspnTeam(row, result)">
+                                                            @if (!string.IsNullOrEmpty(result.PrimaryLogoUrl))
+                                                            {
+                                                                <img src="@result.PrimaryLogoUrl" alt=""
+                                                                     style="height: 20px; width: 20px; object-fit: contain; margin-right: 6px;" />
+                                                            }
+                                                            @result.School
+                                                        </li>
+                                                    }
+                                                </ul>
                                             }
-                                        </select>
+                                            else if (row.SearchAttempted && !row.IsSearching)
+                                            {
+                                                <div class="text-muted small mt-1">No results found.</div>
+                                            }
+                                        }
                                     </td>
                                     <td>
                                         @if (!string.IsNullOrEmpty(row.LogoUrl))
@@ -108,7 +145,6 @@
     private List<TeamInfo>? _teams;
     private int _totalTeams;
     private List<PendingMapping> _pendingMappings = new();
-    private List<TeamInfo> _espnTeams = new();
     private bool _isLoading = true;
     private bool _isSaving = false;
     private string _statusMessage = string.Empty;
@@ -116,10 +152,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Load both in parallel
-        var basketballTask = LoadBasketballTeams();
-        var espnTask = LoadEspnTeams();
-        await Task.WhenAll(basketballTask, espnTask);
+        await LoadBasketballTeams();
         _isLoading = false;
     }
 
@@ -141,32 +174,49 @@
         }
     }
 
-    private async Task LoadEspnTeams()
+    private async Task SearchEspnTeams(PendingMapping row)
     {
+        if (row.SearchQuery.Length < 2) return;
+        row.IsSearching = true;
+        row.SearchAttempted = false;
+        StateHasChanged();
         try
         {
-            var teams = await Http.GetFromJsonAsync<List<TeamInfo>>("api/GetEspnTeams");
-            if (teams != null)
-                _espnTeams = teams.OrderBy(t => t.School).ToList();
+            var results = await Http.GetFromJsonAsync<List<TeamInfo>>(
+                $"api/SearchEspnTeams?q={Uri.EscapeDataString(row.SearchQuery)}");
+            row.SearchResults = results ?? new();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading ESPN teams: {ex.Message}");
+            Console.WriteLine($"Error searching ESPN teams: {ex.Message}");
+            row.SearchResults = new();
+        }
+        finally
+        {
+            row.IsSearching = false;
+            row.SearchAttempted = true;
+            StateHasChanged();
         }
     }
 
-    private void OnEspnTeamSelected(PendingMapping row, string? schoolIdStr)
+    private void SelectEspnTeam(PendingMapping row, TeamInfo espnTeam)
     {
-        if (!int.TryParse(schoolIdStr, out var schoolId) || schoolId == 0)
-        {
-            row.SelectedEspnSchoolId = 0;
-            row.LogoUrl = string.Empty;
-            return;
-        }
+        row.SelectedEspnSchoolId = espnTeam.SchoolId;
+        row.LogoUrl = espnTeam.PrimaryLogoUrl;
+        row.SelectedDisplayName = espnTeam.School;
+        row.SearchResults = new();
+        row.SearchQuery = string.Empty;
+        row.SearchAttempted = false;
+    }
 
-        var espnTeam = _espnTeams.FirstOrDefault(t => t.SchoolId == schoolId);
-        row.SelectedEspnSchoolId = schoolId;
-        row.LogoUrl = espnTeam?.PrimaryLogoUrl ?? string.Empty;
+    private void ClearEspnSelection(PendingMapping row)
+    {
+        row.SelectedEspnSchoolId = 0;
+        row.LogoUrl = string.Empty;
+        row.SelectedDisplayName = string.Empty;
+        row.SearchResults = new();
+        row.SearchQuery = string.Empty;
+        row.SearchAttempted = false;
     }
 
     private async Task ApplyMappings()
@@ -194,7 +244,6 @@
             {
                 _statusMessage = $"Successfully applied {toApply.Count} logo mapping(s).";
                 _statusAlertClass = "alert-success";
-                // Reload so mapped teams disappear from the list
                 _isLoading = true;
                 await LoadBasketballTeams();
                 _isLoading = false;
@@ -222,6 +271,11 @@
         public TeamInfo Team { get; }
         public int SelectedEspnSchoolId { get; set; }
         public string LogoUrl { get; set; } = string.Empty;
+        public string SelectedDisplayName { get; set; } = string.Empty;
+        public string SearchQuery { get; set; } = string.Empty;
+        public List<TeamInfo> SearchResults { get; set; } = new();
+        public bool IsSearching { get; set; }
+        public bool SearchAttempted { get; set; }
         public PendingMapping(TeamInfo team) { Team = team; }
     }
 }

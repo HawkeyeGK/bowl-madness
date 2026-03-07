@@ -10,6 +10,7 @@ namespace BowlPoolManager.Api.Services
         private readonly HttpClient _httpClient;
         private readonly ILogger<EspnDataService> _logger;
         private const string TeamsUrl = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams?limit=1000";
+        private const string SearchUrl = "https://site.api.espn.com/apis/search/v2";
 
         public EspnDataService(HttpClient httpClient, ILogger<EspnDataService> logger)
         {
@@ -60,6 +61,53 @@ namespace BowlPoolManager.Api.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to fetch/parse ESPN teams.");
+                return new List<TeamInfo>();
+            }
+        }
+
+        public async Task<List<TeamInfo>> SearchTeamsAsync(string query)
+        {
+            try
+            {
+                var url = $"{SearchUrl}?query={Uri.EscapeDataString(query)}&sport=basketball&limit=20";
+                var json = await _httpClient.GetStringAsync(url);
+                var root = JObject.Parse(json);
+
+                var resultGroups = root["results"];
+                if (resultGroups == null) return new List<TeamInfo>();
+
+                var teams = new List<TeamInfo>();
+                foreach (var group in resultGroups)
+                {
+                    var items = group["items"];
+                    if (items == null) continue;
+
+                    foreach (var item in items)
+                    {
+                        if (item["type"]?.ToString() != "team") continue;
+                        if (item["subtitle"]?.ToString() != "NCAAM") continue;
+
+                        // uid format: "s:40~l:41~t:2598" — extract numeric team ID after "~t:"
+                        var uid = item["uid"]?.ToString() ?? string.Empty;
+                        var tIdx = uid.IndexOf("~t:", StringComparison.Ordinal);
+                        if (!int.TryParse(tIdx >= 0 ? uid[(tIdx + 3)..] : string.Empty, out var schoolId) || schoolId == 0)
+                            continue;
+
+                        teams.Add(new TeamInfo
+                        {
+                            SchoolId = schoolId,
+                            School = item["displayName"]?.ToString() ?? string.Empty,
+                            PrimaryLogoUrl = item["image"]?["default"]?.ToString() ?? string.Empty
+                        });
+                    }
+                }
+
+                _logger.LogInformation("ESPN search for '{Query}' returned {Count} NCAAM teams.", query, teams.Count);
+                return teams;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to search ESPN teams for query '{Query}'.", query);
                 return new List<TeamInfo>();
             }
         }

@@ -92,5 +92,34 @@ namespace BowlPoolManager.Api.Functions
                 return req.CreateResponse(HttpStatusCode.InternalServerError);
             }
         }
+
+        [Function("SearchEspnTeams")]
+        public async Task<HttpResponseData> SearchEspnTeams([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
+        {
+            var qs = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+            var query = qs["q"] ?? string.Empty;
+
+            if (query.Length < 2)
+            {
+                var bad = req.CreateResponse(HttpStatusCode.BadRequest);
+                await bad.WriteStringAsync("Query must be at least 2 characters.");
+                return bad;
+            }
+
+            _logger.LogInformation("Searching ESPN teams for '{Query}'.", query);
+
+            try
+            {
+                var teams = await _espnService.SearchTeamsAsync(query);
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(teams);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SearchEspnTeams failed.");
+                return req.CreateResponse(HttpStatusCode.InternalServerError);
+            }
+        }
     }
 }
