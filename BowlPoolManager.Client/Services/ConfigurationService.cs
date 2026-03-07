@@ -42,7 +42,7 @@ namespace BowlPoolManager.Client.Services
             {
                 var config = await _http.GetFromJsonAsync<TeamConfig>("api/GetBasketballTeamConfig");
                 if (config != null)
-                    _cachedBasketballTeams = config.Teams;
+                    _cachedBasketballTeams = config.Teams.Where(t => !string.IsNullOrEmpty(t.PrimaryLogoUrl)).ToList();
             }
             catch (Exception ex)
             {
