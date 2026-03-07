@@ -51,6 +51,8 @@ builder.Services.AddSingleton<CosmosClient>(sp =>
 builder.Services.AddSingleton<IGameRepository, GameRepository>();
 builder.Services.AddSingleton<IPoolRepository, PoolRepository>();
 builder.Services.AddSingleton<IHoopsPoolRepository, HoopsPoolRepository>();
+builder.Services.AddSingleton<IHoopsGameRepository, HoopsGameRepository>();
+builder.Services.AddSingleton<IBracketGeneratorService, BracketGeneratorService>();
 builder.Services.AddSingleton<IEntryRepository, EntryRepository>();
 builder.Services.AddSingleton<IUserRepository, UserRepository>();
 builder.Services.AddSingleton<IArchiveRepository, ArchiveRepository>();

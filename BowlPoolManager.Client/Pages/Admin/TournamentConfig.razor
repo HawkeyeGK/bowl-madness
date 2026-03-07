@@ -1,0 +1,384 @@
+@page "/admin/tournament-config"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core.Dtos
+@using BowlPoolManager.Client.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject IHoopsPoolService PoolService
+@inject IHoopsGameService GameService
+@inject IJSRuntime JS
+
+<PageTitle>Tournament Configuration</PageTitle>
+
+<div class="container-fluid mt-3 px-4">
+    <div class="mb-4">
+        <h1 class="h3 fw-bold mb-0"><i class="bi bi-diagram-3-fill text-primary"></i> Tournament Configuration</h1>
+        <p class="text-muted small mt-1">Generate the 67-game bracket shell for a basketball pool.</p>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
+    }
+    else
+    {
+        @* ── Pool selector ─────────────────────────────────────────────────────── *@
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <label class="form-label fw-semibold">Select Pool</label>
+                <select class="form-select" value="@_selectedPoolId" @onchange="OnPoolChanged">
+                    <option value="">— choose a pool —</option>
+                    @foreach (var pool in _pools)
+                    {
+                        <option value="@pool.Id">@pool.Name (@pool.Season)</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        @if (_selectedPool != null)
+        {
+            @* ── Bracket status ────────────────────────────────────────────────── *@
+            <div class="alert @(_hasExistingBracket ? "alert-warning" : "alert-info") d-flex align-items-center mb-4">
+                <i class="bi @(_hasExistingBracket ? "bi-exclamation-triangle-fill" : "bi-info-circle-fill") me-2"></i>
+                @if (_hasExistingBracket)
+                {
+                    <span>This pool already has a bracket with <strong>@_existingGames.Count games</strong>. Generating a new bracket will <strong>delete all existing games</strong>.</span>
+                }
+                else
+                {
+                    <span>No bracket generated yet. Fill in the configuration below and click <strong>Generate Bracket</strong>.</span>
+                }
+            </div>
+
+            @* ── Configuration form ────────────────────────────────────────────── *@
+            <div class="row g-4 mb-4">
+                @* Region names *@
+                <div class="col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header fw-semibold">Region Names</div>
+                        <div class="card-body">
+                            @for (int i = 0; i < 4; i++)
+                            {
+                                var idx = i;
+                                <div class="mb-3">
+                                    <label class="form-label">Region @(idx + 1)</label>
+                                    <input type="text" class="form-control"
+                                           value="@_regions[idx]"
+                                           @onchange="e => _regions[idx] = e.Value?.ToString() ?? string.Empty"
+                                           placeholder='e.g. "East"' />
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                @* Final Four pairings *@
+                <div class="col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header fw-semibold">Final Four Pairings</div>
+                        <div class="card-body">
+                            <p class="text-muted small">Select which two regions meet in each semifinal.</p>
+
+                            @for (int p = 0; p < 2; p++)
+                            {
+                                var pairIdx = p;
+                                <div class="mb-4">
+                                    <label class="form-label fw-semibold">Semifinal @(pairIdx + 1)</label>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <select class="form-select"
+                                                value="@_pairings[pairIdx][0]"
+                                                @onchange="e => _pairings[pairIdx][0] = e.Value?.ToString() ?? string.Empty">
+                                            <option value="">— region —</option>
+                                            @foreach (var r in _regions.Where(r => !string.IsNullOrEmpty(r)))
+                                            {
+                                                <option value="@r">@r</option>
+                                            }
+                                        </select>
+                                        <span class="fw-bold text-muted">vs</span>
+                                        <select class="form-select"
+                                                value="@_pairings[pairIdx][1]"
+                                                @onchange="e => _pairings[pairIdx][1] = e.Value?.ToString() ?? string.Empty">
+                                            <option value="">— region —</option>
+                                            @foreach (var r in _regions.Where(r => !string.IsNullOrEmpty(r)))
+                                            {
+                                                <option value="@r">@r</option>
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrEmpty(_validationError))
+                            {
+                                <div class="alert alert-danger py-2 small">@_validationError</div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-5">
+                <button class="btn btn-primary btn-lg" @onclick="GenerateBracket" disabled="@_isGenerating">
+                    @if (_isGenerating)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        <span>Generating…</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-diagram-3-fill me-2"></i>
+                        <span>@(_hasExistingBracket ? "Regenerate Bracket" : "Generate Bracket")</span>
+                    }
+                </button>
+            </div>
+
+            @* ── Verification view ─────────────────────────────────────────────── *@
+            @if (_existingGames.Any())
+            {
+                <div class="mb-2">
+                    <span class="text-uppercase fw-bold small text-muted">
+                        <i class="bi bi-check2-circle me-1"></i> Bracket Verification
+                    </span>
+                    <hr class="mt-1 mb-3" />
+                </div>
+
+                @* Summary counts *@
+                <div class="row g-3 mb-4">
+                    @foreach (var round in _bracketRounds)
+                    {
+                        var count = _existingGames.Count(g => g.Round == round);
+                        <div class="col-6 col-md-3 col-lg-auto">
+                            <div class="card text-center shadow-sm border-0 px-3 py-2">
+                                <div class="fw-bold fs-4">@count</div>
+                                <div class="text-muted small">@RoundShortName(round)</div>
+                            </div>
+                        </div>
+                    }
+                    <div class="col-6 col-md-3 col-lg-auto">
+                        <div class="card text-center shadow-sm border-0 px-3 py-2 @(_existingGames.Count == 67 ? "bg-success text-white" : "bg-danger text-white")">
+                            <div class="fw-bold fs-4">@_existingGames.Count</div>
+                            <div class="small">Total</div>
+                        </div>
+                    </div>
+                </div>
+
+                @* Full game table *@
+                <div class="card shadow-sm">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Round</th>
+                                        <th>Region</th>
+                                        <th>Game ID</th>
+                                        <th>Next Game ID</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var round in _bracketRounds)
+                                    {
+                                        var roundGames = _existingGames
+                                            .Where(g => g.Round == round)
+                                            .OrderBy(g => g.Region ?? "")
+                                            .ToList();
+
+                                        if (!roundGames.Any()) continue;
+
+                                        <tr class="table-secondary">
+                                            <td colspan="5" class="fw-semibold small text-uppercase text-muted py-1 px-3">
+                                                @RoundDisplayName(round) — @roundGames.Count game(s)
+                                            </td>
+                                        </tr>
+
+                                        @foreach (var game in roundGames)
+                                        {
+                                            var nextGame = _gameById.TryGetValue(game.NextGameId ?? "", out var ng) ? ng : null;
+                                            <tr>
+                                                <td><span class="badge @RoundBadgeClass(round)">@RoundShortName(round)</span></td>
+                                                <td>@(game.Region ?? "—")</td>
+                                                <td><code class="small">…@game.Id[^6..]</code></td>
+                                                <td>
+                                                    @if (nextGame != null)
+                                                    {
+                                                        <code class="small text-success">…@nextGame.Id[^6..]</code>
+                                                        <span class="text-muted small ms-1">(@RoundShortName(nextGame.Round))</span>
+                                                    }
+                                                    else if (game.Round == TournamentRound.NationalChampionship)
+                                                    {
+                                                        <span class="text-muted small">—</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-danger">MISSING</span>
+                                                    }
+                                                </td>
+                                                <td><span class="badge bg-secondary">@game.Status</span></td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    }
+</div>
+
+@code {
+    private List<HoopsPool> _pools = new();
+    private string _selectedPoolId = string.Empty;
+    private HoopsPool? _selectedPool;
+    private List<HoopsGame> _existingGames = new();
+    private Dictionary<string, HoopsGame> _gameById = new();
+    private bool _isLoading = true;
+    private bool _isGenerating = false;
+    private string _validationError = string.Empty;
+
+    // Configuration state
+    private readonly string[] _regions = { "East", "West", "South", "Midwest" };
+    private readonly string[][] _pairings = { new[] { "East", "West" }, new[] { "South", "Midwest" } };
+
+    private bool _hasExistingBracket => _existingGames.Any();
+
+    private static readonly TournamentRound[] _bracketRounds =
+    {
+        TournamentRound.NationalChampionship,
+        TournamentRound.FinalFour,
+        TournamentRound.Elite8,
+        TournamentRound.Sweet16,
+        TournamentRound.RoundOf32,
+        TournamentRound.RoundOf64,
+        TournamentRound.FirstFour,
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _pools = await PoolService.GetPoolsAsync();
+        _isLoading = false;
+    }
+
+    private async Task OnPoolChanged(ChangeEventArgs e)
+    {
+        _selectedPoolId = e.Value?.ToString() ?? string.Empty;
+        _selectedPool = _pools.FirstOrDefault(p => p.Id == _selectedPoolId);
+        _existingGames = new();
+        _gameById = new();
+
+        if (_selectedPool != null && _selectedPool.GameIds.Any())
+        {
+            _existingGames = await GameService.GetGamesAsync(_selectedPool.Id);
+            _gameById = _existingGames.ToDictionary(g => g.Id);
+        }
+    }
+
+    private async Task GenerateBracket()
+    {
+        if (_selectedPool == null) return;
+
+        _validationError = ValidateForm();
+        if (!string.IsNullOrEmpty(_validationError)) return;
+
+        if (_hasExistingBracket)
+        {
+            if (!await JS.InvokeAsync<bool>("confirm",
+                $"This will DELETE the existing {_existingGames.Count} games and regenerate the bracket. Continue?"))
+                return;
+        }
+
+        _isGenerating = true;
+
+        var request = new BracketGenerationRequest
+        {
+            PoolId = _selectedPool.Id,
+            SeasonId = _selectedPool.SeasonId,
+            Regions = _regions.ToList(),
+            FinalFourPairings = new List<List<string>>
+            {
+                _pairings[0].ToList(),
+                _pairings[1].ToList()
+            }
+        };
+
+        var result = await GameService.GenerateBracketAsync(request);
+        _isGenerating = false;
+
+        if (result != null)
+        {
+            _existingGames = result;
+            _gameById = _existingGames.ToDictionary(g => g.Id);
+            // Refresh pool so GameIds is up to date
+            var pools = await PoolService.GetPoolsAsync();
+            _selectedPool = pools.FirstOrDefault(p => p.Id == _selectedPool.Id);
+            _pools = pools;
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("alert", "Failed to generate bracket. Check configuration and try again.");
+        }
+    }
+
+    private string ValidateForm()
+    {
+        if (_regions.Any(string.IsNullOrWhiteSpace))
+            return "All 4 region names are required.";
+
+        if (_regions.Distinct(StringComparer.OrdinalIgnoreCase).Count() != 4)
+            return "Region names must be unique.";
+
+        if (_pairings[0].Any(string.IsNullOrEmpty) || _pairings[1].Any(string.IsNullOrEmpty))
+            return "Both Final Four pairings must be fully specified.";
+
+        var allPaired = _pairings.SelectMany(p => p).ToList();
+        if (allPaired.Distinct(StringComparer.OrdinalIgnoreCase).Count() != 4)
+            return "Each region must appear in exactly one Final Four pairing.";
+
+        foreach (var r in allPaired)
+            if (!_regions.Contains(r, StringComparer.OrdinalIgnoreCase))
+                return $"Region '{r}' in pairings does not match any defined region.";
+
+        return string.Empty;
+    }
+
+    private static string RoundDisplayName(TournamentRound round) => round switch
+    {
+        TournamentRound.NationalChampionship => "National Championship",
+        TournamentRound.FinalFour => "Final Four",
+        TournamentRound.Elite8 => "Elite 8",
+        TournamentRound.Sweet16 => "Sweet 16",
+        TournamentRound.RoundOf32 => "Round of 32",
+        TournamentRound.RoundOf64 => "Round of 64",
+        TournamentRound.FirstFour => "First Four (Play-In)",
+        _ => round.ToString()
+    };
+
+    private static string RoundShortName(TournamentRound round) => round switch
+    {
+        TournamentRound.NationalChampionship => "Champ",
+        TournamentRound.FinalFour => "FF",
+        TournamentRound.Elite8 => "E8",
+        TournamentRound.Sweet16 => "S16",
+        TournamentRound.RoundOf32 => "R32",
+        TournamentRound.RoundOf64 => "R64",
+        TournamentRound.FirstFour => "F4",
+        _ => round.ToString()
+    };
+
+    private static string RoundBadgeClass(TournamentRound round) => round switch
+    {
+        TournamentRound.NationalChampionship => "bg-danger",
+        TournamentRound.FinalFour => "bg-warning text-dark",
+        TournamentRound.Elite8 => "bg-success",
+        TournamentRound.Sweet16 => "bg-primary",
+        TournamentRound.RoundOf32 => "bg-info text-dark",
+        TournamentRound.RoundOf64 => "bg-secondary",
+        TournamentRound.FirstFour => "bg-dark",
+        _ => "bg-secondary"
+    };
+}

@@ -21,6 +21,7 @@ builder.Services.AddScoped<ISiteContext, SiteContext>();
 // DOMAIN SERVICES
 builder.Services.AddScoped<IPoolService, PoolService>();
 builder.Services.AddScoped<IHoopsPoolService, HoopsPoolService>();
+builder.Services.AddScoped<IHoopsGameService, HoopsGameService>();
 builder.Services.AddScoped<ISeasonService, SeasonService>();
 builder.Services.AddScoped<IConfigurationService, ConfigurationService>();
 
