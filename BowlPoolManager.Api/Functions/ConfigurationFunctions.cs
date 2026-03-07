@@ -4,6 +4,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Api.Repositories;
+using BowlPoolManager.Api.Services;
 
 namespace BowlPoolManager.Api.Functions
 {
@@ -11,11 +12,13 @@ namespace BowlPoolManager.Api.Functions
     {
         private readonly ILogger _logger;
         private readonly IConfigurationRepository _configRepo;
+        private readonly IEspnDataService _espnService;
 
-        public ConfigurationFunctions(ILoggerFactory loggerFactory, IConfigurationRepository configRepo)
+        public ConfigurationFunctions(ILoggerFactory loggerFactory, IConfigurationRepository configRepo, IEspnDataService espnService)
         {
             _logger = loggerFactory.CreateLogger<ConfigurationFunctions>();
             _configRepo = configRepo;
+            _espnService = espnService;
         }
 
         [Function("GetTeamConfig")]
@@ -66,6 +69,26 @@ namespace BowlPoolManager.Api.Functions
             catch (Exception ex)
             {
                 _logger.LogError(ex, "GetBasketballTeamConfig failed.");
+                return req.CreateResponse(HttpStatusCode.InternalServerError);
+            }
+        }
+
+        [Function("GetEspnTeams")]
+        public async Task<HttpResponseData> GetEspnTeams([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
+        {
+            _logger.LogInformation("Fetching ESPN team list.");
+
+            try
+            {
+                var teams = await _espnService.GetTeamsAsync();
+
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(teams);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetEspnTeams failed.");
                 return req.CreateResponse(HttpStatusCode.InternalServerError);
             }
         }

@@ -40,34 +40,45 @@
             }
             else
             {
-                <p class="text-muted small mb-3">Enter a direct image URL for each team that is still missing a logo, then click <strong>Apply Mappings</strong>.</p>
+                <p class="text-muted small mb-3">
+                    For each team, select the matching ESPN team from the dropdown. The logo will be previewed automatically.
+                    Click <strong>Apply Mappings</strong> when done.
+                </p>
+                @if (!_espnTeams.Any())
+                {
+                    <div class="alert alert-warning small">Could not load ESPN team list. Check that the API is reachable.</div>
+                }
                 <div class="table-responsive">
                     <table class="table table-sm align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th>School</th>
+                                <th>Basketball School</th>
                                 <th>Conference</th>
-                                <th>Abbreviation</th>
-                                <th>Logo URL</th>
-                                <th style="width: 80px;">Preview</th>
+                                <th>Match to ESPN Team</th>
+                                <th style="width: 56px;">Preview</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var row in _pendingMappings)
                             {
                                 <tr>
-                                    <td>@row.Team.School</td>
-                                    <td>@row.Team.Conference</td>
-                                    <td>@row.Team.Abbreviation</td>
+                                    <td class="fw-semibold">@row.Team.School</td>
+                                    <td class="text-muted small">@row.Team.Conference</td>
                                     <td>
-                                        <input type="text" class="form-control form-control-sm"
-                                               placeholder="https://..."
-                                               @bind="row.LogoUrl" />
+                                        <select class="form-select form-select-sm"
+                                                value="@row.SelectedEspnSchoolId"
+                                                @onchange="e => OnEspnTeamSelected(row, e.Value?.ToString())">
+                                            <option value="">-- not mapped --</option>
+                                            @foreach (var espn in _espnTeams)
+                                            {
+                                                <option value="@espn.SchoolId">@espn.School @espn.Mascot</option>
+                                            }
+                                        </select>
                                     </td>
                                     <td>
                                         @if (!string.IsNullOrEmpty(row.LogoUrl))
                                         {
-                                            <img src="@row.LogoUrl" alt="preview" style="height: 32px; object-fit: contain;" />
+                                            <img src="@row.LogoUrl" alt="logo preview" style="height: 36px; width: 36px; object-fit: contain;" />
                                         }
                                     </td>
                                 </tr>
@@ -97,6 +108,7 @@
     private List<TeamInfo>? _teams;
     private int _totalTeams;
     private List<PendingMapping> _pendingMappings = new();
+    private List<TeamInfo> _espnTeams = new();
     private bool _isLoading = true;
     private bool _isSaving = false;
     private string _statusMessage = string.Empty;
@@ -104,12 +116,15 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadTeams();
+        // Load both in parallel
+        var basketballTask = LoadBasketballTeams();
+        var espnTask = LoadEspnTeams();
+        await Task.WhenAll(basketballTask, espnTask);
+        _isLoading = false;
     }
 
-    private async Task LoadTeams()
+    private async Task LoadBasketballTeams()
     {
-        _isLoading = true;
         try
         {
             var config = await Http.GetFromJsonAsync<TeamConfig>("api/GetBasketballTeamConfig");
@@ -124,10 +139,34 @@
         {
             Console.WriteLine($"Error loading basketball teams: {ex.Message}");
         }
-        finally
+    }
+
+    private async Task LoadEspnTeams()
+    {
+        try
         {
-            _isLoading = false;
+            var teams = await Http.GetFromJsonAsync<List<TeamInfo>>("api/GetEspnTeams");
+            if (teams != null)
+                _espnTeams = teams.OrderBy(t => t.School).ToList();
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading ESPN teams: {ex.Message}");
+        }
+    }
+
+    private void OnEspnTeamSelected(PendingMapping row, string? schoolIdStr)
+    {
+        if (!int.TryParse(schoolIdStr, out var schoolId) || schoolId == 0)
+        {
+            row.SelectedEspnSchoolId = 0;
+            row.LogoUrl = string.Empty;
+            return;
+        }
+
+        var espnTeam = _espnTeams.FirstOrDefault(t => t.SchoolId == schoolId);
+        row.SelectedEspnSchoolId = schoolId;
+        row.LogoUrl = espnTeam?.PrimaryLogoUrl ?? string.Empty;
     }
 
     private async Task ApplyMappings()
@@ -139,7 +178,7 @@
 
         if (!toApply.Any())
         {
-            _statusMessage = "No URLs were entered.";
+            _statusMessage = "No teams were mapped.";
             _statusAlertClass = "alert-warning";
             return;
         }
@@ -155,7 +194,10 @@
             {
                 _statusMessage = $"Successfully applied {toApply.Count} logo mapping(s).";
                 _statusAlertClass = "alert-success";
-                await LoadTeams();
+                // Reload so mapped teams disappear from the list
+                _isLoading = true;
+                await LoadBasketballTeams();
+                _isLoading = false;
             }
             else
             {
@@ -178,6 +220,7 @@
     private class PendingMapping
     {
         public TeamInfo Team { get; }
+        public int SelectedEspnSchoolId { get; set; }
         public string LogoUrl { get; set; } = string.Empty;
         public PendingMapping(TeamInfo team) { Team = team; }
     }
