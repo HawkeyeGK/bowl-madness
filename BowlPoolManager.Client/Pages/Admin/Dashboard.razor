@@ -8,18 +8,55 @@
 <PageTitle>Admin Dashboard</PageTitle>
 
 <div class="container-fluid mt-3 px-4">
-    <div class="d-flex justify-content-between align-items-end mb-3">
-        <div class="d-flex flex-column gap-2">
-            <div class="d-flex align-items-center gap-3">
-                <h1 class="h3 fw-bold mb-0"><i class="bi bi-speedometer2 text-primary"></i> Admin Dashboard</h1>
-            </div>
-        </div>
+    <div class="mb-4">
+        <h1 class="h3 fw-bold mb-0"><i class="bi bi-speedometer2 text-primary"></i> Admin Dashboard</h1>
     </div>
-    
-    <div class="row g-4">
-        
-        @* --- USER & ENTRY MANAGEMENT --- *@
-        <div class="col-md-6 col-lg-4">
+
+    @* ===== SITE ADMIN ===== *@
+    <AuthorizeView Roles="SuperAdmin" Context="sa">
+        <div class="mb-2">
+            <span class="text-uppercase fw-bold small text-muted">
+                <i class="bi bi-gear-fill me-1"></i> Site Admin
+            </span>
+            <hr class="mt-1 mb-3" />
+        </div>
+        <div class="row g-4 mb-5">
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <i class="bi bi-person-badge display-4 text-info mb-3"></i>
+                        <h5 class="card-title">Users</h5>
+                        <p class="card-text text-muted small">Manage roles &amp; access.</p>
+                        <a href="admin/users" class="btn btn-outline-info stretched-link">Manage Users</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <i class="bi bi-calendar-range display-4 mb-3" style="color: #6f42c1;"></i>
+                        <h5 class="card-title">Seasons</h5>
+                        <p class="card-text text-muted small">Manage active years.</p>
+                        <a href="admin/seasons" class="btn btn-outline-primary stretched-link" style="border-color: #6f42c1; color: #6f42c1;">Manage Seasons</a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </AuthorizeView>
+
+    @* ===== FOOTBALL ADMIN ===== *@
+    <div class="mb-2">
+        <span class="text-uppercase fw-bold small text-muted">
+            <i class="bi bi-trophy-fill me-1"></i> Football Admin
+        </span>
+        <hr class="mt-1 mb-3" />
+    </div>
+    <div class="row g-4 mb-5">
+
+        <div class="col-md-6 col-lg-3">
             <div class="card h-100 shadow-sm border-0">
                 <div class="card-body text-center">
                     <i class="bi bi-people display-4 text-primary mb-3"></i>
@@ -30,8 +67,7 @@
             </div>
         </div>
 
-        @* --- PAYMENT TRACKING --- *@
-        <div class="col-md-6 col-lg-4">
+        <div class="col-md-6 col-lg-3">
             <div class="card h-100 shadow-sm border-0">
                 <div class="card-body text-center">
                     <i class="bi bi-cash-coin display-4 text-warning mb-3"></i>
@@ -42,131 +78,136 @@
             </div>
         </div>
 
-        @* SUPER ADMIN ONLY FROM HERE DOWN *@
-        <AuthorizeView Roles="SuperAdmin" Context="innerContext">
-            <div class="contents" style="display: contents;">
+        <AuthorizeView Roles="SuperAdmin" Context="fa">
 
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0">
-                <div class="card-body text-center">
-                    <i class="bi bi-person-badge display-4 text-info mb-3"></i>
-                    <h5 class="card-title">Users</h5>
-                    <p class="card-text text-muted small">Manage roles & access.</p>
-                    <a href="admin/users" class="btn btn-outline-info stretched-link">Manage Users</a>
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <i class="bi bi-collection-play display-4 text-secondary mb-3"></i>
+                        <h5 class="card-title">Pool Settings</h5>
+                        <p class="card-text text-muted small">Lock dates &amp; invite codes.</p>
+                        <a href="admin/pools" class="btn btn-outline-secondary stretched-link">Pool Settings</a>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        @* --- SEASONS MANAGEMENT --- *@
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0">
-                <div class="card-body text-center">
-                    <i class="bi bi-calendar-range display-4 text-purple mb-3" style="color: #6f42c1;"></i>
-                    <h5 class="card-title">Seasons</h5>
-                    <p class="card-text text-muted small">Manage active years.</p>
-                    <a href="admin/seasons" class="btn btn-outline-primary stretched-link" style="border-color: #6f42c1; color: #6f42c1;">Manage Seasons</a>
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <i class="bi bi-calendar-event display-4 text-success mb-3"></i>
+                        <h5 class="card-title">Games</h5>
+                        <p class="card-text text-muted small">Schedules &amp; metadata.</p>
+                        <a href="admin/games" class="btn btn-outline-success stretched-link">Manage Games</a>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        @* --- GAME MANAGEMENT --- *@
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0">
-                <div class="card-body text-center">
-                    <i class="bi bi-calendar-event display-4 text-success mb-3"></i>
-                    <h5 class="card-title">Games</h5>
-                    <p class="card-text text-muted small">Schedules & Metadata.</p>
-                    <a href="admin/games" class="btn btn-outline-success stretched-link">Manage Games</a>
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <i class="bi bi-trophy-fill display-4 text-danger mb-3"></i>
+                        <h5 class="card-title">Results</h5>
+                        <p class="card-text text-muted small">Enter scores &amp; winners.</p>
+                        <a href="admin/gameresults" class="btn btn-outline-danger stretched-link">Enter Results</a>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        @* --- POOL CONFIGURATION (NEW TILE) --- *@
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0">
-                <div class="card-body text-center">
-                    <i class="bi bi-collection-play display-4 text-secondary mb-3"></i>
-                    <h5 class="card-title">Pool Settings</h5>
-                    <p class="card-text text-muted small">Seasons, Lock Dates & Codes.</p>
-                    <a href="admin/pools" class="btn btn-outline-secondary stretched-link">Pool Settings</a>
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <i class="bi bi-link-45deg display-4 text-dark mb-3"></i>
+                        <h5 class="card-title">Link Games</h5>
+                        <p class="card-text text-muted small">Connect API feeds.</p>
+                        <a href="admin/linker" class="btn btn-outline-dark stretched-link">Link Games</a>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        @* --- SCORING & RESULTS --- *@
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0">
-                <div class="card-body text-center">
-                    <i class="bi bi-trophy-fill display-4 text-danger mb-3"></i>
-                    <h5 class="card-title">Results</h5>
-                    <p class="card-text text-muted small">Enter scores & winners.</p>
-                    <a href="admin/gameresults" class="btn btn-outline-danger stretched-link">Enter Results</a>
-                </div>
-            </div>
-        </div>
-
-        @* --- SYSTEM TOOLS --- *@
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0">
-                <div class="card-body text-center">
-                    <i class="bi bi-link-45deg display-4 text-dark mb-3"></i>
-                    <h5 class="card-title">Link Games</h5>
-                    <p class="card-text text-muted small">Connect API Feeds.</p>
-                    <a href="admin/linker" class="btn btn-outline-dark stretched-link">Link Games</a>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0">
-                <div class="card-body text-center">
-                    <i class="bi bi-cloud-arrow-down-fill display-4 text-info mb-3"></i>
-                    <h5 class="card-title">API Integrations</h5>
-                    <p class="card-text text-muted small">Manage API sync & status.</p>
-                    <a href="admin/api-manager" class="btn btn-outline-info stretched-link">Manage Integrations</a>
-                </div>
-            </div>
-        </div>
-
-        @* --- SAFETY NET --- *@
-            <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0">
-                <div class="card-body text-center">
-                    <i class="bi bi-cloud-download display-4 text-dark mb-3"></i>
-                    <h5 class="card-title">Backup Data</h5>
-                    <p class="card-text text-muted small">Download full season JSON.</p>
-                    <a href="/api/GetBackupData" target="_blank" class="btn btn-outline-dark stretched-link">Download Backup</a>
-                </div>
-            </div>
-        </div>
-
-        @* --- MIGRATION UTILITY --- *@
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0">
-                <div class="card-body text-center">
-                    <i class="bi bi-arrow-repeat display-4 text-warning mb-3"></i>
-                    <h5 class="card-title">Migration Utility</h5>
-                    <p class="card-text text-muted small">Migrate legacy pools.</p>
-                    <a href="admin/migration" class="btn btn-outline-warning stretched-link">Manage Migration</a>
-                </div>
-            </div>
-        </div>
-
-        @* --- SYSTEM MAINTENANCE --- *@
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0">
-                <div class="card-body text-center">
-                    <i class="bi bi-hdd-network display-4 text-danger mb-3"></i>
-                    <h5 class="card-title">System Maintenance</h5>
-                    <p class="card-text text-muted small">Initialize database resources.</p>
-                    <a href="admin/maintenance" class="btn btn-outline-danger stretched-link">System Maintenance</a>
-                </div>
-            </div>
-        </div>
-
-            </div>
         </AuthorizeView>
     </div>
+
+    @* ===== HOOPS ADMIN ===== *@
+    <AuthorizeView Roles="SuperAdmin" Context="ha">
+        <div class="mb-2">
+            <span class="text-uppercase fw-bold small text-muted">
+                <i class="bi bi-dribbble me-1"></i> Hoops Admin
+            </span>
+            <hr class="mt-1 mb-3" />
+        </div>
+        <div class="row g-4 mb-5">
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <i class="bi bi-collection-play display-4 text-primary mb-3"></i>
+                        <h5 class="card-title">Hoops Pools</h5>
+                        <p class="card-text text-muted small">Basketball pool settings &amp; scoring.</p>
+                        <a href="admin/hoops-pools" class="btn btn-outline-primary stretched-link">Hoops Pools</a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </AuthorizeView>
+
+    @* ===== UTILITIES ===== *@
+    <AuthorizeView Roles="SuperAdmin" Context="util">
+        <div class="mb-2">
+            <span class="text-uppercase fw-bold small text-muted">
+                <i class="bi bi-tools me-1"></i> Utilities
+            </span>
+            <hr class="mt-1 mb-3" />
+        </div>
+        <div class="row g-4 mb-4">
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <i class="bi bi-cloud-arrow-down-fill display-4 text-info mb-3"></i>
+                        <h5 class="card-title">API Integrations</h5>
+                        <p class="card-text text-muted small">Manage API sync &amp; status.</p>
+                        <a href="admin/api-manager" class="btn btn-outline-info stretched-link">Manage Integrations</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <i class="bi bi-cloud-download display-4 text-dark mb-3"></i>
+                        <h5 class="card-title">Backup Data</h5>
+                        <p class="card-text text-muted small">Download full season JSON.</p>
+                        <a href="/api/GetBackupData" target="_blank" class="btn btn-outline-dark stretched-link">Download Backup</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <i class="bi bi-arrow-repeat display-4 text-warning mb-3"></i>
+                        <h5 class="card-title">Migration Utility</h5>
+                        <p class="card-text text-muted small">Migrate legacy pools.</p>
+                        <a href="admin/migration" class="btn btn-outline-warning stretched-link">Manage Migration</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <i class="bi bi-hdd-network display-4 text-danger mb-3"></i>
+                        <h5 class="card-title">System Maintenance</h5>
+                        <p class="card-text text-muted small">Initialize database resources.</p>
+                        <a href="admin/maintenance" class="btn btn-outline-danger stretched-link">System Maintenance</a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </AuthorizeView>
+
 </div>
 
 @code {
