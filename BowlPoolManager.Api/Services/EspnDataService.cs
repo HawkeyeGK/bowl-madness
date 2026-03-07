@@ -79,7 +79,7 @@ namespace BowlPoolManager.Api.Services
                 var teams = new List<TeamInfo>();
                 foreach (var group in resultGroups)
                 {
-                    var items = group["items"];
+                    var items = group["contents"];
                     if (items == null) continue;
 
                     foreach (var item in items)
