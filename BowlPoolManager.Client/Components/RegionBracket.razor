@@ -53,13 +53,42 @@
 
     protected override void OnParametersSet()
     {
+        var r64Games = Games.Where(g => g.Round == TournamentRound.RoundOf64)
+                            .OrderBy(g => GetSeedMatchupOrder(g.SeedMatchup))
+                            .ToList();
+
+        var r32Games = OrderByFeeder(Games.Where(g => g.Round == TournamentRound.RoundOf32), r64Games);
+        var s16Games = OrderByFeeder(Games.Where(g => g.Round == TournamentRound.Sweet16), r32Games);
+        var e8Games = OrderByFeeder(Games.Where(g => g.Round == TournamentRound.Elite8), s16Games);
+
         Columns = new()
         {
-            (TournamentRound.RoundOf64, Games.Where(g => g.Round == TournamentRound.RoundOf64).OrderBy(g => g.Id).ToList()),
-            (TournamentRound.RoundOf32, Games.Where(g => g.Round == TournamentRound.RoundOf32).OrderBy(g => g.Id).ToList()),
-            (TournamentRound.Sweet16, Games.Where(g => g.Round == TournamentRound.Sweet16).OrderBy(g => g.Id).ToList()),
-            (TournamentRound.Elite8, Games.Where(g => g.Round == TournamentRound.Elite8).OrderBy(g => g.Id).ToList())
+            (TournamentRound.RoundOf64, r64Games),
+            (TournamentRound.RoundOf32, r32Games),
+            (TournamentRound.Sweet16, s16Games),
+            (TournamentRound.Elite8, e8Games)
         };
+    }
+
+    private static int GetSeedMatchupOrder(string? matchUp) => matchUp switch {
+        "1v16" => 0,
+        "8v9" => 1,
+        "5v12" => 2,
+        "4v13" => 3,
+        "6v11" => 4,
+        "3v14" => 5,
+        "7v10" => 6,
+        "2v15" => 7,
+        _ => 99
+    };
+
+    private static List<HoopsGame> OrderByFeeder(IEnumerable<HoopsGame> currentRound, List<HoopsGame> previousRound)
+    {
+        return currentRound.OrderBy(g => 
+        {
+            var feederIndex = previousRound.FindIndex(prev => prev.NextGameId == g.Id);
+            return feederIndex >= 0 ? feederIndex : 99;
+        }).ToList();
     }
 
     private async Task HandlePick((HoopsGame Game, string Pick) args)
