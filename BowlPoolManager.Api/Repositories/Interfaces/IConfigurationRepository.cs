@@ -5,5 +5,6 @@ namespace BowlPoolManager.Api.Repositories
     public interface IConfigurationRepository
     {
         Task<TeamConfig?> GetTeamConfigAsync();
+        Task<TeamConfig?> GetBasketballTeamConfigAsync();
     }
 }

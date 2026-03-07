@@ -5,5 +5,6 @@ namespace BowlPoolManager.Client.Services
     public interface IConfigurationService
     {
         Task<List<TeamInfo>> GetTeamsAsync();
+        Task<List<TeamInfo>> GetBasketballTeamsAsync();
     }
 }

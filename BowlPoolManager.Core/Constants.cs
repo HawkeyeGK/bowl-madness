@@ -27,6 +27,12 @@ namespace BowlPoolManager.Core
             public const string Player = "Player";
         }
 
+        public static class ConfigDocumentIds
+        {
+            public const string FbsTeamConfig = "Config_Teams_FBS";
+            public const string BasketballTeamConfig = "Config_Teams_Basketball";
+        }
+
         public static class DocumentTypes
         {
             public const string BowlPool = "BowlPool";

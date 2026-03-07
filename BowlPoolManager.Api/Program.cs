@@ -19,6 +19,7 @@ builder.Services
 
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ICfbdService, CfbdService>();
+builder.Services.AddSingleton<IBasketballDataService, BasketballDataService>();
 builder.Services.AddSingleton<IGameScoringService, GameScoringService>();
 
 // --- REPOSITORIES & DATABASE ---

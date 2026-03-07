@@ -7,6 +7,7 @@ namespace BowlPoolManager.Client.Services
     {
         private readonly HttpClient _http;
         private List<TeamInfo>? _cachedTeams;
+        private List<TeamInfo>? _cachedBasketballTeams;
 
         public ConfigurationService(HttpClient http)
         {
@@ -16,18 +17,13 @@ namespace BowlPoolManager.Client.Services
         public async Task<List<TeamInfo>> GetTeamsAsync()
         {
             if (_cachedTeams != null && _cachedTeams.Any())
-            {
                 return _cachedTeams;
-            }
 
             try
             {
-                 // API returns TeamConfig object which contains the list
                 var config = await _http.GetFromJsonAsync<TeamConfig>("api/GetTeamConfig");
                 if (config != null)
-                {
                     _cachedTeams = config.Teams;
-                }
             }
             catch (Exception ex)
             {
@@ -35,6 +31,25 @@ namespace BowlPoolManager.Client.Services
             }
 
             return _cachedTeams ?? new List<TeamInfo>();
+        }
+
+        public async Task<List<TeamInfo>> GetBasketballTeamsAsync()
+        {
+            if (_cachedBasketballTeams != null && _cachedBasketballTeams.Any())
+                return _cachedBasketballTeams;
+
+            try
+            {
+                var config = await _http.GetFromJsonAsync<TeamConfig>("api/GetBasketballTeamConfig");
+                if (config != null)
+                    _cachedBasketballTeams = config.Teams;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading basketball teams: {ex.Message}");
+            }
+
+            return _cachedBasketballTeams ?? new List<TeamInfo>();
         }
     }
 }

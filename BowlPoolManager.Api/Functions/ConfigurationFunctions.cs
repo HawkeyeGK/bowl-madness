@@ -22,11 +22,11 @@ namespace BowlPoolManager.Api.Functions
         public async Task<HttpResponseData> GetTeamConfig([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
             _logger.LogInformation("Getting team configuration.");
-            
-            try 
+
+            try
             {
                 var config = await _configRepo.GetTeamConfigAsync();
-                
+
                 if (config == null)
                 {
                     _logger.LogWarning("Team configuration document not found.");
@@ -40,6 +40,32 @@ namespace BowlPoolManager.Api.Functions
             catch (Exception ex)
             {
                 _logger.LogError(ex, "GetTeamConfig failed.");
+                return req.CreateResponse(HttpStatusCode.InternalServerError);
+            }
+        }
+
+        [Function("GetBasketballTeamConfig")]
+        public async Task<HttpResponseData> GetBasketballTeamConfig([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
+        {
+            _logger.LogInformation("Getting basketball team configuration.");
+
+            try
+            {
+                var config = await _configRepo.GetBasketballTeamConfigAsync();
+
+                if (config == null)
+                {
+                    _logger.LogWarning("Basketball team configuration document not found.");
+                    return req.CreateResponse(HttpStatusCode.NotFound);
+                }
+
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(config);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetBasketballTeamConfig failed.");
                 return req.CreateResponse(HttpStatusCode.InternalServerError);
             }
         }
