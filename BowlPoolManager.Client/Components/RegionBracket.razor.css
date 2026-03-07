@@ -1,0 +1,28 @@
+.bracket-region-container {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 1rem 1rem 2rem 1rem;
+    gap: 1rem;
+    min-height: 650px;
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    border: 1px solid #dee2e6;
+}
+
+.bracket-column {
+    display: flex;
+    flex-direction: column;
+    width: 220px;
+    flex-shrink: 0;
+    justify-content: space-around;
+    position: relative;
+    z-index: 2;
+}
+
+.bracket-connector {
+    width: 15px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+}

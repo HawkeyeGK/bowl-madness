@@ -19,7 +19,7 @@ These decisions were made during the planning session and govern the entire impl
 | 5 | **`HoopsGame.PointValue` defaults to 0.** Missed hydration is immediately visible rather than silently wrong. |
 | 6 | **Football What-If stays untouched.** `WhatIf.razor` and `WhatIfScoringEngine` are not refactored. Basketball gets its own independent implementation. |
 | 7 | **SSO deferred.** Users log in separately on each domain. Shared `UserProfile` in Cosmos provides the foundation for future SSO if needed. |
-| 8 | **Bracket generation is deterministic.** Admin enters regions + Final Four pairings; system generates all 67 game shells with correct `NextGameId` linking. Admin manually enters first-round teams/seeds. |
+| 8 | **Bracket generation is deterministic.** Admin enters regions, Final Four pairings, and the four First Four game configurations (each specifying the region and seed the play-in winner assumes); system generates all 67 game shells with correct `NextGameId` linking. Seeds are auto-populated on R64 and First Four games during generation — admin assigns teams only, not seeds. |
 | 9 | **Manual results entry is the primary path.** Live score integration is a late-phase enhancement, not a prerequisite. |
 | 10 | **Minimal theming differences.** Same layout, styling, and nav structure across both sites. Only branding text changes ("Bowl Madness" vs "Hoops Madness") driven by `SiteContext`. Domain: `hoops-madness.com`. |
 | 11 | **Azure configuration changes** (custom domain, API keys) are documented in relevant phases and require explicit owner confirmation before execution. |
@@ -126,12 +126,12 @@ These decisions were made during the planning session and govern the entire impl
 
 ### Deliverables
 - **`HoopsGameRepository`** and supporting API endpoints (CRUD for basketball games).
-- **Bracket generation service:** Given four region names and two Final Four pairings, generates:
-  - 4 First Four games (`TournamentRound.FirstFour`)
-  - 32 Round of 64 games (`TournamentRound.RoundOf64`), with First Four games' `NextGameId` pointing to the correct Round of 64 slots
+- **Bracket generation service:** Given four region names, two Final Four pairings, and four First Four game configurations (each with a target region and seed), generates:
+  - 4 First Four games (`TournamentRound.FirstFour`), each wired to the correct R64 slot for its configured seed
+  - 32 Round of 64 games (`TournamentRound.RoundOf64`), seeds auto-populated from the matchup slot (e.g., "1v16" → Home=1, Away=16)
   - 16 Round of 32 games, 8 Sweet 16 games, 4 Elite 8 games, 2 Final Four games, 1 National Championship game
-  - All games have correct `NextGameId` links, region assignments, round assignments, and seed slot expectations
-- **Tournament configuration admin page:** UI to name the four regions, specify which regions pair for each Final Four semifinal, and trigger bracket generation. Includes a confirmation step before generating.
+  - All games have correct `NextGameId` links, region assignments, round assignments, and seed values
+- **Tournament configuration admin page:** UI with three sections: (1) name the four regions, (2) specify which two regions pair for each Final Four semifinal (default: South/West and East/Midwest), (3) configure the four First Four play-in games (region + winner's seed for each). Includes a confirmation step before generating.
 - **Bracket verification view:** A diagnostic visualization (tree or table) that lets the admin confirm every game is correctly wired — shows the full bracket structure with round, region, and `NextGameId` relationships.
 - Games are associated with the pool via `HoopsPool.GameIds`.
 
@@ -149,12 +149,12 @@ These decisions were made during the planning session and govern the entire impl
 **Goal:** Admin can populate the first-round bracket with actual teams and seeds.
 
 ### Deliverables
-- **Team assignment admin page:** Region-by-region view showing each first-round matchup slot (e.g., "1 seed vs 16 seed"). Admin selects teams from the basketball team config dropdown and assigns seeds.
+- **Team assignment admin page:** Region-by-region view showing each first-round matchup slot (e.g., "1 seed vs 16 seed"). Seeds are displayed as read-only badges (auto-populated during bracket generation). Admin selects teams from the basketball team config dropdown.
 - **`TeamInfo` denormalization:** When a team is assigned, its `TeamInfo` (logo, colors, etc.) is denormalized into the `HoopsGame` document, same pattern as football.
-- **First Four integration:** First Four slots are populated similarly, with the system understanding that their winners feed into specific Round of 64 games.
+- **First Four integration:** First Four slots show two editable team inputs (both competitors in the play-in). The R64 slot the winner feeds into is shown as a read-only "Winner of First Four" placeholder on the correct side, determined by seed comparison.
 
 ### Checkpoint
-- Admin can assign all 68 teams to their correct bracket positions.
+- Admin can assign all 68 teams to their correct bracket positions (seeds pre-filled; teams only).
 - Each game displays correct team names, seeds, logos, and colors.
 - Bracket verification view now shows team names alongside the structural links.
 
@@ -337,6 +337,6 @@ These decisions were made during the planning session and govern the entire impl
 ## Workflow Notes
 
 - **Track B applies to all phases.** Each phase follows: Implement → Build Validator → QA Agent → Code Review Agent → Owner Checkpoint → Commit.
-- **Feature branch:** `feature/basketball-expansion` — all work happens here until the owner is ready to deploy.
+- **Branch strategy:** Work commits directly to `main`. Phases are self-contained and deployable; the owner controls when to push/deploy.
 - **Commits reference the phase issue** (e.g., `#76` for Phase 1 work).
 - **No pushes to `main`** without explicit owner instruction.

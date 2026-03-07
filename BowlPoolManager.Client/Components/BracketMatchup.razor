@@ -1,0 +1,54 @@
+@using BowlPoolManager.Core.Domain
+
+<div class="bracket-matchup card shadow-sm border @(string.IsNullOrEmpty(CurrentPick) ? "border-light" : "border-primary border-opacity-50")">
+    <div class="card-header py-1 px-2 bg-light">
+        <small class="text-muted d-block text-truncate" style="font-size: 0.70rem;">@GameLabel</small>
+    </div>
+    <div class="card-body p-1 position-relative">
+        <div class="d-flex flex-column gap-1">
+            <button class="btn btn-sm @(CurrentPick == HomeName && HomeIsAvailable ? "btn-primary" : "btn-outline-secondary") text-start pick-btn d-flex align-items-center"
+                    disabled="@(IsLocked || !HomeIsAvailable)"
+                    @onclick="() => OnPickClick(HomeName)">
+                @if (HomeSeed.HasValue) { <span class="badge bg-secondary me-1" style="font-size: 0.65rem;">@HomeSeed</span> }
+                <span class="team-name text-truncate flex-grow-1">@(HomeIsAvailable ? HomeName : "TBD")</span>
+            </button>
+            <button class="btn btn-sm @(CurrentPick == AwayName && AwayIsAvailable ? "btn-primary" : "btn-outline-secondary") text-start pick-btn d-flex align-items-center"
+                    disabled="@(IsLocked || !AwayIsAvailable)"
+                    @onclick="() => OnPickClick(AwayName)">
+                @if (AwaySeed.HasValue) { <span class="badge bg-secondary me-1" style="font-size: 0.65rem;">@AwaySeed</span> }
+                <span class="team-name text-truncate flex-grow-1">@(AwayIsAvailable ? AwayName : "TBD")</span>
+            </button>
+        </div>
+        @if (!string.IsNullOrEmpty(CurrentPick))
+        {
+            <div class="text-center mt-1 position-absolute top-100 start-50 translate-middle-x w-100 pb-1" style="z-index: 5; margin-top: -6px;">
+                <span class="badge bg-success rounded-pill shadow-sm border border-white" style="font-size: 0.65rem; max-width: 90%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                    <i class="bi bi-check me-1"></i>@CurrentPick
+                </span>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public HoopsGame Game { get; set; } = default!;
+    [Parameter] public string GameLabel { get; set; } = "";
+    [Parameter] public string CurrentPick { get; set; } = "";
+    [Parameter] public bool IsLocked { get; set; }
+    
+    [Parameter] public string HomeName { get; set; } = "";
+    [Parameter] public int? HomeSeed { get; set; }
+    [Parameter] public bool HomeIsAvailable { get; set; }
+    
+    [Parameter] public string AwayName { get; set; } = "";
+    [Parameter] public int? AwaySeed { get; set; }
+    [Parameter] public bool AwayIsAvailable { get; set; }
+    
+    [Parameter] public EventCallback<(HoopsGame Game, string Pick)> OnPick { get; set; }
+
+    private async Task OnPickClick(string teamName)
+    {
+        if (IsLocked || string.IsNullOrEmpty(teamName) || teamName == "TBD") return;
+        await OnPick.InvokeAsync((Game, teamName));
+    }
+}

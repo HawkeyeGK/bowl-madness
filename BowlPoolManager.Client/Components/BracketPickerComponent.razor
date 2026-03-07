@@ -1,106 +1,68 @@
 @using BowlPoolManager.Core.Domain
 
-@*
-    BracketPickerComponent — visual round-by-round bracket pick entry.
-
-    Parameters:
-      Games       — all HoopsGame documents for this pool (all 67)
-      Picks       — current Dictionary<GameId, TeamName>
-      IsLocked    — true if pool is past lock date (read-only mode)
-      PicksChanged — callback fired with the updated picks dictionary after each change
-*@
-
 @if (!Games.Any())
 {
     <div class="alert alert-info">No bracket games found for this pool.</div>
 }
 else
 {
-    @* ── Round Tabs ── *@
+    @* ── Region Tabs ── *@
     <ul class="nav nav-tabs mb-3 flex-nowrap overflow-auto">
-        @foreach (var round in AvailableRounds)
+        @foreach (var region in AvailableRegions)
         {
-            int made = PicksForRound(round);
-            int total = GamesForRound(round).Count;
+            int made = PicksForRegion(region);
+            int total = GamesForRegion(region).Count;
             bool complete = made == total;
             <li class="nav-item flex-shrink-0">
-                <button class="nav-link @(activeRound == round ? "active" : "") px-2 px-md-3"
-                        @onclick="() => activeRound = round">
-                    @RoundLabel(round)
+                <button class="nav-link @(activeTab == region ? "active" : "") px-2 px-md-3"
+                        @onclick="() => activeTab = region">
+                    @region
                     <span class="badge ms-1 @(complete ? "bg-success" : "bg-secondary")" style="font-size:0.7em;">
                         @made/@total
                     </span>
                 </button>
             </li>
         }
+
+        @{
+            int ffMade = PicksForFinalFour();
+            int ffTotal = GamesForFinalFour().Count;
+            bool ffComplete = ffMade == ffTotal && ffTotal > 0;
+        }
+        <li class="nav-item flex-shrink-0">
+            <button class="nav-link @(activeTab == "Final Four" ? "active" : "") px-2 px-md-3 text-warning fw-bold"
+                    @onclick="@(() => activeTab = "Final Four")">
+                Final Four
+                @if (ffTotal > 0)
+                {
+                    <span class="badge ms-1 @(ffComplete ? "bg-success" : "bg-secondary")" style="font-size:0.7em;">
+                        @ffMade/@ffTotal
+                    </span>
+                }
+            </button>
+        </li>
     </ul>
 
-    @* ── Games for active round ── *@
-    @foreach (var region in GamesForRound(activeRound).Select(g => g.Region ?? "").Distinct().OrderBy(r => r))
+    @* ── Active Tab Content ── *@
+    @if (activeTab == "Final Four")
     {
-        var regionGames = GamesForRound(activeRound).Where(g => (g.Region ?? "") == region).ToList();
-
-        @if (!string.IsNullOrEmpty(region) && activeRound != TournamentRound.NationalChampionship)
-        {
-            <h6 class="text-secondary text-uppercase fw-bold mt-3 mb-2">
-                <i class="bi bi-geo-alt-fill me-1"></i>@region
-            </h6>
-        }
-
-        <div class="row g-2 mb-3">
-            @foreach (var game in regionGames)
-            {
-                var (home, away) = ResolveMatchupTeams(game);
-                var currentPick = Picks.TryGetValue(game.Id, out var p) ? p : "";
-                bool homeAvailable = !string.IsNullOrEmpty(home) && home != "TBD";
-                bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
-                int? homeSeed = GetSeedDisplay(game, true);
-                int? awaySeed = GetSeedDisplay(game, false);
-
-                <div class="col-md-6 col-lg-4">
-                    <div class="card shadow-sm border @(string.IsNullOrEmpty(currentPick) ? "border-light" : "border-primary border-opacity-50")">
-                        <div class="card-header py-1 px-3 bg-light">
-                            <small class="text-muted">@GetGameLabel(game)</small>
-                        </div>
-                        <div class="card-body p-2">
-                            <div class="d-flex gap-2">
-                                @* Home/Left button *@
-                                <button class="btn @(currentPick == home && homeAvailable ? "btn-primary" : "btn-outline-secondary") flex-grow-1 pick-btn"
-                                        disabled="@(IsLocked || !homeAvailable)"
-                                        @onclick="() => OnPickClick(game, home)">
-                                    @if (homeSeed.HasValue)
-                                    {
-                                        <span class="badge bg-secondary me-1" style="font-size:0.7em;">@homeSeed</span>
-                                    }
-                                    <span>@(homeAvailable ? home : "TBD")</span>
-                                </button>
-
-                                <span class="align-self-center text-muted small">vs</span>
-
-                                @* Away/Right button *@
-                                <button class="btn @(currentPick == away && awayAvailable ? "btn-primary" : "btn-outline-secondary") flex-grow-1 pick-btn"
-                                        disabled="@(IsLocked || !awayAvailable)"
-                                        @onclick="() => OnPickClick(game, away)">
-                                    @if (awaySeed.HasValue)
-                                    {
-                                        <span class="badge bg-secondary me-1" style="font-size:0.7em;">@awaySeed</span>
-                                    }
-                                    <span>@(awayAvailable ? away : "TBD")</span>
-                                </button>
-                            </div>
-                            @if (!string.IsNullOrEmpty(currentPick))
-                            {
-                                <div class="text-center mt-1">
-                                    <small class="text-success">
-                                        <i class="bi bi-check-circle-fill me-1"></i>@currentPick
-                                    </small>
-                                </div>
-                            }
-                        </div>
-                    </div>
-                </div>
-            }
-        </div>
+        <FinalFourBracket Games="GamesForFinalFour()"
+                          Picks="Picks"
+                          IsLocked="IsLocked"
+                          ResolveMatchupTeams="ResolveMatchupTeams"
+                          GetSeedDisplay="GetSeedDisplay"
+                          GetGameLabel="GetGameLabel"
+                          OnPick="HandlePick" />
+    }
+    else
+    {
+        <RegionBracket Games="GamesForRegion(activeTab)"
+                       Picks="Picks"
+                       IsLocked="IsLocked"
+                       ResolveMatchupTeams="ResolveMatchupTeams"
+                       GetSeedDisplay="GetSeedDisplay"
+                       GetGameLabel="GetGameLabel"
+                       OnPick="HandlePick" />
     }
 
     @* ── Progress summary ── *@
@@ -114,7 +76,7 @@ else
                 <i class="bi bi-clipboard-check me-1"></i>
                 Total picks: <strong>@totalPicks / @totalGames</strong>
             </small>
-            @if (totalPicks == totalGames)
+            @if (totalPicks == totalGames && totalGames > 0)
             {
                 <span class="badge bg-success"><i class="bi bi-check-all me-1"></i>Bracket Complete!</span>
             }
@@ -132,26 +94,18 @@ else
     [Parameter] public bool IsLocked { get; set; }
     [Parameter] public EventCallback<Dictionary<string, string>> PicksChanged { get; set; }
 
-    private TournamentRound activeRound;
+    private string activeTab = "";
     private Dictionary<string, int?> _seedCache = new(StringComparer.OrdinalIgnoreCase);
 
-    private static readonly TournamentRound[] RoundOrder =
-    {
-        TournamentRound.FirstFour,
-        TournamentRound.RoundOf64,
-        TournamentRound.RoundOf32,
-        TournamentRound.Sweet16,
-        TournamentRound.Elite8,
-        TournamentRound.FinalFour,
-        TournamentRound.NationalChampionship
-    };
-
-    private IEnumerable<TournamentRound> AvailableRounds =>
-        RoundOrder.Where(r => Games.Any(g => g.Round == r));
+    private List<string> AvailableRegions => Games
+        .Where(g => g.Round < TournamentRound.FinalFour && !string.IsNullOrEmpty(g.Region))
+        .Select(g => g.Region!)
+        .Distinct()
+        .OrderBy(r => r)
+        .ToList();
 
     protected override void OnParametersSet()
     {
-        // Build seed cache whenever games change
         _seedCache = new Dictionary<string, int?>(StringComparer.OrdinalIgnoreCase);
         foreach (var g in Games)
         {
@@ -161,48 +115,36 @@ else
                 _seedCache.TryAdd(g.TeamAway, g.TeamAwaySeed);
         }
 
-        // Default to first available round if current round has no games
-        if (!Games.Any(g => g.Round == activeRound))
-            activeRound = AvailableRounds.FirstOrDefault();
+        if (string.IsNullOrEmpty(activeTab) || (!AvailableRegions.Contains(activeTab) && activeTab != "Final Four"))
+        {
+            activeTab = AvailableRegions.FirstOrDefault() ?? "Final Four";
+        }
     }
 
-    private List<HoopsGame> GamesForRound(TournamentRound round) =>
-        Games.Where(g => g.Round == round).OrderBy(g => g.Region).ThenBy(g => g.Id).ToList();
+    private List<HoopsGame> GamesForRegion(string region) =>
+        Games.Where(g => g.Region == region && g.Round < TournamentRound.FinalFour).ToList();
 
-    private int PicksForRound(TournamentRound round) =>
-        GamesForRound(round).Count(g => Picks.ContainsKey(g.Id) && !string.IsNullOrEmpty(Picks[g.Id]));
+    private int PicksForRegion(string region) =>
+        GamesForRegion(region).Count(g => Picks.ContainsKey(g.Id) && !string.IsNullOrEmpty(Picks[g.Id]));
 
-    private static string RoundLabel(TournamentRound round) => round switch
-    {
-        TournamentRound.FirstFour          => "First Four",
-        TournamentRound.RoundOf64          => "Round of 64",
-        TournamentRound.RoundOf32          => "Round of 32",
-        TournamentRound.Sweet16            => "Sweet 16",
-        TournamentRound.Elite8             => "Elite 8",
-        TournamentRound.FinalFour          => "Final Four",
-        TournamentRound.NationalChampionship => "Championship",
-        _                                  => round.ToString()
-    };
+    private List<HoopsGame> GamesForFinalFour() =>
+        Games.Where(g => g.Round >= TournamentRound.FinalFour).ToList();
+
+    private int PicksForFinalFour() =>
+        GamesForFinalFour().Count(g => Picks.ContainsKey(g.Id) && !string.IsNullOrEmpty(Picks[g.Id]));
 
     private string GetGameLabel(HoopsGame game) => game.Round switch
     {
-        TournamentRound.FirstFour => $"First Four – {game.Region} – Seed {game.TeamHomeSeed}",
-        TournamentRound.RoundOf64 => !string.IsNullOrEmpty(game.SeedMatchup)
-            ? $"{game.SeedMatchup} matchup"
-            : "Round of 64",
-        TournamentRound.RoundOf32          => "Round of 32",
-        TournamentRound.Sweet16            => "Sweet 16",
-        TournamentRound.Elite8             => "Elite 8 – Regional Final",
-        TournamentRound.FinalFour          => "Final Four Semifinal",
+        TournamentRound.FirstFour => $"First Four",
+        TournamentRound.RoundOf64 => !string.IsNullOrEmpty(game.SeedMatchup) ? $"{game.SeedMatchup}" : "Round of 64",
+        TournamentRound.RoundOf32 => "Round of 32",
+        TournamentRound.Sweet16 => "Sweet 16",
+        TournamentRound.Elite8 => "Elite 8",
+        TournamentRound.FinalFour => "National Semifinal",
         TournamentRound.NationalChampionship => "National Championship",
-        _                                  => game.Round.ToString()
+        _ => game.Round.ToString()
     };
 
-    /// <summary>
-    /// Resolves the two team name options for a pick.
-    /// For R64/FF: uses TeamHome/TeamAway directly, falling back to picks of feeder games.
-    /// For R32+: resolves from user picks of feeder games.
-    /// </summary>
     private (string Home, string Away) ResolveMatchupTeams(HoopsGame game)
     {
         var feeders = Games.Where(g => g.NextGameId == game.Id).OrderBy(g => g.Id).ToList();
@@ -242,13 +184,11 @@ else
         return $"{feeder.Round} winner";
     }
 
-    /// <summary>Returns seed for display: direct from game fields for FF/R64, from cache for later rounds.</summary>
     private int? GetSeedDisplay(HoopsGame game, bool homeSlot)
     {
         if (homeSlot && game.TeamHomeSeed.HasValue) return game.TeamHomeSeed;
         if (!homeSlot && game.TeamAwaySeed.HasValue) return game.TeamAwaySeed;
 
-        // For later rounds, try to look up the team's seed from cache
         var (home, away) = ResolveMatchupTeams(game);
         var teamName = homeSlot ? home : away;
         if (!string.IsNullOrEmpty(teamName) && teamName != "TBD" && _seedCache.TryGetValue(teamName, out var seed))
@@ -257,20 +197,19 @@ else
         return null;
     }
 
-    private async Task OnPickClick(HoopsGame game, string teamName)
+    private async Task HandlePick((HoopsGame Game, string Pick) args)
     {
-        if (IsLocked || string.IsNullOrEmpty(teamName) || teamName == "TBD") return;
+        if (IsLocked || string.IsNullOrEmpty(args.Pick) || args.Pick == "TBD") return;
 
         var picks = new Dictionary<string, string>(Picks);
 
-        picks.TryGetValue(game.Id, out var oldPick);
-        picks[game.Id] = teamName;
+        picks.TryGetValue(args.Game.Id, out var oldPick);
+        picks[args.Game.Id] = args.Pick;
 
-        // Cascade clear downstream picks that depended on the old team
         if (!string.IsNullOrEmpty(oldPick) &&
-            !string.Equals(oldPick, teamName, StringComparison.OrdinalIgnoreCase))
+            !string.Equals(oldPick, args.Pick, StringComparison.OrdinalIgnoreCase))
         {
-            CascadeClear(game.Id, oldPick, picks);
+            CascadeClear(args.Game.Id, oldPick, picks);
         }
 
         await PicksChanged.InvokeAsync(picks);
@@ -292,13 +231,3 @@ else
         }
     }
 }
-
-<style>
-    .pick-btn {
-        font-size: 0.85rem;
-        padding: 0.3rem 0.5rem;
-        white-space: normal;
-        word-break: break-word;
-        min-height: 2.5rem;
-    }
-</style>

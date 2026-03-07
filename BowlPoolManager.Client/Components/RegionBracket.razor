@@ -1,0 +1,69 @@
+@using BowlPoolManager.Core.Domain
+
+<div class="bracket-region-container shadow-inner">
+    @foreach(var (round, roundGames) in Columns)
+    {
+        <div class="bracket-column round-@(round)">
+            @foreach(var game in roundGames)
+            {
+                var (home, away) = ResolveMatchupTeams?.Invoke(game) ?? ("", "");
+                var currentPick = Picks.TryGetValue(game.Id, out var p) ? p : "";
+                
+                bool homeAvailable = !string.IsNullOrEmpty(home) && home != "TBD";
+                bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
+                int? homeSeed = GetSeedDisplay?.Invoke(game, true);
+                int? awaySeed = GetSeedDisplay?.Invoke(game, false);
+
+                <BracketMatchup 
+                    Game="game" 
+                    GameLabel="@GetGameLabel?.Invoke(game)"
+                    CurrentPick="@currentPick"
+                    IsLocked="IsLocked"
+                    HomeName="@home" 
+                    HomeSeed="homeSeed" 
+                    HomeIsAvailable="homeAvailable"
+                    AwayName="@away" 
+                    AwaySeed="awaySeed" 
+                    AwayIsAvailable="awayAvailable"
+                    OnPick="HandlePick" />
+            }
+        </div>
+        
+        @if (round != TournamentRound.Elite8)
+        {
+            <div class="bracket-connector">
+                <!-- css-based SVGs connecting the columns can go here later if needed -->
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<HoopsGame> Games { get; set; } = new();
+    [Parameter, EditorRequired] public Dictionary<string, string> Picks { get; set; } = new();
+    [Parameter] public bool IsLocked { get; set; }
+    
+    [Parameter] public Func<HoopsGame, (string Home, string Away)>? ResolveMatchupTeams { get; set; }
+    [Parameter] public Func<HoopsGame, bool, int?>? GetSeedDisplay { get; set; }
+    [Parameter] public Func<HoopsGame, string>? GetGameLabel { get; set; }
+    
+    [Parameter] public EventCallback<(HoopsGame Game, string Pick)> OnPick { get; set; }
+
+    private List<(TournamentRound Round, List<HoopsGame> Games)> Columns = new();
+
+    protected override void OnParametersSet()
+    {
+        Columns = new()
+        {
+            (TournamentRound.RoundOf64, Games.Where(g => g.Round == TournamentRound.RoundOf64).OrderBy(g => g.Id).ToList()),
+            (TournamentRound.RoundOf32, Games.Where(g => g.Round == TournamentRound.RoundOf32).OrderBy(g => g.Id).ToList()),
+            (TournamentRound.Sweet16, Games.Where(g => g.Round == TournamentRound.Sweet16).OrderBy(g => g.Id).ToList()),
+            (TournamentRound.Elite8, Games.Where(g => g.Round == TournamentRound.Elite8).OrderBy(g => g.Id).ToList())
+        };
+    }
+
+    private async Task HandlePick((HoopsGame Game, string Pick) args)
+    {
+        await OnPick.InvokeAsync(args);
+    }
+}

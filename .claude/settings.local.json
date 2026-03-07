@@ -2,7 +2,31 @@
   "permissions": {
     "allow": [
       "Bash(dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj)",
-      "Bash(dotnet build BowlPoolManager.sln)"
+      "Bash(dotnet build BowlPoolManager.sln)",
+      "Bash(dotnet run)",
+      "Bash(cp /tmp/TmpInspect/Program.cs /tmp/Program_backup.cs)",
+      "Bash(/tmp/TmpInspect/Program.cs:*)",
+      "Bash(dotnet build BowlPoolManager.Tests/BowlPoolManager.Tests.csproj)",
+      "Bash(dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj --verbosity normal)",
+      "WebFetch(domain:site.api.espn.com)",
+      "Bash(dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj --logger \"console;verbosity=minimal\")",
+      "Bash(dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj --no-build)",
+      "Bash(git push origin main)",
+      "Bash(git add BowlPoolManager.Api/Functions/ConfigurationFunctions.cs BowlPoolManager.Client/Pages/Admin/LogoMapper.razor)",
+      "Bash(git commit:*)",
+      "Bash(git add BowlPoolManager.Client/Pages/Admin/ApiIntegrationManager.razor)",
+      "Bash(dotnet build BowlPoolManager.sln -q)",
+      "Bash(git add BowlPoolManager.Client/Services/ConfigurationService.cs)",
+      "Bash(dotnet test c:/Projects/bowl-madness/BowlPoolManager.Tests/BowlPoolManager.Tests.csproj --logger \"console;verbosity=minimal\")",
+      "Bash(git add BowlPoolManager.Api/Repositories/Interfaces/IHoopsPoolRepository.cs BowlPoolManager.Api/Repositories/HoopsPoolRepository.cs BowlPoolManager.Api/Functions/HoopsPoolFunctions.cs BowlPoolManager.Api/Program.cs BowlPoolManager.Client/Services/IHoopsPoolService.cs BowlPoolManager.Client/Services/HoopsPoolService.cs BowlPoolManager.Client/Pages/Admin/HoopsPoolSettings.razor BowlPoolManager.Client/Program.cs BowlPoolManager.Client/Layout/NavMenu.razor BowlPoolManager.Tests/Core/HoopsPoolTests.cs BowlPoolManager.Tests/Client/HoopsPoolServiceTests.cs BowlPoolManager.Tests/Client/ConfigurationServiceBasketballTests.cs BowlPoolManager.Client/Services/ConfigurationService.cs)",
+      "Bash(Select-String \"error CS\")",
+      "Bash(dotnet build BowlPoolManager.Client/BowlPoolManager.Client.csproj)",
+      "Bash(dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj --logger \"console;verbosity=normal\")",
+      "Bash(dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj --filter \"FullyQualifiedName~BracketGeneratorTests|FullyQualifiedName~HoopsGameServiceTests\" -v normal)",
+      "Bash(dotnet test /c/Projects/bowl-madness/BowlPoolManager.Tests/BowlPoolManager.Tests.csproj --logger \"console;verbosity=minimal\")",
+      "Bash(git add BowlPoolManager.Core/Dtos/BracketGenerationRequest.cs BowlPoolManager.Api/Services/BracketGeneratorService.cs BowlPoolManager.Client/Pages/Admin/TournamentConfig.razor BowlPoolManager.Client/Pages/Admin/TeamAssignment.razor BowlPoolManager.Client/Pages/Admin/Dashboard.razor BowlPoolManager.Tests/Core/BracketGeneratorTests.cs)",
+      "Bash(git add BowlPoolManager.Api/Services/EspnDataService.cs)",
+      "Bash(git add BowlPoolManager.Api/Functions/HoopsEntryFunctions.cs BowlPoolManager.Api/Repositories/HoopsEntryRepository.cs BowlPoolManager.Api/Repositories/Interfaces/IHoopsEntryRepository.cs BowlPoolManager.Client/Components/BracketPickerComponent.razor BowlPoolManager.Client/Pages/Admin/HoopsAdminEntriesList.razor BowlPoolManager.Client/Pages/Admin/HoopsAdminEntryForm.razor BowlPoolManager.Client/Pages/HoopsMyPicks.razor BowlPoolManager.Core/Validation/HoopsEntryUpdateValidator.cs BowlPoolManager.Api/Program.cs BowlPoolManager.Client/Layout/NavMenu.razor BowlPoolManager.Client/Pages/Admin/Dashboard.razor BowlPoolManager.Core/Constants.cs)"
     ]
   }
 }

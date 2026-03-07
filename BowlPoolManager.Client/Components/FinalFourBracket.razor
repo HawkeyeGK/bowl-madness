@@ -1,0 +1,115 @@
+@using BowlPoolManager.Core.Domain
+
+<div class="final-four-container d-flex justify-content-center align-items-center gap-4 py-4 overflow-auto px-4 shadow-inner">
+    <!-- Left Semifinal -->
+    <div class="ff-column">
+        <h6 class="text-center text-secondary text-uppercase fw-bold mb-3">National Semifinal</h6>
+        @if (SemiFinal1 != null) {
+            var (home, away) = ResolveMatchupTeams?.Invoke(SemiFinal1) ?? ("", "");
+            var currentPick = Picks.TryGetValue(SemiFinal1.Id, out var p) ? p : "";
+            
+            bool homeAvailable = !string.IsNullOrEmpty(home) && home != "TBD";
+            bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
+            int? homeSeed = GetSeedDisplay?.Invoke(SemiFinal1, true);
+            int? awaySeed = GetSeedDisplay?.Invoke(SemiFinal1, false);
+
+            <BracketMatchup 
+                Game="SemiFinal1" 
+                GameLabel="@GetGameLabel?.Invoke(SemiFinal1)"
+                CurrentPick="@currentPick"
+                IsLocked="IsLocked"
+                HomeName="@home" 
+                HomeSeed="homeSeed" 
+                HomeIsAvailable="homeAvailable"
+                AwayName="@away" 
+                AwaySeed="awaySeed" 
+                AwayIsAvailable="awayAvailable"
+                OnPick="HandlePick" />
+        }
+    </div>
+
+    <!-- Championship -->
+    <div class="ff-column champ-column">
+        <h4 class="text-center text-warning fw-bold mb-3"><i class="bi bi-trophy-fill me-2"></i>Championship</h4>
+        @if (Championship != null) {
+            var (home, away) = ResolveMatchupTeams?.Invoke(Championship) ?? ("", "");
+            var currentPick = Picks.TryGetValue(Championship.Id, out var p) ? p : "";
+            
+            bool homeAvailable = !string.IsNullOrEmpty(home) && home != "TBD";
+            bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
+            int? homeSeed = GetSeedDisplay?.Invoke(Championship, true);
+            int? awaySeed = GetSeedDisplay?.Invoke(Championship, false);
+
+            <BracketMatchup 
+                Game="Championship" 
+                GameLabel="@GetGameLabel?.Invoke(Championship)"
+                CurrentPick="@currentPick"
+                IsLocked="IsLocked"
+                HomeName="@home" 
+                HomeSeed="homeSeed" 
+                HomeIsAvailable="homeAvailable"
+                AwayName="@away" 
+                AwaySeed="awaySeed" 
+                AwayIsAvailable="awayAvailable"
+                OnPick="HandlePick" />
+        }
+    </div>
+
+    <!-- Right Semifinal -->
+    <div class="ff-column">
+        <h6 class="text-center text-secondary text-uppercase fw-bold mb-3">National Semifinal</h6>
+        @if (SemiFinal2 != null) {
+            var (home, away) = ResolveMatchupTeams?.Invoke(SemiFinal2) ?? ("", "");
+            var currentPick = Picks.TryGetValue(SemiFinal2.Id, out var p) ? p : "";
+            
+            bool homeAvailable = !string.IsNullOrEmpty(home) && home != "TBD";
+            bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
+            int? homeSeed = GetSeedDisplay?.Invoke(SemiFinal2, true);
+            int? awaySeed = GetSeedDisplay?.Invoke(SemiFinal2, false);
+
+            <BracketMatchup 
+                Game="SemiFinal2" 
+                GameLabel="@GetGameLabel?.Invoke(SemiFinal2)"
+                CurrentPick="@currentPick"
+                IsLocked="IsLocked"
+                HomeName="@home" 
+                HomeSeed="homeSeed" 
+                HomeIsAvailable="homeAvailable"
+                AwayName="@away" 
+                AwaySeed="awaySeed" 
+                AwayIsAvailable="awayAvailable"
+                OnPick="HandlePick" />
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<HoopsGame> Games { get; set; } = new();
+    [Parameter, EditorRequired] public Dictionary<string, string> Picks { get; set; } = new();
+    [Parameter] public bool IsLocked { get; set; }
+    
+    [Parameter] public Func<HoopsGame, (string Home, string Away)>? ResolveMatchupTeams { get; set; }
+    [Parameter] public Func<HoopsGame, bool, int?>? GetSeedDisplay { get; set; }
+    [Parameter] public Func<HoopsGame, string>? GetGameLabel { get; set; }
+    
+    [Parameter] public EventCallback<(HoopsGame Game, string Pick)> OnPick { get; set; }
+
+    private HoopsGame? SemiFinal1;
+    private HoopsGame? SemiFinal2;
+    private HoopsGame? Championship;
+
+    protected override void OnParametersSet()
+    {
+        var finalFourGames = Games.Where(g => g.Round == TournamentRound.FinalFour).OrderBy(g => g.Id).ToList();
+        
+        SemiFinal1 = finalFourGames.ElementAtOrDefault(0);
+        SemiFinal2 = finalFourGames.ElementAtOrDefault(1);
+        
+        Championship = Games.FirstOrDefault(g => g.Round == TournamentRound.NationalChampionship);
+    }
+
+    private async Task HandlePick((HoopsGame Game, string Pick) args)
+    {
+        await OnPick.InvokeAsync(args);
+    }
+}

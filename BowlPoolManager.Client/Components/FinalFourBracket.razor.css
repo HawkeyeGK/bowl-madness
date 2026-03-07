@@ -1,0 +1,14 @@
+.final-four-container {
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    border: 1px solid #dee2e6;
+    min-height: 400px;
+}
+.ff-column {
+    width: 250px;
+    flex-shrink: 0;
+}
+.champ-column {
+    margin: 0 1.5rem;
+    width: 280px;
+}
