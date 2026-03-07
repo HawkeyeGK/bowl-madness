@@ -53,5 +53,18 @@ namespace BowlPoolManager.Client.Services
                 return null;
             }
         }
+
+        public async Task<bool> SaveTeamAssignmentsAsync(List<HoopsGame> games)
+        {
+            try
+            {
+                var resp = await _http.PostAsJsonAsync("api/SaveHoopsTeamAssignments", games);
+                return resp.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 }

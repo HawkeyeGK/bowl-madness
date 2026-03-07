@@ -140,6 +140,37 @@ namespace BowlPoolManager.Api.Functions
             }
         }
 
+        [Function("SaveHoopsTeamAssignments")]
+        public async Task<HttpResponseData> SaveHoopsTeamAssignments(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+        {
+            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
+            if (!authResult.IsValid) return authResult.ErrorResponse!;
+
+            try
+            {
+                var games = await JsonSerializer.DeserializeAsync<List<HoopsGame>>(req.Body);
+                if (games == null || !games.Any()) return req.CreateResponse(HttpStatusCode.BadRequest);
+
+                var seasonId = games.First().SeasonId;
+                if (string.IsNullOrEmpty(seasonId) || games.Any(g => g.SeasonId != seasonId))
+                {
+                    var bad = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await bad.WriteStringAsync("All games must have the same SeasonId.");
+                    return bad;
+                }
+
+                await _gameRepo.SaveGamesAsBatchAsync(games, seasonId);
+
+                return req.CreateResponse(HttpStatusCode.OK);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SaveHoopsTeamAssignments failed.");
+                return req.CreateResponse(HttpStatusCode.InternalServerError);
+            }
+        }
+
         [Function("DeleteHoopsGame")]
         public async Task<HttpResponseData> DeleteHoopsGame(
             [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "DeleteHoopsGame/{gameId}")] HttpRequestData req,

@@ -1,0 +1,449 @@
+@page "/admin/team-assignment"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Client.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject IHoopsPoolService PoolService
+@inject IHoopsGameService GameService
+@inject IConfigurationService ConfigurationService
+@inject IJSRuntime JS
+
+<PageTitle>Team Assignment</PageTitle>
+
+<div class="container-fluid mt-3 px-4">
+    <div class="mb-4">
+        <h1 class="h3 fw-bold mb-0"><i class="bi bi-person-fill-check text-primary"></i> Team Assignment</h1>
+        <p class="text-muted small mt-1">Assign teams and seeds to first-round bracket slots.</p>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
+    }
+    else
+    {
+        @* ── Pool selector ─────────────────────────────────────────────────────── *@
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <label class="form-label fw-semibold">Select Pool</label>
+                <select class="form-select" value="@_selectedPoolId" @onchange="OnPoolChanged">
+                    <option value="">— choose a pool —</option>
+                    @foreach (var pool in _pools)
+                    {
+                        <option value="@pool.Id">@pool.Name (@pool.Season)</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        @if (_selectedPool != null)
+        {
+            @if (!_firstRoundGames.Any())
+            {
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    No bracket found for this pool. Go to <a href="admin/tournament-config">Tournament Configuration</a> and generate a bracket first.
+                </div>
+            }
+            else
+            {
+                @* ── Save bar ──────────────────────────────────────────────────────── *@
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <span class="text-muted small">
+                        @(_dirtyGameIds.Count) unsaved change(s)
+                    </span>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="DiscardChanges" disabled="@(!_dirtyGameIds.Any())">
+                            Discard Changes
+                        </button>
+                        <button class="btn btn-primary" @onclick="SaveAll" disabled="@(!_dirtyGameIds.Any() || _isSaving)">
+                            @if (_isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <span>Saving…</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-save me-2"></i>
+                                <span>Save Changes (@_dirtyGameIds.Count)</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_saveMessage))
+                {
+                    <div class="alert @(_saveSuccess ? "alert-success" : "alert-danger") alert-dismissible mb-3">
+                        @_saveMessage
+                        <button type="button" class="btn-close" @onclick="() => _saveMessage = string.Empty"></button>
+                    </div>
+                }
+
+                @* ── Region sections ───────────────────────────────────────────────── *@
+                @foreach (var region in _regions)
+                {
+                    var regionGames = _firstRoundGames
+                        .Where(g => string.Equals(g.Region, region, StringComparison.OrdinalIgnoreCase))
+                        .OrderBy(g => SeedMatchupSortOrder(g.SeedMatchup))
+                        .ToList();
+
+                    if (!regionGames.Any()) continue;
+
+                    <div class="mb-5">
+                        <div class="mb-2">
+                            <span class="text-uppercase fw-bold small text-muted">
+                                <i class="bi bi-geo-fill me-1"></i> @region Region
+                            </span>
+                            <hr class="mt-1 mb-3" />
+                        </div>
+
+                        @foreach (var game in regionGames)
+                        {
+                            var isDirty = _dirtyGameIds.Contains(game.Id);
+                            var firstFourFeeder = GetFirstFourFeeder(game);
+                            var feedsFirstFour = game.Round == TournamentRound.RoundOf64 && firstFourFeeder != null;
+                            var isFirstFour = game.Round == TournamentRound.FirstFour;
+
+                            <div class="card shadow-sm mb-3 @(isDirty ? "border-warning" : "border-0")">
+                                <div class="card-header d-flex justify-content-between align-items-center py-2
+                                            @(isFirstFour ? "bg-dark text-white" : "bg-light")">
+                                    <span class="fw-semibold small">
+                                        @if (isFirstFour)
+                                        {
+                                            <span class="badge bg-warning text-dark me-2">First Four</span>
+                                        }
+                                        @MatchupLabel(game)
+                                    </span>
+                                    @if (feedsFirstFour)
+                                    {
+                                        <span class="badge bg-secondary small">One slot from First Four winner</span>
+                                    }
+                                    @if (isDirty)
+                                    {
+                                        <span class="badge bg-warning text-dark">Unsaved</span>
+                                    }
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        @* Top/Home team *@
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-semibold">Top Team (Home)</label>
+                                            @if (feedsFirstFour && IsFirstFourSlot(game, "home"))
+                                            {
+                                                <div class="form-control-plaintext text-muted small border rounded px-2 py-1">
+                                                    <i class="bi bi-arrow-left-circle me-1"></i>
+                                                    Winner of First Four (@firstFourFeeder?.Region @firstFourFeeder?.SeedMatchup)
+                                                </div>
+                                                <input type="hidden" />
+                                            }
+                                            else
+                                            {
+                                                <div class="d-flex gap-2 align-items-start">
+                                                    <div style="width: 70px;">
+                                                        <label class="form-label small text-muted">Seed</label>
+                                                        <input type="number" min="1" max="16" class="form-control form-control-sm"
+                                                               value="@game.TeamHomeSeed"
+                                                               @onchange="e => OnSeedChanged(game, true, e.Value?.ToString())" />
+                                                    </div>
+                                                    <div class="flex-grow-1">
+                                                        <label class="form-label small text-muted">Team</label>
+                                                        <select class="form-select form-select-sm"
+                                                                value="@game.TeamHomeId?.ToString()"
+                                                                @onchange="e => OnTeamChanged(game, true, e.Value?.ToString())">
+                                                            <option value="">— select team —</option>
+                                                            @foreach (var team in _teams)
+                                                            {
+                                                                <option value="@team.SchoolId">@team.School</option>
+                                                            }
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                @if (!string.IsNullOrEmpty(game.TeamHome))
+                                                {
+                                                    <div class="d-flex align-items-center mt-1 gap-2">
+                                                        @if (!string.IsNullOrEmpty(game.HomeTeamInfo?.PrimaryLogoUrl))
+                                                        {
+                                                            <img src="@game.HomeTeamInfo.PrimaryLogoUrl" height="20" alt="" />
+                                                        }
+                                                        <span class="small text-muted">@game.TeamHome</span>
+                                                        <button class="btn btn-link btn-sm p-0 text-danger ms-auto"
+                                                                @onclick="() => ClearTeam(game, true)">
+                                                            <i class="bi bi-x-circle"></i>
+                                                        </button>
+                                                    </div>
+                                                }
+                                            }
+                                        </div>
+
+                                        @* Bottom/Away team *@
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-semibold">Bottom Team (Away)</label>
+                                            @if (feedsFirstFour && IsFirstFourSlot(game, "away"))
+                                            {
+                                                <div class="form-control-plaintext text-muted small border rounded px-2 py-1">
+                                                    <i class="bi bi-arrow-left-circle me-1"></i>
+                                                    Winner of First Four (@firstFourFeeder?.Region @firstFourFeeder?.SeedMatchup)
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="d-flex gap-2 align-items-start">
+                                                    <div style="width: 70px;">
+                                                        <label class="form-label small text-muted">Seed</label>
+                                                        <input type="number" min="1" max="16" class="form-control form-control-sm"
+                                                               value="@game.TeamAwaySeed"
+                                                               @onchange="e => OnSeedChanged(game, false, e.Value?.ToString())" />
+                                                    </div>
+                                                    <div class="flex-grow-1">
+                                                        <label class="form-label small text-muted">Team</label>
+                                                        <select class="form-select form-select-sm"
+                                                                value="@game.TeamAwayId?.ToString()"
+                                                                @onchange="e => OnTeamChanged(game, false, e.Value?.ToString())">
+                                                            <option value="">— select team —</option>
+                                                            @foreach (var team in _teams)
+                                                            {
+                                                                <option value="@team.SchoolId">@team.School</option>
+                                                            }
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                @if (!string.IsNullOrEmpty(game.TeamAway))
+                                                {
+                                                    <div class="d-flex align-items-center mt-1 gap-2">
+                                                        @if (!string.IsNullOrEmpty(game.AwayTeamInfo?.PrimaryLogoUrl))
+                                                        {
+                                                            <img src="@game.AwayTeamInfo.PrimaryLogoUrl" height="20" alt="" />
+                                                        }
+                                                        <span class="small text-muted">@game.TeamAway</span>
+                                                        <button class="btn btn-link btn-sm p-0 text-danger ms-auto"
+                                                                @onclick="() => ClearTeam(game, false)">
+                                                            <i class="bi bi-x-circle"></i>
+                                                        </button>
+                                                    </div>
+                                                }
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        }
+    }
+</div>
+
+@code {
+    private List<HoopsPool> _pools = new();
+    private string _selectedPoolId = string.Empty;
+    private HoopsPool? _selectedPool;
+    private List<HoopsGame> _allGames = new();
+    private List<HoopsGame> _firstRoundGames = new();
+    private List<TeamInfo> _teams = new();
+    private HashSet<string> _dirtyGameIds = new();
+    private List<string> _regions = new();
+    private bool _isLoading = true;
+    private bool _isSaving = false;
+    private string _saveMessage = string.Empty;
+    private bool _saveSuccess = false;
+
+    // Canonical display order for first-round seed matchups
+    private static readonly Dictionary<string, int> SeedMatchupOrder = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["16v16"] = 0,
+        ["1v16"]  = 1,
+        ["8v9"]   = 2,
+        ["5v12"]  = 3,
+        ["4v13"]  = 4,
+        ["11v11"] = 5,
+        ["6v11"]  = 6,
+        ["3v14"]  = 7,
+        ["7v10"]  = 8,
+        ["2v15"]  = 9,
+    };
+
+    private static int SeedMatchupSortOrder(string? matchup) =>
+        matchup != null && SeedMatchupOrder.TryGetValue(matchup, out var order) ? order : 99;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var poolsTask = PoolService.GetPoolsAsync();
+        var teamsTask = ConfigurationService.GetBasketballTeamsAsync();
+        await Task.WhenAll(poolsTask, teamsTask);
+
+        _pools = poolsTask.Result;
+        _teams = teamsTask.Result.OrderBy(t => t.School).ToList();
+        _isLoading = false;
+    }
+
+    private async Task OnPoolChanged(ChangeEventArgs e)
+    {
+        if (_dirtyGameIds.Any())
+        {
+            if (!await JS.InvokeAsync<bool>("confirm", "You have unsaved changes. Discard them and switch pools?"))
+                return;
+        }
+
+        _selectedPoolId = e.Value?.ToString() ?? string.Empty;
+        _selectedPool = _pools.FirstOrDefault(p => p.Id == _selectedPoolId);
+        _allGames = new();
+        _firstRoundGames = new();
+        _dirtyGameIds = new();
+        _regions = new();
+
+        if (_selectedPool != null && _selectedPool.GameIds.Any())
+        {
+            _allGames = await GameService.GetGamesAsync(_selectedPool.Id);
+            _firstRoundGames = _allGames
+                .Where(g => g.Round == TournamentRound.RoundOf64 || g.Round == TournamentRound.FirstFour)
+                .ToList();
+
+            _regions = _allGames
+                .Where(g => !string.IsNullOrEmpty(g.Region))
+                .Select(g => g.Region!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(r => r)
+                .ToList();
+        }
+    }
+
+    private void OnTeamChanged(HoopsGame game, bool isHome, string? schoolIdStr)
+    {
+        if (int.TryParse(schoolIdStr, out var id))
+        {
+            var team = _teams.FirstOrDefault(t => t.SchoolId == id);
+            if (team != null)
+            {
+                if (isHome)
+                {
+                    game.TeamHomeId = team.SchoolId;
+                    game.TeamHome = team.School;
+                    game.HomeTeamInfo = team.ToDenormalized();
+                }
+                else
+                {
+                    game.TeamAwayId = team.SchoolId;
+                    game.TeamAway = team.School;
+                    game.AwayTeamInfo = team.ToDenormalized();
+                }
+                _dirtyGameIds.Add(game.Id);
+            }
+        }
+        else
+        {
+            ClearTeam(game, isHome);
+        }
+    }
+
+    private void OnSeedChanged(HoopsGame game, bool isHome, string? value)
+    {
+        if (int.TryParse(value, out var seed))
+        {
+            seed = Math.Clamp(seed, 1, 16);
+            if (isHome) game.TeamHomeSeed = seed;
+            else game.TeamAwaySeed = seed;
+            _dirtyGameIds.Add(game.Id);
+        }
+    }
+
+    private void ClearTeam(HoopsGame game, bool isHome)
+    {
+        if (isHome)
+        {
+            game.TeamHomeId = null;
+            game.TeamHome = string.Empty;
+            game.HomeTeamInfo = null;
+        }
+        else
+        {
+            game.TeamAwayId = null;
+            game.TeamAway = string.Empty;
+            game.AwayTeamInfo = null;
+        }
+        _dirtyGameIds.Add(game.Id);
+    }
+
+    private async Task SaveAll()
+    {
+        if (!_dirtyGameIds.Any()) return;
+
+        _isSaving = true;
+        _saveMessage = string.Empty;
+
+        var toSave = _firstRoundGames.Where(g => _dirtyGameIds.Contains(g.Id)).ToList();
+        var success = await GameService.SaveTeamAssignmentsAsync(toSave);
+
+        _isSaving = false;
+        if (success)
+        {
+            _dirtyGameIds.Clear();
+            _saveSuccess = true;
+            _saveMessage = $"Saved {toSave.Count} game(s) successfully.";
+        }
+        else
+        {
+            _saveSuccess = false;
+            _saveMessage = "Save failed. Please try again.";
+        }
+    }
+
+    private async Task DiscardChanges()
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Discard all unsaved changes?")) return;
+
+        // Reload games from API
+        if (_selectedPool != null)
+        {
+            _allGames = await GameService.GetGamesAsync(_selectedPool.Id);
+            _firstRoundGames = _allGames
+                .Where(g => g.Round == TournamentRound.RoundOf64 || g.Round == TournamentRound.FirstFour)
+                .ToList();
+            _dirtyGameIds.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Returns the First Four game that feeds into the given R64 game (if any).
+    /// </summary>
+    private HoopsGame? GetFirstFourFeeder(HoopsGame r64Game)
+    {
+        if (r64Game.Round != TournamentRound.RoundOf64) return null;
+        return _allGames.FirstOrDefault(g =>
+            g.Round == TournamentRound.FirstFour &&
+            g.NextGameId == r64Game.Id);
+    }
+
+    /// <summary>
+    /// Determines whether the home or away slot of a feeder R64 game is the TBD First Four slot.
+    /// Convention (must match BracketGeneratorService): the away (bottom) slot is TBD;
+    /// the home slot holds the known seeded team (e.g. the 1-seed in 1v16, the 6-seed in 6v11).
+    /// If this convention changes in the generator, update this method accordingly.
+    /// </summary>
+    private static bool IsFirstFourSlot(HoopsGame game, string side) =>
+        side == "away";
+
+    private static string MatchupLabel(HoopsGame game)
+    {
+        if (!string.IsNullOrEmpty(game.SeedMatchup))
+        {
+            return game.SeedMatchup switch
+            {
+                "16v16" => "First Four — 16 seed play-in",
+                "11v11" => "First Four — 11 seed play-in",
+                "1v16"  => "1 seed vs 16 seed",
+                "8v9"   => "8 seed vs 9 seed",
+                "5v12"  => "5 seed vs 12 seed",
+                "4v13"  => "4 seed vs 13 seed",
+                "6v11"  => "6 seed vs 11 seed",
+                "3v14"  => "3 seed vs 14 seed",
+                "7v10"  => "7 seed vs 10 seed",
+                "2v15"  => "2 seed vs 15 seed",
+                _ => game.SeedMatchup
+            };
+        }
+        return game.Round.ToString();
+    }
+}

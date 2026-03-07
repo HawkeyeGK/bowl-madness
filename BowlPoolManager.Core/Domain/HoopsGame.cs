@@ -95,6 +95,14 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("nextGameId")]
         public string? NextGameId { get; set; }
 
+        /// <summary>
+        /// Seed matchup label for first-round games, set by the bracket generator.
+        /// e.g. "1v16", "8v9", "11v11", "16v16". Null for later-round games.
+        /// </summary>
+        [JsonProperty("seedMatchup")]
+        [JsonPropertyName("seedMatchup")]
+        public string? SeedMatchup { get; set; }
+
         // --- COMPUTED HELPERS ---
 
         [Newtonsoft.Json.JsonIgnore]

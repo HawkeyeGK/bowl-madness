@@ -620,5 +620,198 @@ namespace BowlPoolManager.Tests.Core
 
             first.Overlaps(second).Should().BeFalse("each call should generate fresh GUIDs");
         }
+
+        // ── SeedMatchup — R64 games ────────────────────────────────────────────
+
+        [Fact]
+        public void GenerateBracket_ShouldSetNonNullSeedMatchup_OnAllRoundOf64Games()
+        {
+            var result = Sut().GenerateBracket(StandardRequest());
+
+            result.Where(g => g.Round == TournamentRound.RoundOf64)
+                  .Should().OnlyContain(g => g.SeedMatchup != null,
+                      "every R64 game must have a SeedMatchup label");
+        }
+
+        [Fact]
+        public void GenerateBracket_ShouldSetNonNullSeedMatchup_OnAllFirstFourGames()
+        {
+            var result = Sut().GenerateBracket(StandardRequest());
+
+            result.Where(g => g.Round == TournamentRound.FirstFour)
+                  .Should().OnlyContain(g => g.SeedMatchup != null,
+                      "every First Four game must have a SeedMatchup label");
+        }
+
+        [Fact]
+        public void GenerateBracket_ShouldSetNullSeedMatchup_OnAllRoundOf32Games()
+        {
+            var result = Sut().GenerateBracket(StandardRequest());
+
+            result.Where(g => g.Round == TournamentRound.RoundOf32)
+                  .Should().OnlyContain(g => g.SeedMatchup == null,
+                      "R32 games should not have a SeedMatchup label");
+        }
+
+        [Fact]
+        public void GenerateBracket_ShouldSetNullSeedMatchup_OnAllSweet16Games()
+        {
+            var result = Sut().GenerateBracket(StandardRequest());
+
+            result.Where(g => g.Round == TournamentRound.Sweet16)
+                  .Should().OnlyContain(g => g.SeedMatchup == null,
+                      "Sweet 16 games should not have a SeedMatchup label");
+        }
+
+        [Fact]
+        public void GenerateBracket_ShouldSetNullSeedMatchup_OnAllElite8Games()
+        {
+            var result = Sut().GenerateBracket(StandardRequest());
+
+            result.Where(g => g.Round == TournamentRound.Elite8)
+                  .Should().OnlyContain(g => g.SeedMatchup == null,
+                      "Elite 8 games should not have a SeedMatchup label");
+        }
+
+        [Fact]
+        public void GenerateBracket_ShouldSetNullSeedMatchup_OnAllFinalFourGames()
+        {
+            var result = Sut().GenerateBracket(StandardRequest());
+
+            result.Where(g => g.Round == TournamentRound.FinalFour)
+                  .Should().OnlyContain(g => g.SeedMatchup == null,
+                      "Final Four games should not have a SeedMatchup label");
+        }
+
+        [Fact]
+        public void GenerateBracket_ShouldSetNullSeedMatchup_OnChampionshipGame()
+        {
+            var result = Sut().GenerateBracket(StandardRequest());
+
+            result.Single(g => g.Round == TournamentRound.NationalChampionship)
+                  .SeedMatchup.Should().BeNull("the Championship game should not have a SeedMatchup label");
+        }
+
+        // ── SeedMatchup — R64 label set correctness ────────────────────────────
+
+        [Fact]
+        public void GenerateBracket_ShouldProduceExactlyTheExpectedR64SeedMatchupLabels()
+        {
+            var result = Sut().GenerateBracket(StandardRequest());
+
+            var expectedLabels = new[] { "1v16", "8v9", "5v12", "4v13", "6v11", "3v14", "7v10", "2v15" };
+            var r64Matchups = result
+                .Where(g => g.Round == TournamentRound.RoundOf64)
+                .Select(g => g.SeedMatchup!)
+                .ToList();
+
+            // 4 regions × 8 labels = 32 total
+            r64Matchups.Should().HaveCount(32);
+
+            // Each label appears exactly 4 times (once per region)
+            foreach (var label in expectedLabels)
+                r64Matchups.Count(m => m == label).Should().Be(4,
+                    $"label '{label}' should appear exactly once per region (4 total)");
+        }
+
+        [Fact]
+        public void GenerateBracket_ShouldHaveExactlyOne1v16R64Game_PerRegion()
+        {
+            var result = Sut().GenerateBracket(StandardRequest());
+
+            foreach (var region in new[] { "East", "West", "South", "Midwest" })
+            {
+                result.Count(g => g.Round == TournamentRound.RoundOf64
+                                  && g.Region == region
+                                  && g.SeedMatchup == "1v16")
+                      .Should().Be(1, $"region '{region}' should have exactly one '1v16' R64 game");
+            }
+        }
+
+        [Fact]
+        public void GenerateBracket_ShouldHaveExactlyOne6v11R64Game_PerRegion()
+        {
+            var result = Sut().GenerateBracket(StandardRequest());
+
+            foreach (var region in new[] { "East", "West", "South", "Midwest" })
+            {
+                result.Count(g => g.Round == TournamentRound.RoundOf64
+                                  && g.Region == region
+                                  && g.SeedMatchup == "6v11")
+                      .Should().Be(1, $"region '{region}' should have exactly one '6v11' R64 game");
+            }
+        }
+
+        // ── SeedMatchup — FirstFour label correctness ──────────────────────────
+
+        [Fact]
+        public void GenerateBracket_ShouldAssign16v16SeedMatchup_ToFirstFourGamesInPairing0Regions()
+        {
+            var request = StandardRequest();
+            // pairing[0] = East, West
+            var result = Sut().GenerateBracket(request);
+
+            var pairing0Regions = request.FinalFourPairings[0]; // ["East", "West"]
+            var ff4InPairing0 = result
+                .Where(g => g.Round == TournamentRound.FirstFour
+                            && pairing0Regions.Contains(g.Region, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+
+            ff4InPairing0.Should().HaveCount(2, "pairing[0] has 2 regions, each with one First Four game");
+            ff4InPairing0.Should().OnlyContain(g => g.SeedMatchup == "16v16",
+                "First Four games in pairing[0] regions are 16-seed play-ins");
+        }
+
+        [Fact]
+        public void GenerateBracket_ShouldAssign11v11SeedMatchup_ToFirstFourGamesInPairing1Regions()
+        {
+            var request = StandardRequest();
+            // pairing[1] = South, Midwest
+            var result = Sut().GenerateBracket(request);
+
+            var pairing1Regions = request.FinalFourPairings[1]; // ["South", "Midwest"]
+            var ff4InPairing1 = result
+                .Where(g => g.Round == TournamentRound.FirstFour
+                            && pairing1Regions.Contains(g.Region, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+
+            ff4InPairing1.Should().HaveCount(2, "pairing[1] has 2 regions, each with one First Four game");
+            ff4InPairing1.Should().OnlyContain(g => g.SeedMatchup == "11v11",
+                "First Four games in pairing[1] regions are 11-seed play-ins");
+        }
+
+        [Fact]
+        public void GenerateBracket_ShouldWire16v16FirstFourGame_ToThe1v16R64SlotInSameRegion()
+        {
+            var request = StandardRequest();
+            var result = Sut().GenerateBracket(request);
+            var idToGame = result.ToDictionary(g => g.Id);
+
+            var ff16v16Games = result.Where(g => g.Round == TournamentRound.FirstFour
+                                                  && g.SeedMatchup == "16v16");
+            foreach (var ff4 in ff16v16Games)
+            {
+                var target = idToGame[ff4.NextGameId!];
+                target.SeedMatchup.Should().Be("1v16",
+                    $"a '16v16' First Four game in {ff4.Region} must feed the '1v16' R64 slot");
+            }
+        }
+
+        [Fact]
+        public void GenerateBracket_ShouldWire11v11FirstFourGame_ToThe6v11R64SlotInSameRegion()
+        {
+            var request = StandardRequest();
+            var result = Sut().GenerateBracket(request);
+            var idToGame = result.ToDictionary(g => g.Id);
+
+            var ff11v11Games = result.Where(g => g.Round == TournamentRound.FirstFour
+                                                  && g.SeedMatchup == "11v11");
+            foreach (var ff4 in ff11v11Games)
+            {
+                var target = idToGame[ff4.NextGameId!];
+                target.SeedMatchup.Should().Be("6v11",
+                    $"an '11v11' First Four game in {ff4.Region} must feed the '6v11' R64 slot");
+            }
+        }
     }
 }

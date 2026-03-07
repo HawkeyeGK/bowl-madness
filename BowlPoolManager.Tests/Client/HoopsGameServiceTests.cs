@@ -344,6 +344,111 @@ namespace BowlPoolManager.Tests.Client
             result.Should().BeNull();
         }
 
+        // ── SaveTeamAssignmentsAsync — URL construction ───────────────────────────
+
+        [Fact]
+        public async Task SaveTeamAssignmentsAsync_ShouldCallCorrectUrl()
+        {
+            var games = new List<HoopsGame> { new() { Id = "game-1" } };
+            var (sut, handler) = Build(HttpStatusCode.OK, string.Empty);
+
+            await sut.SaveTeamAssignmentsAsync(games);
+
+            handler.LastRequestUri.Should().NotBeNull();
+            handler.LastRequestUri!.PathAndQuery.Should().Be("/api/SaveHoopsTeamAssignments");
+        }
+
+        // ── SaveTeamAssignmentsAsync — response handling ──────────────────────────
+
+        [Fact]
+        public async Task SaveTeamAssignmentsAsync_ShouldReturnTrue_WhenApiReturnsOk()
+        {
+            var games = new List<HoopsGame> { new() { Id = "game-1" } };
+            var (sut, _) = Build(HttpStatusCode.OK, string.Empty);
+
+            var result = await sut.SaveTeamAssignmentsAsync(games);
+
+            result.Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task SaveTeamAssignmentsAsync_ShouldReturnFalse_WhenApiReturnsBadRequest()
+        {
+            var games = new List<HoopsGame> { new() { Id = "game-1" } };
+            var (sut, _) = Build(HttpStatusCode.BadRequest, string.Empty);
+
+            var result = await sut.SaveTeamAssignmentsAsync(games);
+
+            result.Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task SaveTeamAssignmentsAsync_ShouldReturnFalse_WhenApiReturnsUnauthorized()
+        {
+            var games = new List<HoopsGame> { new() { Id = "game-1" } };
+            var (sut, _) = Build(HttpStatusCode.Unauthorized, string.Empty);
+
+            var result = await sut.SaveTeamAssignmentsAsync(games);
+
+            result.Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task SaveTeamAssignmentsAsync_ShouldReturnFalse_WhenApiReturnsInternalServerError()
+        {
+            var games = new List<HoopsGame> { new() { Id = "game-1" } };
+            var (sut, _) = Build(HttpStatusCode.InternalServerError, string.Empty);
+
+            var result = await sut.SaveTeamAssignmentsAsync(games);
+
+            result.Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task SaveTeamAssignmentsAsync_ShouldNotThrow_WhenApiThrows()
+        {
+            var throwingHandler = new ThrowingHttpMessageHandler();
+            var httpClient = new HttpClient(throwingHandler) { BaseAddress = new Uri("https://localhost/") };
+            var sut = new HoopsGameService(httpClient);
+            var games = new List<HoopsGame> { new() { Id = "game-1" } };
+
+            var act = () => sut.SaveTeamAssignmentsAsync(games);
+
+            await act.Should().NotThrowAsync();
+        }
+
+        [Fact]
+        public async Task SaveTeamAssignmentsAsync_ShouldReturnFalse_WhenApiThrows()
+        {
+            var throwingHandler = new ThrowingHttpMessageHandler();
+            var httpClient = new HttpClient(throwingHandler) { BaseAddress = new Uri("https://localhost/") };
+            var sut = new HoopsGameService(httpClient);
+            var games = new List<HoopsGame> { new() { Id = "game-1" } };
+
+            var result = await sut.SaveTeamAssignmentsAsync(games);
+
+            result.Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task SaveTeamAssignmentsAsync_ShouldSerializeGameList_InRequestBody()
+        {
+            var games = new List<HoopsGame>
+            {
+                new() { Id = "game-1", SeasonId = "season-2026", Round = TournamentRound.RoundOf64 },
+                new() { Id = "game-2", SeasonId = "season-2026", Round = TournamentRound.FirstFour }
+            };
+            var bodyHandler = new BodyCapturingStubHandler(HttpStatusCode.OK, string.Empty);
+            var httpClient = new HttpClient(bodyHandler) { BaseAddress = new Uri("https://localhost/") };
+            var sut = new HoopsGameService(httpClient);
+
+            await sut.SaveTeamAssignmentsAsync(games);
+
+            bodyHandler.LastRequestBody.Should().NotBeNullOrEmpty();
+            bodyHandler.LastRequestBody.Should().Contain("game-1");
+            bodyHandler.LastRequestBody.Should().Contain("game-2");
+        }
+
         // ── Nested helpers ────────────────────────────────────────────────────────
 
         private sealed class ThrowingHttpMessageHandler : HttpMessageHandler
@@ -352,6 +457,34 @@ namespace BowlPoolManager.Tests.Client
                 HttpRequestMessage request,
                 CancellationToken cancellationToken) =>
                 throw new HttpRequestException("Simulated network failure");
+        }
+
+        private sealed class BodyCapturingStubHandler : HttpMessageHandler
+        {
+            private readonly HttpStatusCode _statusCode;
+            private readonly string _responseBody;
+
+            public string? LastRequestBody { get; private set; }
+
+            public BodyCapturingStubHandler(HttpStatusCode statusCode, string responseBody)
+            {
+                _statusCode = statusCode;
+                _responseBody = responseBody;
+            }
+
+            protected override async Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken)
+            {
+                if (request.Content != null)
+                    LastRequestBody = await request.Content.ReadAsStringAsync(cancellationToken);
+
+                var response = new HttpResponseMessage(_statusCode)
+                {
+                    Content = new StringContent(_responseBody, Encoding.UTF8, "application/json")
+                };
+                return response;
+            }
         }
     }
 }

@@ -31,6 +31,10 @@ namespace BowlPoolManager.Api.Services
         private const int Slot16Seed = 0; // 1 vs 16
         private const int Slot11Seed = 4; // 6 vs 11
 
+        // SeedMatchup labels in slot order for R64 games
+        private static readonly string[] R64SeedMatchups =
+            { "1v16", "8v9", "5v12", "4v13", "6v11", "3v14", "7v10", "2v15" };
+
         public List<HoopsGame> GenerateBracket(BracketGenerationRequest request)
         {
             Validate(request);
@@ -97,7 +101,10 @@ namespace BowlPoolManager.Api.Services
             {
                 var arr = new HoopsGame[8];
                 for (int i = 0; i < 8; i++)
+                {
                     arr[i] = Make(sid, TournamentRound.RoundOf64, region, r32[region][R32Map[i]].Id);
+                    arr[i].SeedMatchup = R64SeedMatchups[i];
+                }
                 games.AddRange(arr);
                 r64[region] = arr;
             }
@@ -107,13 +114,17 @@ namespace BowlPoolManager.Api.Services
             // Pairing[1] regions each get an 11-seed play-in → feeds that region's 6v11 slot
             var firstFourSlots = new[]
             {
-                (Region: request.FinalFourPairings[0][0], R64Slot: Slot16Seed),
-                (Region: request.FinalFourPairings[0][1], R64Slot: Slot16Seed),
-                (Region: request.FinalFourPairings[1][0], R64Slot: Slot11Seed),
-                (Region: request.FinalFourPairings[1][1], R64Slot: Slot11Seed),
+                (Region: request.FinalFourPairings[0][0], R64Slot: Slot16Seed, Matchup: "16v16"),
+                (Region: request.FinalFourPairings[0][1], R64Slot: Slot16Seed, Matchup: "16v16"),
+                (Region: request.FinalFourPairings[1][0], R64Slot: Slot11Seed, Matchup: "11v11"),
+                (Region: request.FinalFourPairings[1][1], R64Slot: Slot11Seed, Matchup: "11v11"),
             };
-            foreach (var (region, slot) in firstFourSlots)
-                games.Add(Make(sid, TournamentRound.FirstFour, region, r64[region][slot].Id));
+            foreach (var (region, slot, matchup) in firstFourSlots)
+            {
+                var g = Make(sid, TournamentRound.FirstFour, region, r64[region][slot].Id);
+                g.SeedMatchup = matchup;
+                games.Add(g);
+            }
 
             return games; // exactly 67
         }
