@@ -56,28 +56,6 @@
     </div>
     <div class="row g-4 mb-5">
 
-        <div class="col-md-6 col-lg-3">
-            <div class="card h-100 shadow-sm border-0">
-                <div class="card-body text-center">
-                    <i class="bi bi-people display-4 text-primary mb-3"></i>
-                    <h5 class="card-title">Entries</h5>
-                    <p class="card-text text-muted small">Manage player brackets.</p>
-                    <a href="admin/entries" class="btn btn-outline-primary stretched-link">Manage Entries</a>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6 col-lg-3">
-            <div class="card h-100 shadow-sm border-0">
-                <div class="card-body text-center">
-                    <i class="bi bi-cash-coin display-4 text-warning mb-3"></i>
-                    <h5 class="card-title">Payments</h5>
-                    <p class="card-text text-muted small">Track manual payments.</p>
-                    <a href="admin/payments" class="btn btn-outline-warning stretched-link">Manage Payments</a>
-                </div>
-            </div>
-        </div>
-
         <AuthorizeView Roles="SuperAdmin" Context="fa">
 
             <div class="col-md-6 col-lg-3">
@@ -105,17 +83,6 @@
             <div class="col-md-6 col-lg-3">
                 <div class="card h-100 shadow-sm border-0">
                     <div class="card-body text-center">
-                        <i class="bi bi-trophy-fill display-4 text-danger mb-3"></i>
-                        <h5 class="card-title">Results</h5>
-                        <p class="card-text text-muted small">Enter scores &amp; winners.</p>
-                        <a href="admin/gameresults" class="btn btn-outline-danger stretched-link">Enter Results</a>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-body text-center">
                         <i class="bi bi-link-45deg display-4 text-dark mb-3"></i>
                         <h5 class="card-title">Link Games</h5>
                         <p class="card-text text-muted small">Connect API feeds.</p>
@@ -124,7 +91,41 @@
                 </div>
             </div>
 
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <i class="bi bi-trophy-fill display-4 text-danger mb-3"></i>
+                        <h5 class="card-title">Results</h5>
+                        <p class="card-text text-muted small">Enter scores &amp; winners.</p>
+                        <a href="admin/gameresults" class="btn btn-outline-danger stretched-link">Enter Results</a>
+                    </div>
+                </div>
+            </div>
+
         </AuthorizeView>
+
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body text-center">
+                    <i class="bi bi-people display-4 text-primary mb-3"></i>
+                    <h5 class="card-title">Entries</h5>
+                    <p class="card-text text-muted small">Manage player brackets.</p>
+                    <a href="admin/entries" class="btn btn-outline-primary stretched-link">Manage Entries</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body text-center">
+                    <i class="bi bi-cash-coin display-4 text-warning mb-3"></i>
+                    <h5 class="card-title">Payments</h5>
+                    <p class="card-text text-muted small">Track manual payments.</p>
+                    <a href="admin/payments" class="btn btn-outline-warning stretched-link">Manage Payments</a>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     @* ===== HOOPS ADMIN ===== *@
@@ -140,10 +141,10 @@
             <div class="col-md-6 col-lg-3">
                 <div class="card h-100 shadow-sm border-0">
                     <div class="card-body text-center">
-                        <i class="bi bi-collection-play display-4 text-primary mb-3"></i>
+                        <i class="bi bi-collection-play display-4 text-secondary mb-3"></i>
                         <h5 class="card-title">Hoops Pools</h5>
                         <p class="card-text text-muted small">Basketball pool settings &amp; scoring.</p>
-                        <a href="admin/hoops-pools" class="btn btn-outline-primary stretched-link">Hoops Pools</a>
+                        <a href="admin/hoops-pools" class="btn btn-outline-secondary stretched-link">Hoops Pools</a>
                     </div>
                 </div>
             </div>
