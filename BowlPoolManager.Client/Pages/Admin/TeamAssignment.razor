@@ -130,23 +130,23 @@
                                         @* Top/Home team *@
                                         <div class="col-md-6">
                                             <label class="form-label small fw-semibold">Top Team (Home)</label>
-                                            @if (feedsFirstFour && IsFirstFourSlot(game, "home"))
+                                            @if (feedsFirstFour && IsFirstFourSlot(game, "home", firstFourFeeder!))
                                             {
                                                 <div class="form-control-plaintext text-muted small border rounded px-2 py-1">
                                                     <i class="bi bi-arrow-left-circle me-1"></i>
                                                     Winner of First Four (@firstFourFeeder?.Region @firstFourFeeder?.SeedMatchup)
                                                 </div>
-                                                <input type="hidden" />
                                             }
                                             else
                                             {
                                                 <div class="d-flex gap-2 align-items-start">
-                                                    <div style="width: 70px;">
-                                                        <label class="form-label small text-muted">Seed</label>
-                                                        <input type="number" min="1" max="16" class="form-control form-control-sm"
-                                                               value="@game.TeamHomeSeed"
-                                                               @onchange="e => OnSeedChanged(game, true, e.Value?.ToString())" />
-                                                    </div>
+                                                    @if (game.TeamHomeSeed.HasValue)
+                                                    {
+                                                        <div style="width: 50px;" class="text-center">
+                                                            <div class="form-label small text-muted mb-1">Seed</div>
+                                                            <span class="badge bg-secondary fs-6">@game.TeamHomeSeed</span>
+                                                        </div>
+                                                    }
                                                     <div class="flex-grow-1">
                                                         <label class="form-label small text-muted">Team</label>
                                                         <select class="form-select form-select-sm"
@@ -180,7 +180,7 @@
                                         @* Bottom/Away team *@
                                         <div class="col-md-6">
                                             <label class="form-label small fw-semibold">Bottom Team (Away)</label>
-                                            @if (feedsFirstFour && IsFirstFourSlot(game, "away"))
+                                            @if (feedsFirstFour && IsFirstFourSlot(game, "away", firstFourFeeder!))
                                             {
                                                 <div class="form-control-plaintext text-muted small border rounded px-2 py-1">
                                                     <i class="bi bi-arrow-left-circle me-1"></i>
@@ -190,12 +190,13 @@
                                             else
                                             {
                                                 <div class="d-flex gap-2 align-items-start">
-                                                    <div style="width: 70px;">
-                                                        <label class="form-label small text-muted">Seed</label>
-                                                        <input type="number" min="1" max="16" class="form-control form-control-sm"
-                                                               value="@game.TeamAwaySeed"
-                                                               @onchange="e => OnSeedChanged(game, false, e.Value?.ToString())" />
-                                                    </div>
+                                                    @if (game.TeamAwaySeed.HasValue)
+                                                    {
+                                                        <div style="width: 50px;" class="text-center">
+                                                            <div class="form-label small text-muted mb-1">Seed</div>
+                                                            <span class="badge bg-secondary fs-6">@game.TeamAwaySeed</span>
+                                                        </div>
+                                                    }
                                                     <div class="flex-grow-1">
                                                         <label class="form-label small text-muted">Team</label>
                                                         <select class="form-select form-select-sm"
@@ -250,23 +251,45 @@
     private string _saveMessage = string.Empty;
     private bool _saveSuccess = false;
 
-    // Canonical display order for first-round seed matchups
-    private static readonly Dictionary<string, int> SeedMatchupOrder = new(StringComparer.OrdinalIgnoreCase)
+    // R64 slot index order (used to interleave First Four before their target slot)
+    private static readonly Dictionary<string, int> R64SlotOrder = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["16v16"] = 0,
-        ["1v16"]  = 1,
-        ["8v9"]   = 2,
-        ["5v12"]  = 3,
-        ["4v13"]  = 4,
-        ["11v11"] = 5,
-        ["6v11"]  = 6,
-        ["3v14"]  = 7,
-        ["7v10"]  = 8,
-        ["2v15"]  = 9,
+        ["1v16"] = 0, ["8v9"] = 1, ["5v12"] = 2, ["4v13"] = 3,
+        ["6v11"] = 4, ["3v14"] = 5, ["7v10"] = 6, ["2v15"] = 7,
     };
 
-    private static int SeedMatchupSortOrder(string? matchup) =>
-        matchup != null && SeedMatchupOrder.TryGetValue(matchup, out var order) ? order : 99;
+    // Maps any seed number to the R64 SeedMatchup it belongs to
+    private static readonly Dictionary<int, string> SeedToR64Matchup = new()
+    {
+        { 1, "1v16" }, { 16, "1v16" },
+        { 8, "8v9"  }, { 9,  "8v9"  },
+        { 5, "5v12" }, { 12, "5v12" },
+        { 4, "4v13" }, { 13, "4v13" },
+        { 6, "6v11" }, { 11, "6v11" },
+        { 3, "3v14" }, { 14, "3v14" },
+        { 7, "7v10" }, { 10, "7v10" },
+        { 2, "2v15" }, { 15, "2v15" },
+    };
+
+    // First Four games sort just before the R64 slot they feed into (slotIdx*2),
+    // R64 games sort at slotIdx*2+1, so play-in always appears above its target.
+    private static int SeedMatchupSortOrder(string? matchup)
+    {
+        if (matchup == null) return 99;
+        var parts = matchup.Split('v');
+        if (parts.Length != 2 ||
+            !int.TryParse(parts[0], out var a) ||
+            !int.TryParse(parts[1], out var b)) return 99;
+
+        if (a == b) // First Four game ("XvX")
+        {
+            return SeedToR64Matchup.TryGetValue(a, out var target) &&
+                   R64SlotOrder.TryGetValue(target, out var idx)
+                ? idx * 2
+                : 99;
+        }
+        return R64SlotOrder.TryGetValue(matchup, out var slotIdx) ? slotIdx * 2 + 1 : 99;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -335,17 +358,6 @@
         else
         {
             ClearTeam(game, isHome);
-        }
-    }
-
-    private void OnSeedChanged(HoopsGame game, bool isHome, string? value)
-    {
-        if (int.TryParse(value, out var seed))
-        {
-            seed = Math.Clamp(seed, 1, 16);
-            if (isHome) game.TeamHomeSeed = seed;
-            else game.TeamAwaySeed = seed;
-            _dirtyGameIds.Add(game.Id);
         }
     }
 
@@ -418,32 +430,40 @@
 
     /// <summary>
     /// Determines whether the home or away slot of a feeder R64 game is the TBD First Four slot.
-    /// Convention (must match BracketGeneratorService): the away (bottom) slot is TBD;
-    /// the home slot holds the known seeded team (e.g. the 1-seed in 1v16, the 6-seed in 6v11).
-    /// If this convention changes in the generator, update this method accordingly.
+    /// Compares the play-in seed (from the feeder game) against the R64 game's home/away seeds,
+    /// which were auto-set during bracket generation.
     /// </summary>
-    private static bool IsFirstFourSlot(HoopsGame game, string side) =>
-        side == "away";
+    private static bool IsFirstFourSlot(HoopsGame r64Game, string side, HoopsGame feeder)
+    {
+        var playInSeed = feeder.TeamHomeSeed ?? feeder.TeamAwaySeed ?? 0;
+        return side == "home"
+            ? r64Game.TeamHomeSeed == playInSeed
+            : r64Game.TeamAwaySeed == playInSeed;
+    }
 
     private static string MatchupLabel(HoopsGame game)
     {
-        if (!string.IsNullOrEmpty(game.SeedMatchup))
+        if (string.IsNullOrEmpty(game.SeedMatchup)) return game.Round.ToString();
+
+        // "XvX" pattern = First Four play-in for seed X
+        var parts = game.SeedMatchup.Split('v');
+        if (parts.Length == 2 &&
+            int.TryParse(parts[0], out var a) &&
+            int.TryParse(parts[1], out var b) &&
+            a == b)
+            return $"First Four — {a} seed play-in";
+
+        return game.SeedMatchup switch
         {
-            return game.SeedMatchup switch
-            {
-                "16v16" => "First Four — 16 seed play-in",
-                "11v11" => "First Four — 11 seed play-in",
-                "1v16"  => "1 seed vs 16 seed",
-                "8v9"   => "8 seed vs 9 seed",
-                "5v12"  => "5 seed vs 12 seed",
-                "4v13"  => "4 seed vs 13 seed",
-                "6v11"  => "6 seed vs 11 seed",
-                "3v14"  => "3 seed vs 14 seed",
-                "7v10"  => "7 seed vs 10 seed",
-                "2v15"  => "2 seed vs 15 seed",
-                _ => game.SeedMatchup
-            };
-        }
-        return game.Round.ToString();
+            "1v16" => "1 seed vs 16 seed",
+            "8v9"  => "8 seed vs 9 seed",
+            "5v12" => "5 seed vs 12 seed",
+            "4v13" => "4 seed vs 13 seed",
+            "6v11" => "6 seed vs 11 seed",
+            "3v14" => "3 seed vs 14 seed",
+            "7v10" => "7 seed vs 10 seed",
+            "2v15" => "2 seed vs 15 seed",
+            _ => game.SeedMatchup
+        };
     }
 }

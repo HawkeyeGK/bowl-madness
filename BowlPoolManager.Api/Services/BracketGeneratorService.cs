@@ -16,9 +16,11 @@ namespace BowlPoolManager.Api.Services
     ///   Final Four  — 2 games  (based on admin-supplied pairings)
     ///   Championship — 1 game
     ///
-    /// First Four (4 play-in games, 1 per region):
-    ///   Pairing[0][0] and Pairing[0][1] each get a 16-seed play-in (feeds the 1v16 slot)
-    ///   Pairing[1][0] and Pairing[1][1] each get an 11-seed play-in (feeds the 6v11 slot)
+    /// First Four (4 play-in games, explicitly configured):
+    ///   Each entry in request.FirstFourGames specifies the region and seed the winner assumes.
+    ///   The generator wires the play-in game to the R64 slot whose SeedMatchup contains that seed.
+    ///   Home seed = lower number (better team); Away seed = higher number in each R64 matchup.
+    ///   Seeds on R64 and First Four games are auto-populated during generation.
     ///
     /// Total: 4 + 32 + 16 + 8 + 4 + 2 + 1 = 67 games.
     /// </summary>
@@ -27,13 +29,22 @@ namespace BowlPoolManager.Api.Services
         // R64 slot index → R32 bucket (two slots share each R32 game)
         private static readonly int[] R32Map = { 0, 0, 1, 1, 2, 2, 3, 3 };
 
-        // R64 slot indexes used for First Four play-in targets
-        private const int Slot16Seed = 0; // 1 vs 16
-        private const int Slot11Seed = 4; // 6 vs 11
-
-        // SeedMatchup labels in slot order for R64 games
+        // SeedMatchup labels in slot order for R64 games (home seed v away seed)
         private static readonly string[] R64SeedMatchups =
             { "1v16", "8v9", "5v12", "4v13", "6v11", "3v14", "7v10", "2v15" };
+
+        // Maps any seed number (1–16) to the R64 SeedMatchup it belongs to
+        private static readonly Dictionary<int, string> SeedToR64Matchup = new()
+        {
+            { 1, "1v16" }, { 16, "1v16" },
+            { 8, "8v9"  }, { 9,  "8v9"  },
+            { 5, "5v12" }, { 12, "5v12" },
+            { 4, "4v13" }, { 13, "4v13" },
+            { 6, "6v11" }, { 11, "6v11" },
+            { 3, "3v14" }, { 14, "3v14" },
+            { 7, "7v10" }, { 10, "7v10" },
+            { 2, "2v15" }, { 15, "2v15" },
+        };
 
         public List<HoopsGame> GenerateBracket(BracketGenerationRequest request)
         {
@@ -96,6 +107,7 @@ namespace BowlPoolManager.Api.Services
 
             // ── 6. Round of 64 (8 per region) ────────────────────────────────────
             // Slot order: 1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15
+            // Home seed = lower number (better team); Away seed = higher number.
             var r64 = new Dictionary<string, HoopsGame[]>(StringComparer.OrdinalIgnoreCase);
             foreach (var region in request.Regions)
             {
@@ -104,25 +116,29 @@ namespace BowlPoolManager.Api.Services
                 {
                     arr[i] = Make(sid, TournamentRound.RoundOf64, region, r32[region][R32Map[i]].Id);
                     arr[i].SeedMatchup = R64SeedMatchups[i];
+
+                    // Auto-set seeds: "XvY" → Home=X (better/lower number), Away=Y (weaker/higher number)
+                    var parts = R64SeedMatchups[i].Split('v');
+                    arr[i].TeamHomeSeed = int.Parse(parts[0]);
+                    arr[i].TeamAwaySeed = int.Parse(parts[1]);
                 }
                 games.AddRange(arr);
                 r64[region] = arr;
             }
 
-            // ── 7. First Four (4 play-in games) ──────────────────────────────────
-            // Pairing[0] regions each get a 16-seed play-in → feeds that region's 1v16 slot
-            // Pairing[1] regions each get an 11-seed play-in → feeds that region's 6v11 slot
-            var firstFourSlots = new[]
+            // ── 7. First Four (4 play-in games, explicitly configured) ────────────
+            // Each entry specifies the region and seed the winner assumes in R64.
+            // Wire to the R64 game in that region whose SeedMatchup contains the seed.
+            foreach (var entry in request.FirstFourGames)
             {
-                (Region: request.FinalFourPairings[0][0], R64Slot: Slot16Seed, Matchup: "16v16"),
-                (Region: request.FinalFourPairings[0][1], R64Slot: Slot16Seed, Matchup: "16v16"),
-                (Region: request.FinalFourPairings[1][0], R64Slot: Slot11Seed, Matchup: "11v11"),
-                (Region: request.FinalFourPairings[1][1], R64Slot: Slot11Seed, Matchup: "11v11"),
-            };
-            foreach (var (region, slot, matchup) in firstFourSlots)
-            {
-                var g = Make(sid, TournamentRound.FirstFour, region, r64[region][slot].Id);
-                g.SeedMatchup = matchup;
+                var targetMatchup = SeedToR64Matchup[entry.Seed];
+                var targetR64 = r64[entry.Region].First(g =>
+                    string.Equals(g.SeedMatchup, targetMatchup, StringComparison.OrdinalIgnoreCase));
+
+                var g = Make(sid, TournamentRound.FirstFour, entry.Region, targetR64.Id);
+                g.SeedMatchup = $"{entry.Seed}v{entry.Seed}";
+                g.TeamHomeSeed = entry.Seed;
+                g.TeamAwaySeed = entry.Seed;
                 games.Add(g);
             }
 
@@ -140,8 +156,7 @@ namespace BowlPoolManager.Api.Services
                 req.FinalFourPairings[1]?.Count != 2)
                 throw new ArgumentException("Exactly 2 Final Four pairings, each containing 2 regions, are required.");
 
-            var pairedRegions = req.FinalFourPairings.SelectMany(p => p)
-                .ToList();
+            var pairedRegions = req.FinalFourPairings.SelectMany(p => p).ToList();
 
             if (pairedRegions.Distinct(StringComparer.OrdinalIgnoreCase).Count() != 4)
                 throw new ArgumentException("Each region must appear in exactly one Final Four pairing.");
@@ -152,6 +167,24 @@ namespace BowlPoolManager.Api.Services
                 if (!allRegions.Contains(r))
                     throw new ArgumentException($"Region '{r}' in Final Four pairings is not in the Regions list.");
             }
+
+            if (req.FirstFourGames == null || req.FirstFourGames.Count != 4)
+                throw new ArgumentException("Exactly 4 First Four play-in games are required.");
+
+            foreach (var entry in req.FirstFourGames)
+            {
+                if (!SeedToR64Matchup.ContainsKey(entry.Seed))
+                    throw new ArgumentException($"Seed {entry.Seed} is not a valid tournament seed (must be 1–16).");
+
+                if (!allRegions.Contains(entry.Region))
+                    throw new ArgumentException($"First Four region '{entry.Region}' is not in the Regions list.");
+            }
+
+            var firstFourKeys = req.FirstFourGames
+                .Select(f => $"{f.Region.ToUpperInvariant()}:{f.Seed}")
+                .ToList();
+            if (firstFourKeys.Distinct().Count() != 4)
+                throw new ArgumentException("Each First Four play-in game must have a unique region/seed combination.");
         }
 
         private static HoopsGame Make(string seasonId, TournamentRound round, string? region, string? nextGameId) =>

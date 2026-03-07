@@ -120,6 +120,45 @@
                 </div>
             </div>
 
+            @* First Four configuration *@
+            <div class="card shadow-sm mb-4">
+                <div class="card-header fw-semibold">First Four (Play-In Games)</div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Configure which region and seed slot each of the 4 play-in games feeds into.
+                        The winner assumes that seed in the Round of 64.
+                    </p>
+                    @for (int i = 0; i < 4; i++)
+                    {
+                        var idx = i;
+                        <div class="row g-2 align-items-end mb-3">
+                            <div class="col-auto d-flex align-items-center">
+                                <span class="badge bg-dark me-2">Game @(idx + 1)</span>
+                            </div>
+                            <div class="col">
+                                <label class="form-label small mb-1">Region</label>
+                                <select class="form-select form-select-sm"
+                                        value="@_firstFour[idx].Region"
+                                        @onchange="e => _firstFour[idx].Region = e.Value?.ToString() ?? string.Empty">
+                                    <option value="">— region —</option>
+                                    @foreach (var r in _regions.Where(r => !string.IsNullOrEmpty(r)))
+                                    {
+                                        <option value="@r">@r</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-auto" style="width: 130px;">
+                                <label class="form-label small mb-1">Winner's Seed</label>
+                                <input type="number" min="1" max="16" class="form-control form-control-sm"
+                                       placeholder="1–16"
+                                       value="@(_firstFour[idx].Seed == 0 ? string.Empty : _firstFour[idx].Seed.ToString())"
+                                       @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var s)) _firstFour[idx].Seed = s; else _firstFour[idx].Seed = 0; }" />
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
             <div class="mb-5">
                 <button class="btn btn-primary btn-lg" @onclick="GenerateBracket" disabled="@_isGenerating">
                     @if (_isGenerating)
@@ -243,7 +282,9 @@
 
     // Configuration state
     private readonly string[] _regions = { "East", "West", "South", "Midwest" };
-    private readonly string[][] _pairings = { new[] { "East", "West" }, new[] { "South", "Midwest" } };
+    // Historical default: South vs West and East vs Midwest
+    private readonly string[][] _pairings = { new[] { "South", "West" }, new[] { "East", "Midwest" } };
+    private readonly FirstFourEntry[] _firstFour = { new(), new(), new(), new() };
 
     private bool _hasExistingBracket => _existingGames.Any();
 
@@ -303,7 +344,10 @@
             {
                 _pairings[0].ToList(),
                 _pairings[1].ToList()
-            }
+            },
+            FirstFourGames = _firstFour
+                .Select(f => new FirstFourEntry { Region = f.Region, Seed = f.Seed })
+                .ToList()
         };
 
         var result = await GameService.GenerateBracketAsync(request);
@@ -342,6 +386,22 @@
         foreach (var r in allPaired)
             if (!_regions.Contains(r, StringComparer.OrdinalIgnoreCase))
                 return $"Region '{r}' in pairings does not match any defined region.";
+
+        if (_firstFour.Any(f => string.IsNullOrEmpty(f.Region)))
+            return "All 4 First Four play-in games must have a region selected.";
+
+        if (_firstFour.Any(f => f.Seed < 1 || f.Seed > 16))
+            return "All 4 First Four play-in games must have a valid seed (1–16).";
+
+        var firstFourKeys = _firstFour
+            .Select(f => $"{f.Region.ToUpperInvariant()}:{f.Seed}")
+            .ToList();
+        if (firstFourKeys.Distinct().Count() != 4)
+            return "Each First Four play-in game must have a unique region/seed combination.";
+
+        foreach (var f in _firstFour)
+            if (!_regions.Contains(f.Region, StringComparer.OrdinalIgnoreCase))
+                return $"First Four region '{f.Region}' does not match any defined region.";
 
         return string.Empty;
     }
