@@ -2,33 +2,41 @@
 
 <div class="first-four-container py-4 px-4 bg-light rounded shadow-inner" style="min-height: 400px; border: 1px solid #dee2e6;">
     <h5 class="text-secondary text-center mb-4"><i class="bi bi-ticket-perforated me-2"></i>First Four Play-In Games</h5>
-    <div class="row g-4 justify-content-center">
-        @foreach (var game in Games.OrderBy(g => g.Region).ThenBy(g => g.TeamHomeSeed))
-        {
-            var (home, away) = ResolveMatchupTeams?.Invoke(game) ?? ("", "");
-            var currentPick = Picks.TryGetValue(game.Id, out var p) ? p : "";
-            
-            bool homeAvailable = !string.IsNullOrEmpty(home) && home != "TBD";
-            bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
-            int? homeSeed = GetSeedDisplay?.Invoke(game, true);
-            int? awaySeed = GetSeedDisplay?.Invoke(game, false);
+    @foreach (var regionGroup in Games.OrderBy(g => g.Region).ThenBy(g => g.TeamHomeSeed).GroupBy(g => g.Region))
+    {
+        <div class="mb-4">
+            <h6 class="text-uppercase fw-bold text-muted mb-3 border-bottom pb-1">
+                <i class="bi bi-geo-alt-fill me-1"></i>@regionGroup.Key Region
+            </h6>
+            <div class="row g-4 justify-content-start">
+                @foreach (var game in regionGroup)
+                {
+                    var (home, away) = ResolveMatchupTeams?.Invoke(game) ?? ("", "");
+                    var currentPick = Picks.TryGetValue(game.Id, out var p) ? p : "";
 
-            <div class="col-12 col-md-6 col-lg-5 col-xl-4">
-                <BracketMatchup 
-                    Game="game" 
-                    GameLabel="@GetGameLabel?.Invoke(game)"
-                    CurrentPick="@currentPick"
-                    IsLocked="IsLocked"
-                    HomeName="@home" 
-                    HomeSeed="homeSeed" 
-                    HomeIsAvailable="homeAvailable"
-                    AwayName="@away" 
-                    AwaySeed="awaySeed" 
-                    AwayIsAvailable="awayAvailable"
-                    OnPick="HandlePick" />
+                    bool homeAvailable = !string.IsNullOrEmpty(home) && home != "TBD";
+                    bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
+                    int? homeSeed = GetSeedDisplay?.Invoke(game, true);
+                    int? awaySeed = GetSeedDisplay?.Invoke(game, false);
+
+                    <div class="col-12 col-md-6 col-lg-5 col-xl-4">
+                        <BracketMatchup
+                            Game="game"
+                            GameLabel="@GetGameLabel?.Invoke(game)"
+                            CurrentPick="@currentPick"
+                            IsLocked="IsLocked"
+                            HomeName="@home"
+                            HomeSeed="homeSeed"
+                            HomeIsAvailable="homeAvailable"
+                            AwayName="@away"
+                            AwaySeed="awaySeed"
+                            AwayIsAvailable="awayAvailable"
+                            OnPick="HandlePick" />
+                    </div>
+                }
             </div>
-        }
-    </div>
+        </div>
+    }
 </div>
 
 @code {
