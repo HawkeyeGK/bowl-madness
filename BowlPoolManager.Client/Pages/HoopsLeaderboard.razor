@@ -187,7 +187,7 @@
             var currentSeason = await SeasonService.GetCurrentSeasonAsync();
             currentSeasonId = currentSeason?.Id ?? "";
 
-            var poolsTask = Http.GetFromJsonAsync<List<HoopsPool>>($"api/GetHoopsPools?seasonId={currentSeasonId}");
+            var poolsTask = Http.GetFromJsonAsync<List<HoopsPool>>("api/GetHoopsPools");
             var myEntriesTask = FetchMyEntriesSafe();
 
             await Task.WhenAll(poolsTask, myEntriesTask);

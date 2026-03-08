@@ -53,8 +53,8 @@ namespace BowlPoolManager.Api.Functions
                 return notFound;
             }
 
-            // 2. Fetch All Games for Season
-            var allGames = await _gameRepo.GetGamesAsync(seasonId);
+            // 2. Fetch All Games for Season (use pool.SeasonId — the stored value may differ from the query param)
+            var allGames = await _gameRepo.GetGamesAsync(pool.SeasonId);
 
             // 3. Filter Games by Pool's GameIds (if configured)
             List<HoopsGame> games;
@@ -99,8 +99,8 @@ namespace BowlPoolManager.Api.Functions
                     string.Join(", ", unhydrated.Select(g => g.Round).Distinct()));
             }
 
-            // 5. Fetch All Entries for Pool
-            var entries = await _entryRepo.GetEntriesAsync(seasonId, poolId);
+            // 5. Fetch All Entries for Pool (use pool.SeasonId — the stored value may differ from the query param)
+            var entries = await _entryRepo.GetEntriesAsync(pool.SeasonId, poolId);
 
             // 6. Calculate Leaderboard using ScoringEngine (no tiebreaker for basketball)
             var leaderboardRows = ScoringEngine.Calculate(
