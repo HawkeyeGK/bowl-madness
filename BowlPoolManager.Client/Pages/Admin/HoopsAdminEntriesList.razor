@@ -8,7 +8,6 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject IJSRuntime JS
-@inject BowlPoolManager.Client.Services.ISeasonService SeasonService
 
 <PageTitle>Hoops Entries – Admin</PageTitle>
 
@@ -119,12 +118,11 @@
     {
         try
         {
-            var currentSeason = await SeasonService.GetCurrentSeasonAsync();
-            string sid = currentSeason?.Id ?? "";
-
-            var poolsTask = Http.GetFromJsonAsync<List<HoopsPool>>("api/GetHoopsPools");
-            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetHoopsEntries?seasonId={sid}");
-            var usersTask = Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers");
+            // Fetch entries cross-partition — pool SeasonId may not match the Season document
+            // GUID, so filtering by seasonId here would silently exclude entries.
+            var poolsTask   = Http.GetFromJsonAsync<List<HoopsPool>>("api/GetHoopsPools");
+            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>("api/GetHoopsEntries");
+            var usersTask   = Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers");
 
             await Task.WhenAll(poolsTask, entriesTask, usersTask);
 

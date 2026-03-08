@@ -309,8 +309,11 @@
             hoopsPools = await poolsTask ?? new();
             var allEntries = await entriesTask ?? new();
 
-            currentEntries = allEntries.Where(e => e.SeasonId == currentSeasonId).ToList();
-            pastEntries = allEntries.Where(e => e.SeasonId != currentSeasonId).ToList();
+            // Classify by pool membership — more robust than SeasonId comparison, which
+            // can fail if the pool's SeasonId doesn't match the Season document's GUID Id.
+            var activePoolIds = hoopsPools.Where(p => !p.IsArchived).Select(p => p.Id).ToHashSet();
+            currentEntries = allEntries.Where(e => activePoolIds.Contains(e.PoolId)).ToList();
+            pastEntries    = allEntries.Where(e => !activePoolIds.Contains(e.PoolId)).ToList();
 
             // Pre-fetch game counts for dashboard display
             foreach (var pool in hoopsPools)
@@ -467,7 +470,8 @@
                 var saved = await response.Content.ReadFromJsonAsync<BracketEntry>();
                 if (saved != null)
                 {
-                    var list = (saved.SeasonId == currentSeasonId) ? currentEntries : pastEntries;
+                    var list = hoopsPools.Any(p => !p.IsArchived && p.Id == saved.PoolId)
+                        ? currentEntries : pastEntries;
                     var idx = list.FindIndex(e => e.Id == saved.Id);
                     if (idx >= 0) list[idx] = saved; else list.Add(saved);
 

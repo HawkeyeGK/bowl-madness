@@ -1,9 +1,11 @@
 @using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Client.Helpers
 
 <div class="bracket-region-container shadow-inner">
     @foreach(var (round, roundGames) in Columns)
     {
         <div class="bracket-column round-@(round)">
+            <div class="bracket-column-header">@RoundLabel(round)</div>
             @foreach(var game in roundGames)
             {
                 var (home, away) = ResolveMatchupTeams?.Invoke(game) ?? ("", "");
@@ -54,12 +56,12 @@
     protected override void OnParametersSet()
     {
         var r64Games = Games.Where(g => g.Round == TournamentRound.RoundOf64)
-                            .OrderBy(g => GetSeedMatchupOrder(g.SeedMatchup))
+                            .OrderBy(g => BracketLayoutHelper.GetSeedMatchupOrder(g.SeedMatchup))
                             .ToList();
 
-        var r32Games = OrderByFeeder(Games.Where(g => g.Round == TournamentRound.RoundOf32), r64Games);
-        var s16Games = OrderByFeeder(Games.Where(g => g.Round == TournamentRound.Sweet16), r32Games);
-        var e8Games = OrderByFeeder(Games.Where(g => g.Round == TournamentRound.Elite8), s16Games);
+        var r32Games = BracketLayoutHelper.OrderByFeeder(Games.Where(g => g.Round == TournamentRound.RoundOf32), r64Games);
+        var s16Games = BracketLayoutHelper.OrderByFeeder(Games.Where(g => g.Round == TournamentRound.Sweet16), r32Games);
+        var e8Games  = BracketLayoutHelper.OrderByFeeder(Games.Where(g => g.Round == TournamentRound.Elite8), s16Games);
 
         Columns = new()
         {
@@ -70,26 +72,14 @@
         };
     }
 
-    private static int GetSeedMatchupOrder(string? matchUp) => matchUp switch {
-        "1v16" => 0,
-        "8v9" => 1,
-        "5v12" => 2,
-        "4v13" => 3,
-        "6v11" => 4,
-        "3v14" => 5,
-        "7v10" => 6,
-        "2v15" => 7,
-        _ => 99
-    };
-
-    private static List<HoopsGame> OrderByFeeder(IEnumerable<HoopsGame> currentRound, List<HoopsGame> previousRound)
+    private static string RoundLabel(TournamentRound round) => round switch
     {
-        return currentRound.OrderBy(g => 
-        {
-            var feederIndex = previousRound.FindIndex(prev => prev.NextGameId == g.Id);
-            return feederIndex >= 0 ? feederIndex : 99;
-        }).ToList();
-    }
+        TournamentRound.RoundOf64 => "Round of 64",
+        TournamentRound.RoundOf32 => "Round of 32",
+        TournamentRound.Sweet16   => "Sweet 16",
+        TournamentRound.Elite8    => "Elite 8",
+        _                         => round.ToString()
+    };
 
     private async Task HandlePick((HoopsGame Game, string Pick) args)
     {

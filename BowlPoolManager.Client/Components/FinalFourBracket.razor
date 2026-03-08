@@ -3,7 +3,7 @@
 <div class="final-four-container d-flex justify-content-center align-items-center gap-4 py-4 overflow-auto px-4 shadow-inner">
     <!-- Left Semifinal -->
     <div class="ff-column">
-        <h6 class="text-center text-secondary text-uppercase fw-bold mb-3">National Semifinal</h6>
+        <h6 class="text-center text-secondary text-uppercase fw-bold mb-3">@SF1Label</h6>
         @if (SemiFinal1 != null) {
             var (home, away) = ResolveMatchupTeams?.Invoke(SemiFinal1) ?? ("", "");
             var currentPick = Picks.TryGetValue(SemiFinal1.Id, out var p) ? p : "";
@@ -57,7 +57,7 @@
 
     <!-- Right Semifinal -->
     <div class="ff-column">
-        <h6 class="text-center text-secondary text-uppercase fw-bold mb-3">National Semifinal</h6>
+        <h6 class="text-center text-secondary text-uppercase fw-bold mb-3">@SF2Label</h6>
         @if (SemiFinal2 != null) {
             var (home, away) = ResolveMatchupTeams?.Invoke(SemiFinal2) ?? ("", "");
             var currentPick = Picks.TryGetValue(SemiFinal2.Id, out var p) ? p : "";
@@ -85,27 +85,70 @@
 
 @code {
     [Parameter, EditorRequired] public List<HoopsGame> Games { get; set; } = new();
+    /// <summary>Full game list (all 67) — used to resolve E8 feeders for region labels.</summary>
+    [Parameter] public List<HoopsGame> AllGames { get; set; } = new();
     [Parameter, EditorRequired] public Dictionary<string, string> Picks { get; set; } = new();
     [Parameter] public bool IsLocked { get; set; }
-    
+
     [Parameter] public Func<HoopsGame, (string Home, string Away)>? ResolveMatchupTeams { get; set; }
     [Parameter] public Func<HoopsGame, bool, int?>? GetSeedDisplay { get; set; }
     [Parameter] public Func<HoopsGame, string>? GetGameLabel { get; set; }
-    
+
     [Parameter] public EventCallback<(HoopsGame Game, string Pick)> OnPick { get; set; }
 
     private HoopsGame? SemiFinal1;
     private HoopsGame? SemiFinal2;
     private HoopsGame? Championship;
+    private string SF1Label = "National Semifinal";
+    private string SF2Label = "National Semifinal";
 
     protected override void OnParametersSet()
     {
-        var finalFourGames = Games.Where(g => g.Round == TournamentRound.FinalFour).OrderBy(g => g.Id).ToList();
-        
-        SemiFinal1 = finalFourGames.ElementAtOrDefault(0);
-        SemiFinal2 = finalFourGames.ElementAtOrDefault(1);
-        
+        // Sort semifinals by the alphabetically-first E8 feeder region for stable left-right placement.
+        var ffGames = Games
+            .Where(g => g.Round == TournamentRound.FinalFour)
+            .OrderBy(g => GetStableSortKey(g))
+            .ToList();
+
+        SemiFinal1 = ffGames.ElementAtOrDefault(0);
+        SemiFinal2 = ffGames.ElementAtOrDefault(1);
         Championship = Games.FirstOrDefault(g => g.Round == TournamentRound.NationalChampionship);
+
+        SF1Label = BuildRegionLabel(SemiFinal1);
+        SF2Label = BuildRegionLabel(SemiFinal2);
+    }
+
+    /// <summary>
+    /// Returns the alphabetically-first E8 feeder region for <paramref name="ffGame"/>,
+    /// falling back to the game ID so the sort is always stable.
+    /// </summary>
+    private string GetStableSortKey(HoopsGame ffGame)
+    {
+        var firstFeederRegion = AllGames
+            .Where(g => g.Round == TournamentRound.Elite8 && g.NextGameId == ffGame.Id)
+            .Select(g => g.Region ?? "")
+            .Where(r => r.Length > 0)
+            .OrderBy(r => r)
+            .FirstOrDefault();
+
+        return firstFeederRegion ?? ffGame.Id;
+    }
+
+    /// <summary>Returns a "Region1 / Region2" label derived from the E8 feeders of <paramref name="ffGame"/>.</summary>
+    private string BuildRegionLabel(HoopsGame? ffGame)
+    {
+        if (ffGame == null) return "National Semifinal";
+
+        var regions = AllGames
+            .Where(g => g.Round == TournamentRound.Elite8 && g.NextGameId == ffGame.Id)
+            .Select(g => g.Region ?? "")
+            .Where(r => r.Length > 0)
+            .OrderBy(r => r)
+            .ToList();
+
+        return regions.Count > 0
+            ? string.Join(" / ", regions)
+            : "National Semifinal";
     }
 
     private async Task HandlePick((HoopsGame Game, string Pick) args)

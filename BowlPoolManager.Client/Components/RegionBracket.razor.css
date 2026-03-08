@@ -26,3 +26,13 @@
     position: relative;
     z-index: 1;
 }
+
+.bracket-column-header {
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6c757d;
+    padding: 0.25rem 0 0.5rem 0;
+}
