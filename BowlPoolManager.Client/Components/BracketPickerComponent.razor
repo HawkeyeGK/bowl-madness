@@ -8,6 +8,25 @@ else
 {
     @* ── Region Tabs ── *@
     <ul class="nav nav-tabs mb-3 flex-nowrap overflow-auto">
+        @{
+            int firstFourTotal = GamesForFirstFour().Count;
+        }
+        @if (firstFourTotal > 0)
+        {
+            int firstFourMade = PicksForFirstFour();
+            bool firstFourComplete = firstFourMade == firstFourTotal;
+
+            <li class="nav-item flex-shrink-0">
+                <button class="nav-link @(activeTab == "First Four" ? "active" : "") px-2 px-md-3"
+                        @onclick="@(() => activeTab = "First Four")">
+                    First Four
+                    <span class="badge ms-1 @(firstFourComplete ? "bg-success" : "bg-secondary")" style="font-size:0.7em;">
+                        @firstFourMade/@firstFourTotal
+                    </span>
+                </button>
+            </li>
+        }
+
         @foreach (var region in AvailableRegions)
         {
             int made = PicksForRegion(region);
@@ -44,7 +63,17 @@ else
     </ul>
 
     @* ── Active Tab Content ── *@
-    @if (activeTab == "Final Four")
+    @if (activeTab == "First Four")
+    {
+        <FirstFourBracket Games="GamesForFirstFour()"
+                          Picks="Picks"
+                          IsLocked="IsLocked"
+                          ResolveMatchupTeams="ResolveMatchupTeams"
+                          GetSeedDisplay="GetSeedDisplay"
+                          GetGameLabel="GetGameLabel"
+                          OnPick="HandlePick" />
+    }
+    else if (activeTab == "Final Four")
     {
         <FinalFourBracket Games="GamesForFinalFour()"
                           Picks="Picks"
@@ -98,7 +127,7 @@ else
     private Dictionary<string, int?> _seedCache = new(StringComparer.OrdinalIgnoreCase);
 
     private List<string> AvailableRegions => Games
-        .Where(g => g.Round < TournamentRound.FinalFour && !string.IsNullOrEmpty(g.Region))
+        .Where(g => g.Round > TournamentRound.FirstFour && g.Round < TournamentRound.FinalFour && !string.IsNullOrEmpty(g.Region))
         .Select(g => g.Region!)
         .Distinct()
         .OrderBy(r => r)
@@ -115,14 +144,23 @@ else
                 _seedCache.TryAdd(g.TeamAway, g.TeamAwaySeed);
         }
 
-        if (string.IsNullOrEmpty(activeTab) || (!AvailableRegions.Contains(activeTab) && activeTab != "Final Four"))
+        if (string.IsNullOrEmpty(activeTab) || (!AvailableRegions.Contains(activeTab) && activeTab != "Final Four" && activeTab != "First Four"))
         {
-            activeTab = AvailableRegions.FirstOrDefault() ?? "Final Four";
+            if (GamesForFirstFour().Any())
+                activeTab = "First Four";
+            else
+                activeTab = AvailableRegions.FirstOrDefault() ?? "Final Four";
         }
     }
 
+    private List<HoopsGame> GamesForFirstFour() =>
+        Games.Where(g => g.Round == TournamentRound.FirstFour).ToList();
+
+    private int PicksForFirstFour() =>
+        GamesForFirstFour().Count(g => Picks.ContainsKey(g.Id) && !string.IsNullOrEmpty(Picks[g.Id]));
+
     private List<HoopsGame> GamesForRegion(string region) =>
-        Games.Where(g => g.Region == region && g.Round < TournamentRound.FinalFour).ToList();
+        Games.Where(g => g.Region == region && g.Round > TournamentRound.FirstFour && g.Round < TournamentRound.FinalFour).ToList();
 
     private int PicksForRegion(string region) =>
         GamesForRegion(region).Count(g => Picks.ContainsKey(g.Id) && !string.IsNullOrEmpty(Picks[g.Id]));

@@ -1,0 +1,49 @@
+@using BowlPoolManager.Core.Domain
+
+<div class="first-four-container py-4 px-4 bg-light rounded shadow-inner" style="min-height: 400px; border: 1px solid #dee2e6;">
+    <h5 class="text-secondary text-center mb-4"><i class="bi bi-ticket-perforated me-2"></i>First Four Play-In Games</h5>
+    <div class="row g-4 justify-content-center">
+        @foreach (var game in Games.OrderBy(g => g.Region).ThenBy(g => g.TeamHomeSeed))
+        {
+            var (home, away) = ResolveMatchupTeams?.Invoke(game) ?? ("", "");
+            var currentPick = Picks.TryGetValue(game.Id, out var p) ? p : "";
+            
+            bool homeAvailable = !string.IsNullOrEmpty(home) && home != "TBD";
+            bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
+            int? homeSeed = GetSeedDisplay?.Invoke(game, true);
+            int? awaySeed = GetSeedDisplay?.Invoke(game, false);
+
+            <div class="col-12 col-md-6 col-lg-5 col-xl-4">
+                <BracketMatchup 
+                    Game="game" 
+                    GameLabel="@GetGameLabel?.Invoke(game)"
+                    CurrentPick="@currentPick"
+                    IsLocked="IsLocked"
+                    HomeName="@home" 
+                    HomeSeed="homeSeed" 
+                    HomeIsAvailable="homeAvailable"
+                    AwayName="@away" 
+                    AwaySeed="awaySeed" 
+                    AwayIsAvailable="awayAvailable"
+                    OnPick="HandlePick" />
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<HoopsGame> Games { get; set; } = new();
+    [Parameter, EditorRequired] public Dictionary<string, string> Picks { get; set; } = new();
+    [Parameter] public bool IsLocked { get; set; }
+    
+    [Parameter] public Func<HoopsGame, (string Home, string Away)>? ResolveMatchupTeams { get; set; }
+    [Parameter] public Func<HoopsGame, bool, int?>? GetSeedDisplay { get; set; }
+    [Parameter] public Func<HoopsGame, string>? GetGameLabel { get; set; }
+    
+    [Parameter] public EventCallback<(HoopsGame Game, string Pick)> OnPick { get; set; }
+
+    private async Task HandlePick((HoopsGame Game, string Pick) args)
+    {
+        await OnPick.InvokeAsync(args);
+    }
+}
