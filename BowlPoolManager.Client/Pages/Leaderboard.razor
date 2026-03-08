@@ -11,6 +11,7 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Nav
 @inject IJSRuntime JSRuntime
+@inject ISiteContext SiteContext
 
 <PageTitle>Leaderboard</PageTitle>
 
@@ -210,10 +211,17 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await SiteContext.InitializeAsync();
+        if (SiteContext.ActiveSport == Sport.Basketball)
+        {
+            Nav.NavigateTo("/hoops/leaderboard", replace: true);
+            return;
+        }
+
         try
         {
             isLoading = true;
-            
+
             // 0. Fetch Current Season
             var currentSeason = await SeasonService.GetCurrentSeasonAsync();
             currentSeasonId = currentSeason?.Id ?? "";
