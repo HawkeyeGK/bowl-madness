@@ -8,7 +8,7 @@
 else
 {
     @* ── Region Tabs ── *@
-    <ul class="nav nav-tabs mb-3 flex-nowrap overflow-auto">
+    <ul class="nav nav-tabs mb-3 flex-nowrap overflow-auto bracket-nav-tabs">
         @{
             int firstFourTotal = GamesForFirstFour().Count;
         }
@@ -18,7 +18,7 @@ else
             bool firstFourComplete = firstFourMade == firstFourTotal;
 
             <li class="nav-item flex-shrink-0">
-                <button class="nav-link @(activeTab == "First Four" ? "active" : "") px-2 px-md-3"
+                <button class="nav-link @(activeTab == "First Four" ? "active fw-bold" : "") px-2 px-md-3"
                         @onclick="@(() => activeTab = "First Four")">
                     First Four
                     <span class="badge ms-1 @(firstFourComplete ? "bg-success" : "bg-secondary")" style="font-size:0.7em;">
@@ -34,7 +34,7 @@ else
             int total = GamesForRegion(region).Count;
             bool complete = made == total;
             <li class="nav-item flex-shrink-0">
-                <button class="nav-link @(activeTab == region ? "active" : "") px-2 px-md-3"
+                <button class="nav-link @(activeTab == region ? "active fw-bold" : "") px-2 px-md-3"
                         @onclick="() => activeTab = region">
                     @region
                     <span class="badge ms-1 @(complete ? "bg-success" : "bg-secondary")" style="font-size:0.7em;">
@@ -50,7 +50,7 @@ else
             bool ffComplete = ffMade == ffTotal && ffTotal > 0;
         }
         <li class="nav-item flex-shrink-0">
-            <button class="nav-link @(activeTab == "Final Four" ? "active" : "") px-2 px-md-3 text-warning fw-bold"
+            <button class="nav-link @(activeTab == "Final Four" ? "active fw-bold" : "") px-2 px-md-3"
                     @onclick="@(() => activeTab = "Final Four")">
                 Final Four
                 @if (ffTotal > 0)
@@ -113,11 +113,30 @@ else
             }
             else
             {
-                <span class="badge bg-warning text-dark">@(totalGames - totalPicks) picks remaining</span>
+                <span class="badge bg-dark text-warning fw-bold">@(totalGames - totalPicks) picks remaining</span>
             }
         </div>
     </div>
 }
+
+<style>
+    .bracket-nav-tabs .nav-link {
+        color: #495057;
+        border: 1px solid #ced4da;
+        border-radius: 4px 4px 0 0;
+        margin-right: 2px;
+    }
+
+    .bracket-nav-tabs .nav-link:hover:not(.active) {
+        background-color: #f8f9fa;
+        color: #212529;
+        border-color: #adb5bd;
+    }
+
+    .bracket-nav-tabs .nav-link.active {
+        color: #212529;
+    }
+</style>
 
 @code {
     [Parameter, EditorRequired] public List<HoopsGame> Games { get; set; } = new();
