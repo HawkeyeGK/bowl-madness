@@ -66,5 +66,32 @@ namespace BowlPoolManager.Client.Services
                 return false;
             }
         }
+
+        public async Task<HoopsGame?> SaveGameAsync(HoopsGame game)
+        {
+            try
+            {
+                var resp = await _http.PostAsJsonAsync("api/SaveHoopsGame", game);
+                if (!resp.IsSuccessStatusCode) return null;
+                return await resp.Content.ReadFromJsonAsync<HoopsGame>();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public async Task<bool> ForcePropagationAsync(string seasonId)
+        {
+            try
+            {
+                var resp = await _http.PostAsync($"api/ForceHoopsPropagation?seasonId={seasonId}", null);
+                return resp.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 }

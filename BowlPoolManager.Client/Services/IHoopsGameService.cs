@@ -9,5 +9,7 @@ namespace BowlPoolManager.Client.Services
         Task<List<HoopsGame>?> GenerateBracketAsync(BracketGenerationRequest request);
         Task<HoopsGame?> UpdateGameAsync(HoopsGame game);
         Task<bool> SaveTeamAssignmentsAsync(List<HoopsGame> games);
+        Task<HoopsGame?> SaveGameAsync(HoopsGame game);
+        Task<bool> ForcePropagationAsync(string seasonId);
     }
 }

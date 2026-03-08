@@ -18,19 +18,22 @@ namespace BowlPoolManager.Api.Functions
         private readonly IHoopsPoolRepository _poolRepo;
         private readonly IUserRepository _userRepo;
         private readonly IBracketGeneratorService _bracketGenerator;
+        private readonly IHoopsGameScoringService _scoringService;
 
         public HoopsGameFunctions(
             ILoggerFactory loggerFactory,
             IHoopsGameRepository gameRepo,
             IHoopsPoolRepository poolRepo,
             IUserRepository userRepo,
-            IBracketGeneratorService bracketGenerator)
+            IBracketGeneratorService bracketGenerator,
+            IHoopsGameScoringService scoringService)
         {
             _logger = loggerFactory.CreateLogger<HoopsGameFunctions>();
             _gameRepo = gameRepo;
             _poolRepo = poolRepo;
             _userRepo = userRepo;
             _bracketGenerator = bracketGenerator;
+            _scoringService = scoringService;
         }
 
         [Function("GetHoopsGames")]
@@ -186,6 +189,58 @@ namespace BowlPoolManager.Api.Functions
 
             await _gameRepo.DeleteGameAsync(gameId, seasonId);
             return req.CreateResponse(HttpStatusCode.OK);
+        }
+
+        [Function("SaveHoopsGame")]
+        public async Task<HttpResponseData> SaveHoopsGame(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+        {
+            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
+            if (!authResult.IsValid) return authResult.ErrorResponse!;
+
+            try
+            {
+                var game = await JsonSerializer.DeserializeAsync<HoopsGame>(req.Body);
+                if (game == null ||
+                    string.IsNullOrEmpty(game.Id) ||
+                    string.IsNullOrEmpty(game.SeasonId))
+                {
+                    return req.CreateResponse(HttpStatusCode.BadRequest);
+                }
+
+                await _scoringService.ProcessGameUpdateAsync(game);
+
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(game);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SaveHoopsGame failed.");
+                return req.CreateResponse(HttpStatusCode.InternalServerError);
+            }
+        }
+
+        [Function("ForceHoopsPropagation")]
+        public async Task<HttpResponseData> ForceHoopsPropagation(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+        {
+            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
+            if (!authResult.IsValid) return authResult.ErrorResponse!;
+
+            var seasonId = req.Query["seasonId"];
+            if (string.IsNullOrEmpty(seasonId)) return req.CreateResponse(HttpStatusCode.BadRequest);
+
+            try
+            {
+                await _scoringService.ForcePropagateAllAsync(seasonId);
+                return req.CreateResponse(HttpStatusCode.OK);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ForceHoopsPropagation failed.");
+                return req.CreateResponse(HttpStatusCode.InternalServerError);
+            }
         }
     }
 }

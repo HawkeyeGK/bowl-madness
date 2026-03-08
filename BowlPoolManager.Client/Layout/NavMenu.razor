@@ -59,16 +59,32 @@
 
         @* 3. SCOREBOARD *@
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="results">
-                <span class="bi bi-display me-2" aria-hidden="true"></span> Scoreboard
-                @if (IsLive)
-                {
-                    <span class="badge bg-danger ms-2" style="font-size: 0.7em;">
-                        <span class="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style="width: 5px; height: 5px;"></span>
-                        LIVE
-                    </span>
-                }
-            </NavLink>
+            @if (SiteContext.ActiveSport == Sport.Basketball)
+            {
+                <NavLink class="nav-link" href="hoops/scoreboard">
+                    <span class="bi bi-display me-2" aria-hidden="true"></span> Scoreboard
+                    @if (IsLive)
+                    {
+                        <span class="badge bg-danger ms-2" style="font-size: 0.7em;">
+                            <span class="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style="width: 5px; height: 5px;"></span>
+                            LIVE
+                        </span>
+                    }
+                </NavLink>
+            }
+            else
+            {
+                <NavLink class="nav-link" href="results">
+                    <span class="bi bi-display me-2" aria-hidden="true"></span> Scoreboard
+                    @if (IsLive)
+                    {
+                        <span class="badge bg-danger ms-2" style="font-size: 0.7em;">
+                            <span class="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style="width: 5px; height: 5px;"></span>
+                            LIVE
+                        </span>
+                    }
+                </NavLink>
+            }
         </div>
 
         @* 4. PATH TO VICTORY *@
@@ -103,6 +119,14 @@
                         <span class="bi bi-speedometer2 me-2" aria-hidden="true"></span> Dashboard
                     </NavLink>
                 </div>
+                @if (SiteContext.ActiveSport == Sport.Basketball)
+                {
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="admin/hoops/gameresults">
+                            <span class="bi bi-scoreboard me-2" aria-hidden="true"></span> Enter Results
+                        </NavLink>
+                    </div>
+                }
             </Authorized>
         </AuthorizeView>
 

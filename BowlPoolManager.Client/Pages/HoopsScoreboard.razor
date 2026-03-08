@@ -1,0 +1,276 @@
+@page "/hoops/scoreboard"
+@using BowlPoolManager.Core.Domain
+@inject IHoopsPoolService PoolService
+@inject IHoopsGameService GameService
+
+<PageTitle>Hoops Scoreboard</PageTitle>
+
+<div class="container-fluid mt-3 px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 fw-bold mb-0"><i class="bi bi-display text-primary me-2"></i>Scoreboard</h1>
+            <div class="text-muted small">Tournament results by round</div>
+        </div>
+        @if (_isLoading)
+        {
+            <div class="spinner-border text-primary spinner-border-sm" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        }
+    </div>
+
+    @if (_isLoading && _games == null)
+    {
+        <div class="text-center mt-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted">Loading games...</p>
+        </div>
+    }
+    else if (_games == null || !_games.Any())
+    {
+        <div class="alert alert-info">No games available yet.</div>
+    }
+    else
+    {
+        @foreach (var round in _roundOrder)
+        {
+            var roundGames = _games.Where(g => g.Round == round).ToList();
+            if (!roundGames.Any()) continue;
+
+            var hasLive = roundGames.Any(g => g.Status == GameStatus.InProgress);
+
+            <div class="mb-5">
+                <div class="d-flex align-items-center gap-2 mb-3 border-bottom pb-2">
+                    <h5 class="fw-bold mb-0 text-primary">@GetRoundLabel(round)</h5>
+                    @if (hasLive)
+                    {
+                        <span class="badge bg-danger" style="font-size: 0.7em;">
+                            <span class="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style="width: 5px; height: 5px;"></span>
+                            LIVE
+                        </span>
+                    }
+                </div>
+
+                @* Group by region within round *@
+                @foreach (var region in roundGames.Select(g => g.Region ?? "").Distinct().OrderBy(r => r))
+                {
+                    var regionGames = roundGames.Where(g => (g.Region ?? "") == region).OrderBy(g => g.Id).ToList();
+
+                    @if (!string.IsNullOrEmpty(region) && roundGames.Select(g => g.Region ?? "").Distinct().Count() > 1)
+                    {
+                        <h6 class="text-muted fw-semibold mb-2 ms-1">@region</h6>
+                    }
+
+                    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mb-3">
+                        @foreach (var game in regionGames)
+                        {
+                            <div class="col" @key="game.Id">
+                                <div class="card h-100 shadow-sm @GetCardClass(game)">
+                                    <div class="card-body p-3">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <span class="badge @GetStatusBadgeClass(game)">@GetStatusLabel(game)</span>
+                                            @if (!string.IsNullOrEmpty(game.SeedMatchup))
+                                            {
+                                                <span class="text-muted small">@game.SeedMatchup</span>
+                                            }
+                                        </div>
+
+                                        @* Home Team *@
+                                        <div class="d-flex justify-content-between align-items-center mb-1 @(IsWinner(game, true) ? "fw-bold" : "")">
+                                            <div class="d-flex align-items-center gap-2">
+                                                @if (!string.IsNullOrEmpty(game.HomeTeamInfo?.PrimaryLogoUrl))
+                                                {
+                                                    <img src="@game.HomeTeamInfo.PrimaryLogoUrl" height="24" width="24" style="object-fit: contain;" alt="" />
+                                                }
+                                                @if (game.TeamHomeSeed.HasValue)
+                                                {
+                                                    <span class="badge bg-secondary" style="font-size: 0.7em; min-width: 22px;">@game.TeamHomeSeed</span>
+                                                }
+                                                <span class="small @(IsEliminated(game, true) ? "text-decoration-line-through text-muted" : "")">
+                                                    @GetDisplayTeamName(game, true)
+                                                </span>
+                                            </div>
+                                            @if (game.TeamHomeScore.HasValue)
+                                            {
+                                                <span class="fw-bold @(IsWinner(game, true) ? "text-success" : "")">@game.TeamHomeScore</span>
+                                            }
+                                        </div>
+
+                                        @* Away Team *@
+                                        <div class="d-flex justify-content-between align-items-center @(IsWinner(game, false) ? "fw-bold" : "")">
+                                            <div class="d-flex align-items-center gap-2">
+                                                @if (!string.IsNullOrEmpty(game.AwayTeamInfo?.PrimaryLogoUrl))
+                                                {
+                                                    <img src="@game.AwayTeamInfo.PrimaryLogoUrl" height="24" width="24" style="object-fit: contain;" alt="" />
+                                                }
+                                                @if (game.TeamAwaySeed.HasValue)
+                                                {
+                                                    <span class="badge bg-secondary" style="font-size: 0.7em; min-width: 22px;">@game.TeamAwaySeed</span>
+                                                }
+                                                <span class="small @(IsEliminated(game, false) ? "text-decoration-line-through text-muted" : "")">
+                                                    @GetDisplayTeamName(game, false)
+                                                </span>
+                                            </div>
+                                            @if (game.TeamAwayScore.HasValue)
+                                            {
+                                                <span class="fw-bold @(IsWinner(game, false) ? "text-success" : "")">@game.TeamAwayScore</span>
+                                            }
+                                        </div>
+
+                                        @if (!string.IsNullOrEmpty(game.GameDetail) && game.Status == GameStatus.InProgress)
+                                        {
+                                            <div class="text-muted small text-end mt-1">@game.GameDetail</div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<HoopsGame>? _games;
+    private bool _isLoading = true;
+
+    private static readonly TournamentRound[] _roundOrder =
+    [
+        TournamentRound.FirstFour,
+        TournamentRound.RoundOf64,
+        TournamentRound.RoundOf32,
+        TournamentRound.Sweet16,
+        TournamentRound.Elite8,
+        TournamentRound.FinalFour,
+        TournamentRound.NationalChampionship
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _isLoading = true;
+            var pools = await PoolService.GetPoolsAsync();
+            var activePool = pools.FirstOrDefault(p => !p.IsConcluded) ?? pools.FirstOrDefault();
+            if (activePool != null)
+            {
+                _games = await GameService.GetGamesAsync(activePool.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading hoops scoreboard: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static string GetRoundLabel(TournamentRound round) => round switch
+    {
+        TournamentRound.FirstFour => "First Four",
+        TournamentRound.RoundOf64 => "Round of 64",
+        TournamentRound.RoundOf32 => "Round of 32",
+        TournamentRound.Sweet16 => "Sweet 16",
+        TournamentRound.Elite8 => "Elite 8",
+        TournamentRound.FinalFour => "Final Four",
+        TournamentRound.NationalChampionship => "National Championship",
+        _ => round.ToString()
+    };
+
+    private static string GetStatusLabel(HoopsGame game) => game.Status switch
+    {
+        GameStatus.Final => "Final",
+        GameStatus.InProgress => game.GameDetail ?? "In Progress",
+        _ => "Scheduled"
+    };
+
+    private static string GetStatusBadgeClass(HoopsGame game) => game.Status switch
+    {
+        GameStatus.Final => "bg-secondary",
+        GameStatus.InProgress => "bg-danger",
+        _ => "bg-primary opacity-50"
+    };
+
+    private static string GetCardClass(HoopsGame game) => game.Status switch
+    {
+        GameStatus.InProgress => "border-warning border-2",
+        GameStatus.Final => "opacity-90",
+        _ => ""
+    };
+
+    private static bool IsWinner(HoopsGame game, bool isHome)
+    {
+        if (game.Status != GameStatus.Final) return false;
+        var winner = game.WinningTeamName;
+        if (string.IsNullOrEmpty(winner)) return false;
+        var team = isHome ? game.TeamHome : game.TeamAway;
+        return string.Equals(winner, team, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsEliminated(HoopsGame game, bool isHome)
+    {
+        if (game.Status != GameStatus.Final) return false;
+        var winner = game.WinningTeamName;
+        if (string.IsNullOrEmpty(winner)) return false;
+        var team = isHome ? game.TeamHome : game.TeamAway;
+        return !string.Equals(winner, team, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string GetDisplayTeamName(HoopsGame game, bool isHome)
+    {
+        string current = isHome ? game.TeamHome : game.TeamAway;
+        if (!IsPlaceholder(current)) return current;
+
+        if (_games == null) return "TBD";
+
+        var feeders = _games
+            .Where(g => string.Equals(g.NextGameId, game.Id, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(g => (int)g.Round).ThenBy(g => g.Id)
+            .ToList();
+
+        if (!feeders.Any()) return "TBD";
+
+        HoopsGame? targetFeeder = null;
+
+        if (feeders.Count > 1)
+        {
+            targetFeeder = isHome ? feeders[0] : feeders[1];
+        }
+        else
+        {
+            string otherSlot = isHome ? game.TeamAway : game.TeamHome;
+            bool otherIsPlaceholder = IsPlaceholder(otherSlot);
+            var feederWinner = feeders[0].Status == GameStatus.Final ? feeders[0].WinningTeamName : null;
+
+            if (!otherIsPlaceholder)
+            {
+                if (feederWinner != null && string.Equals(feederWinner, otherSlot, StringComparison.OrdinalIgnoreCase))
+                    targetFeeder = null;
+                else
+                    targetFeeder = feeders[0];
+            }
+            else
+            {
+                if (isHome) targetFeeder = feeders[0];
+            }
+        }
+
+        if (targetFeeder == null) return "TBD";
+
+        return targetFeeder.Status == GameStatus.Final && !string.IsNullOrEmpty(targetFeeder.WinningTeamName)
+            ? targetFeeder.WinningTeamName
+            : "TBD";
+    }
+
+    private static bool IsPlaceholder(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return true;
+        if (name.Equals("TBD", StringComparison.OrdinalIgnoreCase)) return true;
+        if (name.StartsWith("Winner of", StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+}

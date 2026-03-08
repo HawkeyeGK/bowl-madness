@@ -21,6 +21,7 @@ builder.Services.AddHttpClient<ICfbdService, CfbdService>();
 builder.Services.AddHttpClient<IBasketballDataService, BasketballDataService>();
 builder.Services.AddHttpClient<IEspnDataService, EspnDataService>();
 builder.Services.AddSingleton<IGameScoringService, GameScoringService>();
+builder.Services.AddSingleton<IHoopsGameScoringService, HoopsGameScoringService>();
 
 // --- REPOSITORIES & DATABASE ---
 // --- 1. OPTIMIZED REGISTRATION (Fast, No Network Calls) ---

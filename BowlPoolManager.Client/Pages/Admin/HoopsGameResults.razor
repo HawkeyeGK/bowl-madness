@@ -1,0 +1,398 @@
+@page "/admin/hoops/gameresults"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
+
+@inject IHoopsPoolService PoolService
+@inject IHoopsGameService GameService
+
+<PageTitle>Hoops Game Results</PageTitle>
+
+<div class="container-fluid mt-3 px-4">
+    <div class="d-flex justify-content-between align-items-end mb-3">
+        <div class="d-flex align-items-center gap-3">
+            <h1 class="h3 fw-bold mb-0"><i class="bi bi-dribbble text-primary"></i> Hoops Results</h1>
+        </div>
+        <span class="badge bg-danger">Super Admin Zone</span>
+    </div>
+
+    @* Pool Selector *@
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <label class="form-label fw-bold">Select Pool:</label>
+            <select class="form-select" value="@_selectedPoolId" @onchange="OnPoolChanged">
+                <option value="">-- Select Pool --</option>
+                @if (_pools != null)
+                {
+                    @foreach (var p in _pools)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="alert alert-info">Loading games...</div>
+    }
+    else if (string.IsNullOrEmpty(_selectedPoolId))
+    {
+        <div class="alert alert-secondary">Select a pool to view games.</div>
+    }
+    else if (_games == null || !_games.Any())
+    {
+        <div class="alert alert-warning">No games found. Generate a bracket first.</div>
+    }
+    else
+    {
+        @foreach (var round in _roundOrder)
+        {
+            var roundGames = _games.Where(g => g.Round == round).ToList();
+            if (!roundGames.Any()) continue;
+
+            <div class="mb-4">
+                <h5 class="fw-bold text-primary border-bottom pb-1 mb-2">@GetRoundLabel(round)</h5>
+                <div class="card shadow-sm">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 15%">Region / Seed</th>
+                                        <th style="width: 30%">Matchup</th>
+                                        <th style="width: 20%">Status</th>
+                                        <th style="width: 10%">Home</th>
+                                        <th style="width: 10%">Away</th>
+                                        <th style="width: 15%" class="text-end">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var game in roundGames.OrderBy(g => g.Region).ThenBy(g => g.Id))
+                                    {
+                                        <tr class="@GetRowClass(game)">
+                                            <td>
+                                                <div class="fw-bold">@(game.Region ?? "–")</div>
+                                                @if (!string.IsNullOrEmpty(game.SeedMatchup))
+                                                {
+                                                    <div class="small text-muted">@game.SeedMatchup</div>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div class="small">
+                                                    <span class="text-primary">@GetDisplayTeamName(game, true)</span>
+                                                    <span class="text-muted mx-1">vs</span>
+                                                    <span class="text-danger">@GetDisplayTeamName(game, false)</span>
+                                                </div>
+                                                @if (game.Status == GameStatus.Final && !string.IsNullOrEmpty(game.WinningTeamName))
+                                                {
+                                                    <div class="small text-success fw-bold">Winner: @game.WinningTeamName</div>
+                                                }
+                                            </td>
+                                            <td>
+                                                <InputSelect class="form-select form-select-sm" @bind-Value="game.Status">
+                                                    <option value="@GameStatus.Scheduled">Scheduled</option>
+                                                    <option value="@GameStatus.InProgress">In Progress</option>
+                                                    <option value="@GameStatus.Final">Final</option>
+                                                </InputSelect>
+                                            </td>
+                                            <td>
+                                                <InputNumber class="form-control form-control-sm" @bind-Value="game.TeamHomeScore" placeholder="–" />
+                                            </td>
+                                            <td>
+                                                <InputNumber class="form-control form-control-sm" @bind-Value="game.TeamAwayScore" placeholder="–" />
+                                            </td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-success" @onclick="() => SaveResult(game)">
+                                                    <i class="bi bi-check-lg"></i> Save
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    @* Debug / Diagnostics *@
+    @if (_games != null && _games.Any())
+    {
+        <div class="mt-4">
+            <button class="btn btn-outline-secondary btn-sm mb-3" @onclick="() => _showDebug = !_showDebug">
+                @(_showDebug ? "Hide Diagnostics" : "Show Diagnostics")
+            </button>
+
+            @if (_showDebug)
+            {
+                <div class="card bg-light border-warning">
+                    <div class="card-header bg-warning text-dark fw-bold d-flex justify-content-between align-items-center">
+                        <span>Propagation Diagnostics</span>
+                        <button class="btn btn-danger btn-sm" @onclick="ForcePropagation">
+                            <i class="bi bi-arrow-repeat"></i> Force Propagation
+                        </button>
+                    </div>
+                    <div class="card-body font-monospace small">
+                        <ul class="list-group list-group-flush">
+                            @foreach (var game in _games.Where(g => !string.IsNullOrEmpty(g.NextGameId) || _games.Any(f => f.NextGameId == g.Id)))
+                            {
+                                var feeders = _games.Where(f => string.Equals(f.NextGameId, game.Id, StringComparison.OrdinalIgnoreCase)).OrderBy(f => f.Id).ToList();
+                                var nextGame = _games.FirstOrDefault(f => string.Equals(f.Id, game.NextGameId, StringComparison.OrdinalIgnoreCase));
+
+                                <li class="list-group-item bg-transparent">
+                                    <div class="fw-bold text-primary">@GetGameLabel(game) (@game.Id[..8]…)</div>
+                                    <div class="ms-3 text-secondary">
+                                        Home="@(game.TeamHome ?? "null")" | Away="@(game.TeamAway ?? "null")" | Status=@game.Status
+                                    </div>
+                                    <div class="ms-3">
+                                        <span>Feeds into: </span>
+                                        @if (nextGame != null)
+                                        {
+                                            <span class="text-success">@GetGameLabel(nextGame)</span>
+                                        }
+                                        else if (!string.IsNullOrEmpty(game.NextGameId))
+                                        {
+                                            <span class="text-danger fw-bold">BROKEN LINK</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">None (Championship)</span>
+                                        }
+                                    </div>
+                                    <div class="ms-3">
+                                        <span>Fed by (@feeders.Count):</span>
+                                        @if (feeders.Any())
+                                        {
+                                            <ul class="mb-0">
+                                                @foreach (var f in feeders)
+                                                {
+                                                    <li>@GetGameLabel(f) — @f.Status @(f.Status == GameStatus.Final ? $"✅ {f.WinningTeamName}" : "")</li>
+                                                }
+                                            </ul>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted"> None</span>
+                                        }
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @* Toast *@
+    @if (!string.IsNullOrEmpty(_statusMessage))
+    {
+        <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+            <div class="toast show align-items-center text-white @(_isError ? "bg-danger" : "bg-success") border-0" role="alert">
+                <div class="d-flex">
+                    <div class="toast-body">@_statusMessage</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" @onclick="() => _statusMessage = null"></button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<HoopsPool>? _pools;
+    private List<HoopsGame>? _games;
+    private string _selectedPoolId = "";
+    private HoopsPool? _selectedPool;
+    private string? _statusMessage;
+    private bool _isError;
+    private bool _isLoading;
+    private bool _showDebug;
+
+    private static readonly TournamentRound[] _roundOrder =
+    [
+        TournamentRound.FirstFour,
+        TournamentRound.RoundOf64,
+        TournamentRound.RoundOf32,
+        TournamentRound.Sweet16,
+        TournamentRound.Elite8,
+        TournamentRound.FinalFour,
+        TournamentRound.NationalChampionship
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _pools = await PoolService.GetPoolsAsync();
+        var active = _pools.FirstOrDefault(p => !p.IsConcluded) ?? _pools.FirstOrDefault();
+        if (active != null)
+        {
+            _selectedPoolId = active.Id;
+            _selectedPool = active;
+            await LoadGames();
+        }
+    }
+
+    private async Task OnPoolChanged(ChangeEventArgs e)
+    {
+        _selectedPoolId = e.Value?.ToString() ?? "";
+        _selectedPool = _pools?.FirstOrDefault(p => p.Id == _selectedPoolId);
+        await LoadGames();
+    }
+
+    private async Task LoadGames()
+    {
+        if (string.IsNullOrEmpty(_selectedPoolId))
+        {
+            _games = null;
+            return;
+        }
+
+        _isLoading = true;
+        try
+        {
+            _games = await GameService.GetGamesAsync(_selectedPoolId);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SaveResult(HoopsGame game)
+    {
+        try
+        {
+            var updated = await GameService.SaveGameAsync(game);
+            if (updated != null)
+            {
+                ShowToast($"Saved — {GetGameLabel(game)}");
+                await LoadGames();
+            }
+            else
+            {
+                ShowToast("Save failed.", isError: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowToast($"Error: {ex.Message}", isError: true);
+        }
+    }
+
+    private async Task ForcePropagation()
+    {
+        if (_selectedPool == null) return;
+
+        ShowToast("Running force propagation…");
+        var ok = await GameService.ForcePropagationAsync(_selectedPool.SeasonId);
+
+        if (ok)
+        {
+            ShowToast("Propagation complete! Reloading…");
+            await Task.Delay(1000);
+            await LoadGames();
+        }
+        else
+        {
+            ShowToast("Force propagation failed.", isError: true);
+        }
+    }
+
+    private void ShowToast(string message, bool isError = false)
+    {
+        _statusMessage = message;
+        _isError = isError;
+        StateHasChanged();
+        _ = Task.Delay(4000).ContinueWith(_ =>
+        {
+            _statusMessage = null;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private string GetRowClass(HoopsGame game) => game.Status switch
+    {
+        GameStatus.InProgress => "table-warning border-start border-warning border-5",
+        GameStatus.Final => "table-secondary text-muted",
+        _ => ""
+    };
+
+    private static string GetRoundLabel(TournamentRound round) => round switch
+    {
+        TournamentRound.FirstFour => "First Four",
+        TournamentRound.RoundOf64 => "Round of 64",
+        TournamentRound.RoundOf32 => "Round of 32",
+        TournamentRound.Sweet16 => "Sweet 16",
+        TournamentRound.Elite8 => "Elite 8",
+        TournamentRound.FinalFour => "Final Four",
+        TournamentRound.NationalChampionship => "National Championship",
+        _ => round.ToString()
+    };
+
+    private static string GetGameLabel(HoopsGame game)
+    {
+        if (!string.IsNullOrEmpty(game.SeedMatchup) && !string.IsNullOrEmpty(game.Region))
+            return $"{game.Region} {game.SeedMatchup}";
+        if (!string.IsNullOrEmpty(game.Region))
+            return $"{game.Region} {GetRoundLabel(game.Round)}";
+        return GetRoundLabel(game.Round);
+    }
+
+    private string GetDisplayTeamName(HoopsGame game, bool isHome)
+    {
+        string current = isHome ? game.TeamHome : game.TeamAway;
+        if (!IsPlaceholder(current)) return current;
+
+        if (_games == null) return "TBD";
+
+        var feeders = _games
+            .Where(g => string.Equals(g.NextGameId, game.Id, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(g => (int)g.Round).ThenBy(g => g.Id)
+            .ToList();
+
+        if (!feeders.Any()) return "TBD";
+
+        HoopsGame? targetFeeder = null;
+
+        if (feeders.Count > 1)
+        {
+            targetFeeder = isHome ? feeders[0] : feeders[1];
+        }
+        else
+        {
+            string otherSlot = isHome ? game.TeamAway : game.TeamHome;
+            bool otherIsPlaceholder = IsPlaceholder(otherSlot);
+            var feederWinner = feeders[0].Status == GameStatus.Final ? feeders[0].WinningTeamName : null;
+
+            if (!otherIsPlaceholder)
+            {
+                if (feederWinner != null && string.Equals(feederWinner, otherSlot, StringComparison.OrdinalIgnoreCase))
+                    targetFeeder = null;
+                else
+                    targetFeeder = feeders[0];
+            }
+            else
+            {
+                if (isHome) targetFeeder = feeders[0];
+            }
+        }
+
+        if (targetFeeder == null) return "TBD";
+
+        return targetFeeder.Status == GameStatus.Final && !string.IsNullOrEmpty(targetFeeder.WinningTeamName)
+            ? targetFeeder.WinningTeamName
+            : $"Winner of {GetGameLabel(targetFeeder)}";
+    }
+
+    private static bool IsPlaceholder(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return true;
+        if (name.Equals("TBD", StringComparison.OrdinalIgnoreCase)) return true;
+        if (name.StartsWith("Winner of", StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+}
