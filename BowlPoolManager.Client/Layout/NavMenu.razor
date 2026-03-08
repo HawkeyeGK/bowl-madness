@@ -25,9 +25,18 @@
 
         @* 1. LEADERBOARD (Home) *@
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-trophy-fill me-2" aria-hidden="true"></span> Leaderboard
-            </NavLink>
+            @if (SiteContext.ActiveSport == Sport.Basketball)
+            {
+                <NavLink class="nav-link" href="hoops/leaderboard">
+                    <span class="bi bi-trophy-fill me-2" aria-hidden="true"></span> Leaderboard
+                </NavLink>
+            }
+            else
+            {
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="bi bi-trophy-fill me-2" aria-hidden="true"></span> Leaderboard
+                </NavLink>
+            }
         </div>
 
         @* 2. MY PICKS / LOG IN *@
