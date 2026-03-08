@@ -109,11 +109,11 @@ else
             </small>
             @if (totalPicks == totalGames && totalGames > 0)
             {
-                <span class="badge bg-success"><i class="bi bi-check-all me-1"></i>Bracket Complete!</span>
+                <span class="badge" style="background-color:#198754;color:#fff;"><i class="bi bi-check-all me-1"></i>Bracket Complete!</span>
             }
             else
             {
-                <span class="badge bg-dark text-warning fw-bold">@(totalGames - totalPicks) picks remaining</span>
+                <span class="badge" style="background-color:#ffc107;color:#000;">@(totalGames - totalPicks) picks remaining</span>
             }
         </div>
     </div>
