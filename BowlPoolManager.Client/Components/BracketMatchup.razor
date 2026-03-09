@@ -6,6 +6,9 @@
     int _correctCount = _hasWinner && PickCounts.TryGetValue(CurrentPick, out var _cc) ? _cc : 0;
     int _correctPct = _total > 0 && _hasWinner ? (int)Math.Round(_correctCount * 100.0 / _total) : 0;
     int _wrongPct = 100 - _correctPct;
+    int _homePct = _total > 0 && HomeIsAvailable ? (int)Math.Round((PickCounts.TryGetValue(HomeName, out var _hc) ? _hc : 0) * 100.0 / _total) : 0;
+    int _awayPct = _total > 0 && AwayIsAvailable ? (int)Math.Round((PickCounts.TryGetValue(AwayName, out var _ac) ? _ac : 0) * 100.0 / _total) : 0;
+    string _barTooltip = _total > 0 ? $"{HomeName}: {_homePct}% · {AwayName}: {_awayPct}%" : "";
 }
 <div class="bracket-matchup card shadow-sm border @(string.IsNullOrEmpty(CurrentPick) ? "border-light" : "border-primary border-opacity-50")">
     <div class="card-body p-1">
@@ -20,13 +23,15 @@
                     <i class="bi bi-star-fill ms-1 ghost-indicator" title="This entry's pick" aria-label="This entry's pick"></i>
                 }
             </button>
-            <div style="height:5px;display:flex;overflow:hidden;border-radius:2px;background-color:#dee2e6;"
-                 title="@(_total > 0 && _hasWinner ? $"{_correctCount} of {_total} ({_correctPct}%) picked {CurrentPick}" : "")">
-                @if (_total > 0 && _hasWinner)
-                {
-                    <div style="width:@_correctPct%;background-color:#198754;"></div>
-                    <div style="width:@_wrongPct%;background-color:#dc3545;"></div>
-                }
+            <div style="padding:4px 0;cursor:default;"
+                 title="@_barTooltip">
+                <div style="height:5px;display:flex;overflow:hidden;border-radius:2px;background-color:#dee2e6;">
+                    @if (_total > 0 && _hasWinner)
+                    {
+                        <div style="width:@_correctPct%;background-color:#198754;"></div>
+                        <div style="width:@_wrongPct%;background-color:#dc3545;"></div>
+                    }
+                </div>
             </div>
             <button class="btn btn-sm @(CurrentPick == AwayName && AwayIsAvailable ? "btn-primary" : "btn-outline-secondary") text-start pick-btn d-flex align-items-center"
                     disabled="@(IsLocked || !AwayIsAvailable)"
