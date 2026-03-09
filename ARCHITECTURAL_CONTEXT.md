@@ -74,7 +74,56 @@ To maintain architectural purity, follow these rules:
 - **Security Check**: For restricted endpoints, call `SecurityHelper.ValidateSuperAdminAsync(req, _userRepo)` as the very first statement before any business logic executes.
 - **Database Initialization**: Container creation and schema setup are triggered manually via the Admin Dashboard (`InfrastructureFunctions.cs`). Do not add startup initialization logic.
 
-## 6. Scoring Logic (Core)
+## 6. Print Bracket Layout Pattern
+
+The printable bracket page ([HoopsPrintBracket.razor](BowlPoolManager.Client/Pages/HoopsPrintBracket.razor)) uses a specific layout strategy for arranging regions and rendering bracket columns. Any future print or export view must follow this pattern.
+
+### Region Side Assignment
+
+Regions are split into left/right halves by mirroring the logic in `FinalFourBracket.GetStableSortKey`:
+
+```csharp
+private string GetFfSortKey(HoopsGame ffGame) =>
+    games.Where(g => g.Round == TournamentRound.Elite8 && g.NextGameId == ffGame.Id)
+         .Select(g => g.Region ?? "")
+         .Where(r => r.Length > 0)
+         .OrderBy(r => r)
+         .FirstOrDefault() ?? ffGame.Id;
+```
+
+The Final Four game with the **alphabetically-earlier sort key** gets its two feeder regions assigned to the **left side**; the other FF game's regions go to the **right side**. This guarantees the print bracket always pairs regions that face each other in a semifinal on the same side — matching the interactive `FinalFourBracket` layout exactly.
+
+### Column Direction
+
+- **Left-side regions**: columns render R64 → R32 → S16 → E8 (left to right). The E8 column carries `no-right-line` to suppress the outbound connector stub.
+- **Right-side regions**: columns render E8 → S16 → R32 → R64 (left to right, mirrored). The region container receives the `.reversed` CSS class. The E8 column carries `no-left-line`.
+
+### Connector Stub CSS
+
+Left-side regions use the standard `::after` right-pointing stubs. Right-side regions suppress `::after` and use `::before` left-pointing stubs:
+
+```css
+/* Right-side mirrored stubs */
+.reversed .match-card::after { display: none; }
+.reversed .match-card:not(.no-left-line)::before {
+    content: '';
+    position: absolute;
+    left: -4px;
+    top: 50%;
+    width: 4px;
+    height: 1px;
+    background: #999;
+}
+```
+
+### Pick Highlighting
+
+When an `EntryId` is provided, each match card is annotated with a CSS class based on the user's pick relative to the actual game result:
+- `user-pick-correct` (green) — user's pick matches the game winner
+- `user-pick-incorrect` (red) — game has a winner and user's pick lost
+- `user-pick-pending` (blue) — user made a pick but the game has no result yet
+
+## 7. Scoring Logic (Core)
 
 Two pure calculation engines live in `BowlPoolManager.Core/Helpers/`:
 
@@ -100,3 +149,28 @@ Two pure calculation engines live in `BowlPoolManager.Core/Helpers/`:
 A net10.0 project can reference net8.0 assemblies, so this compiles and runs cleanly.
 
 **API ceiling**: The API is capped at `net9.0` maximum — not because Azure Functions lacks support for net10, but because the **Azure Static Web Apps Oryx build system** (which builds and deploys the API) does not yet support net10.0. Do not upgrade the Api or Core target frameworks beyond net9.0 without verifying Oryx support first.
+
+## 10. Cross-Sport Archive Conventions
+
+### Shared Model Extension Pattern
+`PoolArchive` and `ArchiveGame` in `BowlPoolManager.Core/Domain/PoolArchive.cs` serve **both** football and basketball. Sport-specific fields are added as **nullable** properties so existing documents are unaffected:
+
+```csharp
+// Basketball-specific — null for football archives
+public TournamentRound? Round { get; set; }
+public string? Region { get; set; }
+public int? TeamHomeSeed { get; set; }
+public int? TeamAwaySeed { get; set; }
+```
+
+The rule: **extend shared models with nullable sport-specific fields rather than creating parallel model hierarchies**. This keeps the `PoolArchives` Cosmos container and `IArchiveRepository` unified. New fields must carry both `[JsonProperty]` and `[JsonPropertyName]` per Section 5.
+
+### Archive ID Namespace Convention
+Both sports write to the same `PoolArchives` container (partition key: `seasonId`). IDs use a sport-specific prefix to prevent collision on cross-partition reads:
+
+| Sport | ID Format | Example |
+|---|---|---|
+| Football | `"Archive_{poolId}"` | `Archive_abc123` |
+| Basketball | `"HoopsArchive_{poolId}"` | `HoopsArchive_abc123` |
+
+Any future sport must introduce its own prefix (e.g., `"BaseballArchive_{poolId}"`). The `GetArchiveAsync(id)` repository method does a cross-partition query by ID — acceptable at archive volume (one read per page load, low total document count).
