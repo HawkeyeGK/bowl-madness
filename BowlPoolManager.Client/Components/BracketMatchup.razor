@@ -1,9 +1,21 @@
 @using BowlPoolManager.Core.Domain
 
+@{
+    int _total = PickCounts.Values.Sum();
+    bool _hasWinner = !string.IsNullOrEmpty(CurrentPick);
+    int _correctCount = _hasWinner && PickCounts.TryGetValue(CurrentPick, out var _cc) ? _cc : 0;
+    int _correctPct = _total > 0 && _hasWinner ? (int)Math.Round(_correctCount * 100.0 / _total) : 0;
+    int _wrongPct = 100 - _correctPct;
+}
 <div class="bracket-matchup card shadow-sm border @(string.IsNullOrEmpty(CurrentPick) ? "border-light" : "border-primary border-opacity-50")">
-    <div class="card-header py-1 px-2 bg-light">
-        <small class="text-muted d-block text-truncate" style="font-size: 0.70rem;">@GameLabel</small>
-    </div>
+    @if (_total > 0 && _hasWinner)
+    {
+        <div style="height:5px;display:flex;overflow:hidden;border-radius:calc(var(--bs-card-border-radius, 0.375rem) - 1px) calc(var(--bs-card-border-radius, 0.375rem) - 1px) 0 0;"
+             title="@_correctCount of @_total (@_correctPct%) picked @CurrentPick">
+            <div style="width:@_correctPct%;background-color:#198754;"></div>
+            <div style="width:@_wrongPct%;background-color:#dc3545;"></div>
+        </div>
+    }
     <div class="card-body p-1">
         <div class="d-flex flex-column gap-1">
             <button class="btn btn-sm @(CurrentPick == HomeName && HomeIsAvailable ? "btn-primary" : "btn-outline-secondary") text-start pick-btn d-flex align-items-center"
@@ -44,10 +56,15 @@
     [Parameter] public int? AwaySeed { get; set; }
     [Parameter] public bool AwayIsAvailable { get; set; }
 
+    /// <summary>
+    /// Pick counts for this game keyed by team name. Used to render the correct-pick consensus bar.
+    /// </summary>
+    [Parameter] public Dictionary<string, int> PickCounts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
     [Parameter] public EventCallback<(HoopsGame Game, string Pick)> OnPick { get; set; }
 
     /// <summary>
-    /// Optional: team name picked by the "ghosted" entry. Shows a subtle dot indicator
+    /// Optional: team name picked by the "ghosted" entry. Shows a star indicator
     /// on that team's button without affecting the current-pick highlight.
     /// </summary>
     [Parameter] public string GhostPick { get; set; } = "";

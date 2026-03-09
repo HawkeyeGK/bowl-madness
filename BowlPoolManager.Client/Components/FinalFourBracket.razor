@@ -12,6 +12,7 @@
             bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
             int? homeSeed = GetSeedDisplay?.Invoke(SemiFinal1, true);
             int? awaySeed = GetSeedDisplay?.Invoke(SemiFinal1, false);
+            var pickCounts1 = AllPickCounts.TryGetValue(SemiFinal1.Id, out var pc1) ? pc1 : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
             <BracketMatchup
                 Game="SemiFinal1"
@@ -24,6 +25,7 @@
                 AwayName="@away"
                 AwaySeed="awaySeed"
                 AwayIsAvailable="awayAvailable"
+                PickCounts="pickCounts1"
                 GhostPick="@(GhostPicks.TryGetValue(SemiFinal1.Id, out var g1) ? g1 : "")"
                 OnPick="HandlePick" />
         }
@@ -40,6 +42,7 @@
             bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
             int? homeSeed = GetSeedDisplay?.Invoke(Championship, true);
             int? awaySeed = GetSeedDisplay?.Invoke(Championship, false);
+            var pickCountsC = AllPickCounts.TryGetValue(Championship.Id, out var pcC) ? pcC : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
             <BracketMatchup
                 Game="Championship"
@@ -52,6 +55,7 @@
                 AwayName="@away"
                 AwaySeed="awaySeed"
                 AwayIsAvailable="awayAvailable"
+                PickCounts="pickCountsC"
                 GhostPick="@(GhostPicks.TryGetValue(Championship.Id, out var gc) ? gc : "")"
                 OnPick="HandlePick" />
         }
@@ -68,6 +72,7 @@
             bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
             int? homeSeed = GetSeedDisplay?.Invoke(SemiFinal2, true);
             int? awaySeed = GetSeedDisplay?.Invoke(SemiFinal2, false);
+            var pickCounts2 = AllPickCounts.TryGetValue(SemiFinal2.Id, out var pc2) ? pc2 : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
             <BracketMatchup
                 Game="SemiFinal2"
@@ -80,6 +85,7 @@
                 AwayName="@away"
                 AwaySeed="awaySeed"
                 AwayIsAvailable="awayAvailable"
+                PickCounts="pickCounts2"
                 GhostPick="@(GhostPicks.TryGetValue(SemiFinal2.Id, out var g2) ? g2 : "")"
                 OnPick="HandlePick" />
         }
@@ -97,6 +103,7 @@
     [Parameter] public Func<HoopsGame, bool, int?>? GetSeedDisplay { get; set; }
     [Parameter] public Func<HoopsGame, string>? GetGameLabel { get; set; }
     [Parameter] public Dictionary<string, string> GhostPicks { get; set; } = new();
+    [Parameter] public Dictionary<string, Dictionary<string, int>> AllPickCounts { get; set; } = new();
 
     [Parameter] public EventCallback<(HoopsGame Game, string Pick)> OnPick { get; set; }
 

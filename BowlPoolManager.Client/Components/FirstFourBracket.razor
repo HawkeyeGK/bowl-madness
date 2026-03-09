@@ -18,6 +18,7 @@
                     bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
                     int? homeSeed = GetSeedDisplay?.Invoke(game, true);
                     int? awaySeed = GetSeedDisplay?.Invoke(game, false);
+                    var pickCounts = AllPickCounts.TryGetValue(game.Id, out var pc) ? pc : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
                     <div class="col-12 col-md-6 col-lg-5 col-xl-4">
                         <BracketMatchup
@@ -31,6 +32,7 @@
                             AwayName="@away"
                             AwaySeed="awaySeed"
                             AwayIsAvailable="awayAvailable"
+                            PickCounts="pickCounts"
                             GhostPick="@(GhostPicks.TryGetValue(game.Id, out var gp) ? gp : "")"
                             OnPick="HandlePick" />
                     </div>
@@ -49,6 +51,7 @@
     [Parameter] public Func<HoopsGame, bool, int?>? GetSeedDisplay { get; set; }
     [Parameter] public Func<HoopsGame, string>? GetGameLabel { get; set; }
     [Parameter] public Dictionary<string, string> GhostPicks { get; set; } = new();
+    [Parameter] public Dictionary<string, Dictionary<string, int>> AllPickCounts { get; set; } = new();
 
     [Parameter] public EventCallback<(HoopsGame Game, string Pick)> OnPick { get; set; }
 

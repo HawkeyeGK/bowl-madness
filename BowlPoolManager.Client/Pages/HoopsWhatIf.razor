@@ -268,6 +268,7 @@
                                           GetSeedDisplay="GetSeedDisplay"
                                           GetGameLabel="GetGameLabel"
                                           GhostPicks="GhostPicks"
+                                          AllPickCounts="_pickCountsByGame"
                                           OnPick="HandlePick" />
                     }
                     else if (activeTab == "Final Four")
@@ -280,6 +281,7 @@
                                           GetSeedDisplay="GetSeedDisplay"
                                           GetGameLabel="GetGameLabel"
                                           GhostPicks="GhostPicks"
+                                          AllPickCounts="_pickCountsByGame"
                                           OnPick="HandlePick" />
                     }
                     else
@@ -291,6 +293,7 @@
                                        GetSeedDisplay="GetSeedDisplay"
                                        GetGameLabel="GetGameLabel"
                                        GhostPicks="GhostPicks"
+                                       AllPickCounts="_pickCountsByGame"
                                        OnPick="HandlePick" />
                     }
                 </div>
@@ -357,6 +360,9 @@
     private Dictionary<string, HoopsGame> _gameById = new();
     private Dictionary<string, List<string>> _feederGameIds = new();  // targetGameId → list of feeder gameIds
     private Dictionary<string, int?> _seedCache = new(StringComparer.OrdinalIgnoreCase);
+
+    // ── Consensus pick counts: gameId → (teamName → count) ──
+    private Dictionary<string, Dictionary<string, int>> _pickCountsByGame = new();
 
     [SupplyParameterFromQuery(Name = "poolId")]
     public string? QueryPoolId { get; set; }
@@ -450,6 +456,7 @@
         allEntries = await entriesTask ?? new();
 
         RebuildLookups();
+        ComputePickCounts();
         InitSimulation();
         SetDefaultTab();
     }
@@ -477,6 +484,26 @@
                 _seedCache.TryAdd(g.TeamHome, g.TeamHomeSeed);
             if (!string.IsNullOrEmpty(g.TeamAway) && g.TeamAwaySeed.HasValue)
                 _seedCache.TryAdd(g.TeamAway, g.TeamAwaySeed);
+        }
+    }
+
+    private void ComputePickCounts()
+    {
+        _pickCountsByGame = new();
+        foreach (var entry in allEntries)
+        {
+            if (entry.Picks == null) continue;
+            foreach (var (gameId, pick) in entry.Picks)
+            {
+                if (string.IsNullOrEmpty(pick)) continue;
+                if (!_pickCountsByGame.TryGetValue(gameId, out var gameCounts))
+                {
+                    gameCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                    _pickCountsByGame[gameId] = gameCounts;
+                }
+                gameCounts.TryGetValue(pick, out var existing);
+                gameCounts[pick] = existing + 1;
+            }
         }
     }
 
