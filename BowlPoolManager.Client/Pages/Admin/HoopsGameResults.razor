@@ -92,24 +92,30 @@
                                                 }
                                             </td>
                                             <td>
-                                                <InputSelect class="form-select form-select-sm" @bind-Value="game.Status">
+                                                <InputSelect class="form-select form-select-sm" @bind-Value="game.Status" @bind-Value:after="() => MarkDirty(game.Id)">
                                                     <option value="@GameStatus.Scheduled">Scheduled</option>
                                                     <option value="@GameStatus.InProgress">In Progress</option>
                                                     <option value="@GameStatus.Final">Final</option>
                                                 </InputSelect>
                                             </td>
                                             <td>
-                                                <InputNumber class="form-control form-control-sm" @bind-Value="game.TeamHomeScore" placeholder="–" />
+                                                <InputNumber class="form-control form-control-sm" @bind-Value="game.TeamHomeScore" @bind-Value:after="() => MarkDirty(game.Id)" placeholder="–" />
                                             </td>
                                             <td>
-                                                <InputNumber class="form-control form-control-sm" @bind-Value="game.TeamAwayScore" placeholder="–" />
+                                                <InputNumber class="form-control form-control-sm" @bind-Value="game.TeamAwayScore" @bind-Value:after="() => MarkDirty(game.Id)" placeholder="–" />
                                             </td>
                                             <td class="text-end">
+                                                @{
+                                                    bool isDirty = _dirtyGameIds.Contains(game.Id);
+                                                }
                                                 <div class="d-flex gap-1 justify-content-end">
-                                                    <button class="btn btn-sm btn-success" @onclick="() => SaveResult(game)">
+                                                    <button class="btn btn-sm @(isDirty ? "btn-success" : "btn-outline-secondary")"
+                                                            title="@(isDirty ? "Save changes" : "No changes")"
+                                                            disabled="@(!isDirty)"
+                                                            @onclick="() => SaveResult(game)">
                                                         <i class="bi bi-check-lg"></i> Save
                                                     </button>
-                                                    @if (game.Status != GameStatus.Scheduled)
+                                                    @if (game.Status != GameStatus.Scheduled || isDirty)
                                                     {
                                                         <button class="btn btn-sm btn-outline-secondary" title="Reset to Scheduled" @onclick="() => ResetGame(game)">
                                                             <i class="bi bi-arrow-counterclockwise"></i>
@@ -220,6 +226,7 @@
     private bool _isError;
     private bool _isLoading;
     private bool _showDebug;
+    private HashSet<string> _dirtyGameIds = new();
 
     private static readonly TournamentRound[] _roundOrder =
     [
@@ -263,12 +270,15 @@
         try
         {
             _games = await GameService.GetGamesAsync(_selectedPoolId);
+            _dirtyGameIds.Clear();
         }
         finally
         {
             _isLoading = false;
         }
     }
+
+    private void MarkDirty(string gameId) => _dirtyGameIds.Add(gameId);
 
     private async Task SaveResult(HoopsGame game)
     {
@@ -296,6 +306,7 @@
         game.Status = GameStatus.Scheduled;
         game.TeamHomeScore = null;
         game.TeamAwayScore = null;
+        MarkDirty(game.Id);
         await SaveResult(game);
     }
 
