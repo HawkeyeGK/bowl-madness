@@ -562,7 +562,7 @@ else
                 if (userEntry?.Picks != null && userEntry.Picks.TryGetValue(f.Id, out var pick) && !string.IsNullOrEmpty(pick))
                     home = pick;
                 else
-                    home = FeederLabel(f);
+                    home = "";
             }
         }
 
@@ -574,7 +574,7 @@ else
                 if (userEntry?.Picks != null && userEntry.Picks.TryGetValue(f.Id, out var pick) && !string.IsNullOrEmpty(pick))
                     away = pick;
                 else
-                    away = FeederLabel(f);
+                    away = "";
             }
         }
 
