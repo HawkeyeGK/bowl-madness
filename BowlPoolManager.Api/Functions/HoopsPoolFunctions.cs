@@ -13,12 +13,21 @@ namespace BowlPoolManager.Api.Functions
     {
         private readonly ILogger _logger;
         private readonly IHoopsPoolRepository _poolRepo;
+        private readonly IHoopsGameRepository _gameRepo;
+        private readonly IHoopsEntryRepository _entryRepo;
         private readonly IUserRepository _userRepo;
 
-        public HoopsPoolFunctions(ILoggerFactory loggerFactory, IHoopsPoolRepository poolRepo, IUserRepository userRepo)
+        public HoopsPoolFunctions(
+            ILoggerFactory loggerFactory,
+            IHoopsPoolRepository poolRepo,
+            IHoopsGameRepository gameRepo,
+            IHoopsEntryRepository entryRepo,
+            IUserRepository userRepo)
         {
             _logger = loggerFactory.CreateLogger<HoopsPoolFunctions>();
             _poolRepo = poolRepo;
+            _gameRepo = gameRepo;
+            _entryRepo = entryRepo;
             _userRepo = userRepo;
         }
 
@@ -108,6 +117,30 @@ namespace BowlPoolManager.Api.Functions
 
             if (string.IsNullOrEmpty(poolId)) return req.CreateResponse(HttpStatusCode.BadRequest);
 
+            var pool = await _poolRepo.GetPoolAsync(poolId);
+            if (pool == null) return req.CreateResponse(HttpStatusCode.NotFound);
+
+            // Delete bracket games
+            if (pool.GameIds.Any())
+            {
+                var allGames = await _gameRepo.GetGamesAsync(pool.SeasonId);
+                var poolGameIds = pool.GameIds.ToHashSet();
+                var gamesToDelete = allGames.Where(g => poolGameIds.Contains(g.Id)).ToList();
+                if (gamesToDelete.Any())
+                {
+                    await _gameRepo.DeleteGamesAsBatchAsync(gamesToDelete, pool.SeasonId);
+                    _logger.LogInformation("DeleteHoopsPool: Deleted {Count} games for pool '{PoolId}'.", gamesToDelete.Count, poolId);
+                }
+            }
+
+            // Delete entries
+            var entries = await _entryRepo.GetEntriesAsync(poolId: poolId);
+            foreach (var entry in entries)
+                await _entryRepo.DeleteEntryAsync(entry.Id, entry.SeasonId);
+            if (entries.Any())
+                _logger.LogInformation("DeleteHoopsPool: Deleted {Count} entries for pool '{PoolId}'.", entries.Count, poolId);
+
+            // Delete the pool itself
             await _poolRepo.DeletePoolAsync(poolId);
             return req.CreateResponse(HttpStatusCode.OK);
         }
