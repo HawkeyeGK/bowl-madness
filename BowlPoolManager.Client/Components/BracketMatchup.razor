@@ -11,12 +11,20 @@
                     @onclick="() => OnPickClick(HomeName)">
                 @if (HomeSeed.HasValue) { <span class="badge bg-secondary me-1" style="font-size: 0.65rem;">@HomeSeed</span> }
                 <span class="team-name text-truncate flex-grow-1">@(HomeIsAvailable ? HomeName : "TBD")</span>
+                @if (!string.IsNullOrEmpty(GhostPick) && string.Equals(GhostPick, HomeName, StringComparison.OrdinalIgnoreCase) && HomeIsAvailable)
+                {
+                    <span class="ms-1 ghost-indicator" title="Ghosted pick" aria-label="Ghosted pick">●</span>
+                }
             </button>
             <button class="btn btn-sm @(CurrentPick == AwayName && AwayIsAvailable ? "btn-primary" : "btn-outline-secondary") text-start pick-btn d-flex align-items-center"
                     disabled="@(IsLocked || !AwayIsAvailable)"
                     @onclick="() => OnPickClick(AwayName)">
                 @if (AwaySeed.HasValue) { <span class="badge bg-secondary me-1" style="font-size: 0.65rem;">@AwaySeed</span> }
                 <span class="team-name text-truncate flex-grow-1">@(AwayIsAvailable ? AwayName : "TBD")</span>
+                @if (!string.IsNullOrEmpty(GhostPick) && string.Equals(GhostPick, AwayName, StringComparison.OrdinalIgnoreCase) && AwayIsAvailable)
+                {
+                    <span class="ms-1 ghost-indicator" title="Ghosted pick" aria-label="Ghosted pick">●</span>
+                }
             </button>
         </div>
     </div>
@@ -27,16 +35,22 @@
     [Parameter] public string GameLabel { get; set; } = "";
     [Parameter] public string CurrentPick { get; set; } = "";
     [Parameter] public bool IsLocked { get; set; }
-    
+
     [Parameter] public string HomeName { get; set; } = "";
     [Parameter] public int? HomeSeed { get; set; }
     [Parameter] public bool HomeIsAvailable { get; set; }
-    
+
     [Parameter] public string AwayName { get; set; } = "";
     [Parameter] public int? AwaySeed { get; set; }
     [Parameter] public bool AwayIsAvailable { get; set; }
-    
+
     [Parameter] public EventCallback<(HoopsGame Game, string Pick)> OnPick { get; set; }
+
+    /// <summary>
+    /// Optional: team name picked by the "ghosted" entry. Shows a subtle dot indicator
+    /// on that team's button without affecting the current-pick highlight.
+    /// </summary>
+    [Parameter] public string GhostPick { get; set; } = "";
 
     private async Task OnPickClick(string teamName)
     {

@@ -1,0 +1,890 @@
+@page "/hoops/what-if"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@using BowlPoolManager.Core.Helpers
+@using BowlPoolManager.Client.Services
+@using BowlPoolManager.Client.Helpers
+@using BowlPoolManager.Client.Components
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.JSInterop
+@inject ISeasonService SeasonService
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Path to Victory — Hoops Madness</PageTitle>
+
+<style>
+    /* Ghost indicator dot shown inside bracket buttons */
+    .ghost-indicator {
+        color: #ffc107;
+        font-size: 0.6rem;
+        line-height: 1;
+        vertical-align: middle;
+    }
+
+    /* Leaderboard panel */
+    .what-if-leaderboard {
+        width: 280px;
+        min-width: 280px;
+        flex-shrink: 0;
+    }
+
+    .lb-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: background-color 0.1s;
+    }
+    .lb-row:hover { background-color: #f1f3f5; }
+    .lb-row.lb-row-ghost {
+        background-color: rgba(255, 193, 7, 0.15);
+        border-color: #ffc107;
+    }
+    .lb-row.lb-row-eliminated { opacity: 0.45; }
+
+    .lb-rank { font-size: 0.75rem; color: #6c757d; min-width: 18px; text-align: right; }
+    .lb-name { font-size: 0.82rem; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lb-score { font-size: 0.82rem; font-weight: 700; color: #0d6efd; white-space: nowrap; }
+    .lb-max  { font-size: 0.72rem; color: #6c757d; white-space: nowrap; }
+
+    /* Bracket panel */
+    .what-if-bracket {
+        min-width: 0;
+        flex: 1;
+    }
+
+    /* Constrain overall height to viewport */
+    .what-if-body {
+        display: flex;
+        gap: 12px;
+        height: calc(100vh - 160px);
+        min-height: 400px;
+    }
+    .what-if-leaderboard .card { height: 100%; }
+    .what-if-leaderboard .lb-scroll { overflow-y: auto; height: calc(100% - 40px); }
+    .what-if-bracket { overflow: hidden; display: flex; flex-direction: column; }
+    .bracket-scroll { overflow: auto; flex: 1; }
+
+    /* Bracket nav tabs (same style as BracketPickerComponent) */
+    .bracket-nav-tabs .nav-link {
+        color: #495057;
+        border: 1px solid #ced4da;
+        border-radius: 4px 4px 0 0;
+        margin-right: 2px;
+    }
+    .bracket-nav-tabs .nav-link:hover:not(.active) {
+        background-color: #f8f9fa;
+        color: #212529;
+        border-color: #adb5bd;
+    }
+    .bracket-nav-tabs .nav-link.active { color: #212529; }
+
+    @@media (max-width: 767px) {
+        .what-if-body { flex-direction: column; height: auto; }
+        .what-if-leaderboard { width: 100%; min-width: 0; }
+        .what-if-leaderboard .card { height: auto; }
+        .what-if-leaderboard .lb-scroll { height: 260px; }
+        .what-if-bracket { min-height: 500px; }
+    }
+</style>
+
+<div class="container-fluid mt-3 px-4">
+
+    @* ── Header ── *@
+    <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
+        <div class="d-flex flex-column gap-1">
+            <h1 class="h3 fw-bold mb-0">
+                <i class="bi bi-signpost-split-fill text-primary"></i> Path to Victory
+            </h1>
+
+            @if (poolList.Count > 1)
+            {
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-muted small fw-bold">Pool:</span>
+                    <select class="form-select form-select-sm shadow-sm" style="width: auto; min-width: 200px;"
+                            @onchange="OnPoolChanged">
+                        @foreach (var pool in poolList)
+                        {
+                            <option value="@pool.Id" selected="@(pool.Id == selectedPoolId)">@pool.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+            else if (poolList.Count == 1)
+            {
+                <span class="text-secondary small">@poolList[0].Name</span>
+            }
+        </div>
+
+        <div class="d-flex flex-wrap gap-2">
+            @* Fill Entry picker *@
+            @if (allEntries.Any())
+            {
+                <div class="d-flex gap-1">
+                    <select class="form-select form-select-sm" style="width: auto; min-width: 160px;"
+                            @bind="fillEntryId">
+                        <option value="">— Fill entry picks —</option>
+                        @foreach (var e in allEntries.OrderBy(e => e.PlayerName))
+                        {
+                            <option value="@e.Id">@e.PlayerName</option>
+                        }
+                    </select>
+                    <button class="btn btn-outline-primary btn-sm" @onclick="ApplyFillEntry"
+                            disabled="@string.IsNullOrEmpty(fillEntryId)"
+                            title="Auto-fill remaining undecided games with this entry's picks">
+                        <i class="bi bi-arrow-right-circle"></i> Fill
+                    </button>
+                </div>
+            }
+
+            @* Chalk *@
+            <button class="btn btn-outline-secondary btn-sm" @onclick="ApplyChalk"
+                    title="Fill all undecided games with the higher-seeded (lower seed number) team">
+                <i class="bi bi-bar-chart-steps"></i> Chalk
+            </button>
+
+            @* Reset *@
+            @if (HasActiveSimulation)
+            {
+                <button class="btn btn-outline-danger btn-sm" @onclick="ResetSimulation">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset to Reality
+                </button>
+            }
+        </div>
+    </div>
+
+    @* ── Loading / Empty States ── *@
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading…</span>
+            </div>
+        </div>
+    }
+    else if (!poolList.Any())
+    {
+        <div class="text-center py-5">
+            <i class="bi bi-hourglass-split display-1 text-secondary opacity-50"></i>
+            <h2 class="mt-3 text-secondary">Awaiting Tip-Off</h2>
+            <p class="lead text-muted">Path to Victory unlocks when the first pool of the season opens.</p>
+        </div>
+    }
+    else if (!games.Any())
+    {
+        <div class="alert alert-info text-center">No bracket games found for this pool.</div>
+    }
+    else
+    {
+        @* ── Split body ── *@
+        <div class="what-if-body">
+
+            @* LEFT: Leaderboard *@
+            <div class="what-if-leaderboard">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header py-2 px-3 bg-primary text-white small fw-bold d-flex justify-content-between">
+                        <span>Standings</span>
+                        @if (!string.IsNullOrEmpty(ghostEntryId))
+                        {
+                            <span class="badge bg-warning text-dark">
+                                <i class="bi bi-eye-fill me-1"></i>Ghosting
+                            </span>
+                        }
+                    </div>
+                    <div class="lb-scroll p-2">
+                        @if (!projectedStandings.Any())
+                        {
+                            <div class="text-muted small text-center py-3">No entries yet.</div>
+                        }
+                        else
+                        {
+                            @foreach (var row in projectedStandings)
+                            {
+                                bool isGhost = row.EntryId == ghostEntryId;
+                                <div class="lb-row @(isGhost ? "lb-row-ghost" : "") @(row.IsEliminated ? "lb-row-eliminated" : "")"
+                                     @onclick="() => ToggleGhost(row.EntryId)"
+                                     title="@(isGhost ? "Click to clear ghost" : "Click to ghost this entry's picks on the bracket")">
+                                    <span class="lb-rank">@row.Rank.</span>
+                                    <span class="lb-name" title="@row.PlayerName">@row.PlayerName</span>
+                                    <span class="lb-score">@row.Score</span>
+                                    <span class="lb-max">/ @row.MaxPossible</span>
+                                    @if (row.IsEliminated)
+                                    {
+                                        <i class="bi bi-x-circle-fill text-danger" style="font-size:0.75rem;" title="Mathematically eliminated"></i>
+                                    }
+                                </div>
+                            }
+                            <div class="text-muted small text-center mt-2 px-2">
+                                <i class="bi bi-eye me-1"></i>Click a row to ghost picks on the bracket
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @* RIGHT: Bracket *@
+            <div class="what-if-bracket">
+                @* Tab bar *@
+                <ul class="nav nav-tabs mb-2 flex-nowrap overflow-auto bracket-nav-tabs">
+                    @if (GamesForFirstFour().Any())
+                    {
+                        <li class="nav-item flex-shrink-0">
+                            <button class="nav-link @(activeTab == "First Four" ? "active fw-bold" : "") px-2 px-md-3"
+                                    @onclick='@(() => activeTab = "First Four")'>
+                                First Four
+                            </button>
+                        </li>
+                    }
+                    @foreach (var region in AvailableRegions)
+                    {
+                        <li class="nav-item flex-shrink-0">
+                            <button class="nav-link @(activeTab == region ? "active fw-bold" : "") px-2 px-md-3"
+                                    @onclick="@(() => activeTab = region)">
+                                @region
+                            </button>
+                        </li>
+                    }
+                    <li class="nav-item flex-shrink-0">
+                        <button class="nav-link @(activeTab == "Final Four" ? "active fw-bold" : "") px-2 px-md-3"
+                                @onclick='@(() => activeTab = "Final Four")'>
+                            Final Four
+                        </button>
+                    </li>
+                </ul>
+
+                @* Bracket content *@
+                <div class="bracket-scroll">
+                    @if (activeTab == "First Four")
+                    {
+                        <FirstFourBracket Games="GamesForFirstFour()"
+                                          Picks="SimPicks"
+                                          IsLocked="false"
+                                          ResolveMatchupTeams="WhatIfResolveMatchupTeams"
+                                          GetSeedDisplay="GetSeedDisplay"
+                                          GetGameLabel="GetGameLabel"
+                                          GhostPicks="GhostPicks"
+                                          OnPick="HandlePick" />
+                    }
+                    else if (activeTab == "Final Four")
+                    {
+                        <FinalFourBracket Games="GamesForFinalFour()"
+                                          AllGames="games"
+                                          Picks="SimPicks"
+                                          IsLocked="false"
+                                          ResolveMatchupTeams="WhatIfResolveMatchupTeams"
+                                          GetSeedDisplay="GetSeedDisplay"
+                                          GetGameLabel="GetGameLabel"
+                                          GhostPicks="GhostPicks"
+                                          OnPick="HandlePick" />
+                    }
+                    else
+                    {
+                        <RegionBracket Games="GamesForRegion(activeTab)"
+                                       Picks="SimPicks"
+                                       IsLocked="false"
+                                       ResolveMatchupTeams="WhatIfResolveMatchupTeams"
+                                       GetSeedDisplay="GetSeedDisplay"
+                                       GetGameLabel="GetGameLabel"
+                                       GhostPicks="GhostPicks"
+                                       OnPick="HandlePick" />
+                    }
+                </div>
+            </div>
+
+        </div>
+    }
+</div>
+
+@code {
+    // ── Data ──
+    private bool isLoading = true;
+    private List<HoopsPool> poolList = new();
+    private string selectedPoolId = "";
+    private HoopsPool? currentPool;
+    private List<HoopsGame> games = new();
+    private List<BracketEntry> allEntries = new();
+    private string currentSeasonId = "";
+
+    // ── Bracket navigation ──
+    private string activeTab = "";
+
+    private List<string> AvailableRegions => games
+        .Where(g => g.Round > TournamentRound.FirstFour && g.Round < TournamentRound.FinalFour && !string.IsNullOrEmpty(g.Region))
+        .Select(g => g.Region!)
+        .Distinct()
+        .OrderBy(r => r)
+        .ToList();
+
+    private List<HoopsGame> GamesForFirstFour() => games.Where(g => g.Round == TournamentRound.FirstFour).ToList();
+    private List<HoopsGame> GamesForRegion(string region) => games.Where(g => g.Region == region && g.Round > TournamentRound.FirstFour && g.Round < TournamentRound.FinalFour).ToList();
+    private List<HoopsGame> GamesForFinalFour() => games.Where(g => g.Round >= TournamentRound.FinalFour).ToList();
+
+    // ── Simulation state ──
+    private Dictionary<string, string> _userSimulations = new();
+
+    private class SimulationState
+    {
+        public Dictionary<string, HashSet<string>> ValidEntrants { get; } = new();
+        public Dictionary<string, string?> EffectiveWinners { get; } = new();
+    }
+    private SimulationState _simState = new();
+
+    // SimPicks: what each game's bracket "CurrentPick" should show (the effective winner)
+    private Dictionary<string, string> SimPicks =>
+        _simState.EffectiveWinners
+            .Where(kv => kv.Value != null)
+            .ToDictionary(kv => kv.Key, kv => kv.Value!);
+
+    // ── Leaderboard ──
+    private List<HoopsWhatIfScoringEngine.HoopsWhatIfRow> projectedStandings = new();
+
+    // ── Ghosting ──
+    private string ghostEntryId = "";
+    private Dictionary<string, string> GhostPicks =>
+        string.IsNullOrEmpty(ghostEntryId)
+            ? new Dictionary<string, string>()
+            : allEntries.FirstOrDefault(e => e.Id == ghostEntryId)?.Picks ?? new Dictionary<string, string>();
+
+    // ── Fill Entry dropdown ──
+    private string fillEntryId = "";
+
+    // ── Lookup caches ──
+    private Dictionary<string, HoopsGame> _gameById = new();
+    private Dictionary<string, List<string>> _feederGameIds = new();  // targetGameId → list of feeder gameIds
+    private Dictionary<string, int?> _seedCache = new(StringComparer.OrdinalIgnoreCase);
+
+    [SupplyParameterFromQuery(Name = "poolId")]
+    public string? QueryPoolId { get; set; }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Init
+    // ────────────────────────────────────────────────────────────────────────
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var currentSeason = await SeasonService.GetCurrentSeasonAsync();
+            currentSeasonId = currentSeason?.Id ?? "";
+
+            var poolsTask = Http.GetFromJsonAsync<List<HoopsPool>>("api/GetHoopsPools");
+            var myEntriesTask = FetchMyEntriesSafe();
+            await Task.WhenAll(poolsTask, myEntriesTask);
+
+            var allPools = await poolsTask ?? new();
+            var myEntries = await myEntriesTask;
+
+            // Only show open (past lock date) non-archived pools
+            poolList = allPools.Where(p => !p.IsArchived && DateTime.UtcNow >= p.LockDate).ToList();
+
+            if (!poolList.Any())
+            {
+                isLoading = false;
+                return;
+            }
+
+            // Smart pool selection
+            HoopsPool? targetPool = null;
+            if (!string.IsNullOrEmpty(QueryPoolId))
+                targetPool = poolList.FirstOrDefault(p => p.Id == QueryPoolId);
+
+            if (targetPool == null)
+            {
+                try
+                {
+                    var savedId = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "lastSelectedHoopsPoolId");
+                    if (!string.IsNullOrEmpty(savedId))
+                        targetPool = poolList.FirstOrDefault(p => p.Id == savedId);
+                }
+                catch { }
+            }
+
+            if (targetPool == null && myEntries.Any())
+            {
+                var last = myEntries.OrderByDescending(e => e.CreatedOn).FirstOrDefault();
+                if (last != null)
+                    targetPool = poolList.FirstOrDefault(p => p.Id == last.PoolId);
+            }
+
+            targetPool ??= poolList.First();
+
+            selectedPoolId = targetPool.Id;
+            currentPool = targetPool;
+
+            await LoadPoolData(selectedPoolId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"HoopsWhatIf init error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task<List<BracketEntry>> FetchMyEntriesSafe()
+    {
+        try
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            if (auth.User.Identity?.IsAuthenticated == true)
+                return await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyHoopsEntries?seasonId={currentSeasonId}") ?? new();
+        }
+        catch { }
+        return new();
+    }
+
+    private async Task LoadPoolData(string poolId)
+    {
+        var gamesTask = Http.GetFromJsonAsync<List<HoopsGame>>($"api/GetHoopsGames?poolId={poolId}");
+        var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetHoopsEntries?poolId={poolId}");
+        await Task.WhenAll(gamesTask, entriesTask);
+
+        games = await gamesTask ?? new();
+        allEntries = await entriesTask ?? new();
+
+        RebuildLookups();
+        InitSimulation();
+        SetDefaultTab();
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Setup helpers
+    // ────────────────────────────────────────────────────────────────────────
+
+    private void RebuildLookups()
+    {
+        _gameById = games.ToDictionary(g => g.Id);
+        _feederGameIds = new();
+        _seedCache = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var g in games)
+        {
+            if (!string.IsNullOrEmpty(g.NextGameId))
+            {
+                if (!_feederGameIds.ContainsKey(g.NextGameId))
+                    _feederGameIds[g.NextGameId] = new();
+                _feederGameIds[g.NextGameId].Add(g.Id);
+            }
+
+            if (!string.IsNullOrEmpty(g.TeamHome) && g.TeamHomeSeed.HasValue)
+                _seedCache.TryAdd(g.TeamHome, g.TeamHomeSeed);
+            if (!string.IsNullOrEmpty(g.TeamAway) && g.TeamAwaySeed.HasValue)
+                _seedCache.TryAdd(g.TeamAway, g.TeamAwaySeed);
+        }
+    }
+
+    private void InitSimulation()
+    {
+        _userSimulations.Clear();
+        // Seed with real results so Final games start showing actual winners
+        foreach (var g in games.Where(g => g.Status == GameStatus.Final))
+        {
+            var w = g.WinningTeamName;
+            if (!string.IsNullOrEmpty(w))
+                _userSimulations[g.Id] = w;
+        }
+        RecomputeSimulationState();
+    }
+
+    private void SetDefaultTab()
+    {
+        var firstFour = GamesForFirstFour();
+        activeTab = firstFour.Any()
+            ? "First Four"
+            : (AvailableRegions.FirstOrDefault() ?? "Final Four");
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Pool selector
+    // ────────────────────────────────────────────────────────────────────────
+
+    private async Task OnPoolChanged(ChangeEventArgs e)
+    {
+        selectedPoolId = e.Value?.ToString() ?? "";
+        currentPool = poolList.FirstOrDefault(p => p.Id == selectedPoolId);
+        if (!string.IsNullOrEmpty(selectedPoolId))
+        {
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "lastSelectedHoopsPoolId", selectedPoolId);
+            ghostEntryId = "";
+            fillEntryId = "";
+            await LoadPoolData(selectedPoolId);
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Core simulation logic
+    // ────────────────────────────────────────────────────────────────────────
+
+    private void RecomputeSimulationState()
+    {
+        _simState = new SimulationState();
+
+        // Process in round order so feeders are resolved before downstream games
+        var roundOrder = new[]
+        {
+            TournamentRound.FirstFour,
+            TournamentRound.RoundOf64,
+            TournamentRound.RoundOf32,
+            TournamentRound.Sweet16,
+            TournamentRound.Elite8,
+            TournamentRound.FinalFour,
+            TournamentRound.NationalChampionship
+        };
+
+        foreach (var round in roundOrder)
+        {
+            foreach (var game in games.Where(g => g.Round == round))
+                ComputeGameState(game);
+        }
+
+        // Recalculate leaderboard
+        if (currentPool != null)
+        {
+            projectedStandings = HoopsWhatIfScoringEngine.Calculate(
+                games, allEntries, currentPool, _simState.EffectiveWinners);
+        }
+
+        StateHasChanged();
+    }
+
+    private void ComputeGameState(HoopsGame game)
+    {
+        var entrants = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Add teams propagated from feeder game winners
+        if (_feederGameIds.TryGetValue(game.Id, out var feederIds))
+        {
+            foreach (var feederId in feederIds)
+            {
+                if (_simState.EffectiveWinners.TryGetValue(feederId, out var feederWinner) && feederWinner != null)
+                {
+                    entrants.Add(feederWinner);
+                }
+                else if (_simState.ValidEntrants.TryGetValue(feederId, out var feederEntrants))
+                {
+                    foreach (var t in feederEntrants) entrants.Add(t);
+                }
+            }
+        }
+
+        // Add fixed teams (those not coming from a feeder)
+        if (!IsTBD(game.TeamHome) && !HasFeederProvidingTeam(game, game.TeamHome))
+            entrants.Add(game.TeamHome);
+        if (!IsTBD(game.TeamAway) && !HasFeederProvidingTeam(game, game.TeamAway))
+            entrants.Add(game.TeamAway);
+
+        _simState.ValidEntrants[game.Id] = entrants;
+
+        // Determine effective winner
+        string? effectiveWinner = null;
+
+        // Priority 1: user's explicit simulation (if still valid)
+        if (_userSimulations.TryGetValue(game.Id, out var userChoice) && entrants.Contains(userChoice))
+            effectiveWinner = userChoice;
+
+        // Priority 2: real result (for Final games where no user override)
+        if (effectiveWinner == null && game.Status == GameStatus.Final)
+        {
+            var realWinner = game.WinningTeamName;
+            if (!string.IsNullOrEmpty(realWinner) && entrants.Contains(realWinner))
+                effectiveWinner = realWinner;
+        }
+
+        _simState.EffectiveWinners[game.Id] = effectiveWinner;
+    }
+
+    private bool HasFeederProvidingTeam(HoopsGame game, string? teamName)
+    {
+        if (string.IsNullOrEmpty(teamName) || !_feederGameIds.TryGetValue(game.Id, out var feederIds))
+            return false;
+
+        foreach (var feederId in feederIds)
+        {
+            if (_gameById.TryGetValue(feederId, out var feederGame) &&
+                GetAllOriginalTeams(feederGame).Contains(teamName))
+                return true;
+        }
+        return false;
+    }
+
+    private HashSet<string> GetAllOriginalTeams(HoopsGame game)
+    {
+        var teams = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!IsTBD(game.TeamHome)) teams.Add(game.TeamHome);
+        if (!IsTBD(game.TeamAway)) teams.Add(game.TeamAway);
+
+        if (_feederGameIds.TryGetValue(game.Id, out var feederIds))
+        {
+            foreach (var feederId in feederIds)
+            {
+                if (_gameById.TryGetValue(feederId, out var feederGame))
+                    foreach (var t in GetAllOriginalTeams(feederGame)) teams.Add(t);
+            }
+        }
+        return teams;
+    }
+
+    private static bool IsTBD(string? name) =>
+        string.IsNullOrEmpty(name) ||
+        name.Equals("TBD", StringComparison.OrdinalIgnoreCase) ||
+        name.StartsWith("Winner of ", StringComparison.OrdinalIgnoreCase) ||
+        name.StartsWith("Win of ", StringComparison.OrdinalIgnoreCase);
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Interaction
+    // ────────────────────────────────────────────────────────────────────────
+
+    private async Task HandlePick((HoopsGame Game, string Pick) args)
+    {
+        if (string.IsNullOrEmpty(args.Pick) || IsTBD(args.Pick)) return;
+
+        if (_userSimulations.TryGetValue(args.Game.Id, out var current) && current == args.Pick)
+        {
+            // Clicking the active pick again clears the simulation for this game
+            // (falls back to real result if Final, or undecided if not)
+            _userSimulations.Remove(args.Game.Id);
+        }
+        else
+        {
+            _userSimulations[args.Game.Id] = args.Pick;
+        }
+
+        ClearDownstreamChoices(args.Game.Id);
+        RecomputeSimulationState();
+        await Task.CompletedTask;
+    }
+
+    private void ClearDownstreamChoices(string gameId)
+    {
+        if (!_gameById.TryGetValue(gameId, out var game) || string.IsNullOrEmpty(game.NextGameId))
+            return;
+        _userSimulations.Remove(game.NextGameId);
+        ClearDownstreamChoices(game.NextGameId);
+    }
+
+    private void ResetSimulation()
+    {
+        _userSimulations.Clear();
+        foreach (var g in games.Where(g => g.Status == GameStatus.Final))
+        {
+            var w = g.WinningTeamName;
+            if (!string.IsNullOrEmpty(w)) _userSimulations[g.Id] = w;
+        }
+        RecomputeSimulationState();
+    }
+
+    private bool HasActiveSimulation
+    {
+        get
+        {
+            foreach (var kvp in _userSimulations)
+            {
+                if (!_gameById.TryGetValue(kvp.Key, out var game)) continue;
+                if (game.Status != GameStatus.Final) return true;
+                if (!string.Equals(game.WinningTeamName, kvp.Value, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Chalk: fill every undecided game with the higher-seeded (lower number) team
+    // ────────────────────────────────────────────────────────────────────────
+
+    private void ApplyChalk()
+    {
+        // Start fresh from reality
+        _userSimulations.Clear();
+        foreach (var g in games.Where(g => g.Status == GameStatus.Final))
+        {
+            var w = g.WinningTeamName;
+            if (!string.IsNullOrEmpty(w)) _userSimulations[g.Id] = w;
+        }
+
+        // Build chalk winners round by round, accumulating into a temp dict
+        var chalkWinners = new Dictionary<string, string>(_userSimulations, StringComparer.OrdinalIgnoreCase);
+
+        var roundOrder = new[]
+        {
+            TournamentRound.FirstFour,
+            TournamentRound.RoundOf64,
+            TournamentRound.RoundOf32,
+            TournamentRound.Sweet16,
+            TournamentRound.Elite8,
+            TournamentRound.FinalFour,
+            TournamentRound.NationalChampionship
+        };
+
+        foreach (var round in roundOrder)
+        {
+            foreach (var game in games.Where(g => g.Round == round && g.Status != GameStatus.Final))
+            {
+                var (home, away) = ResolveTeamsFromWinners(game, chalkWinners);
+                var winner = PickLowerSeed(home, away);
+                if (!string.IsNullOrEmpty(winner))
+                    chalkWinners[game.Id] = winner;
+            }
+        }
+
+        _userSimulations = chalkWinners;
+        RecomputeSimulationState();
+    }
+
+    /// <summary>
+    /// Resolves the two competing teams for <paramref name="game"/> using a provided winners dict
+    /// (instead of the live simulation state). Used during the chalk pass.
+    /// </summary>
+    private (string Home, string Away) ResolveTeamsFromWinners(HoopsGame game, Dictionary<string, string> winners)
+    {
+        string home = game.TeamHome ?? "";
+        string away = game.TeamAway ?? "";
+
+        if (!_feederGameIds.TryGetValue(game.Id, out var feederIds) || feederIds.Count == 0)
+            return (home, away);
+
+        var feeders = feederIds.OrderBy(id => id).ToList();  // stable order
+
+        if (IsTBD(home) && feeders.Count > 0)
+            home = winners.TryGetValue(feeders[0], out var hw) ? hw : "";
+
+        if (IsTBD(away) && feeders.Count > 1)
+            away = winners.TryGetValue(feeders[1], out var aw) ? aw : "";
+
+        // Also handle propagated (non-TBD but feeder-sourced) team names
+        if (!IsTBD(home) && HasFeederProvidingTeam(game, home) && feeders.Count > 0)
+            home = winners.TryGetValue(feeders[0], out var hw2) ? hw2 : home;
+
+        if (!IsTBD(away) && HasFeederProvidingTeam(game, away) && feeders.Count > 1)
+            away = winners.TryGetValue(feeders[1], out var aw2) ? aw2 : away;
+
+        return (home, away);
+    }
+
+    private string? PickLowerSeed(string home, string away)
+    {
+        if (string.IsNullOrEmpty(home) && string.IsNullOrEmpty(away)) return null;
+        if (string.IsNullOrEmpty(home)) return away;
+        if (string.IsNullOrEmpty(away)) return home;
+
+        bool homeKnown = _seedCache.TryGetValue(home, out var homeSeed) && homeSeed.HasValue;
+        bool awayKnown = _seedCache.TryGetValue(away, out var awaySeed) && awaySeed.HasValue;
+
+        if (!homeKnown && !awayKnown) return null;
+        if (!homeKnown) return away;
+        if (!awayKnown) return home;
+
+        // Lower seed number = better seeded = chalk winner
+        return homeSeed!.Value <= awaySeed!.Value ? home : away;
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Fill Entry: auto-fill remaining games with a selected entry's picks
+    // ────────────────────────────────────────────────────────────────────────
+
+    private void ApplyFillEntry()
+    {
+        if (string.IsNullOrEmpty(fillEntryId)) return;
+        var entry = allEntries.FirstOrDefault(e => e.Id == fillEntryId);
+        if (entry?.Picks == null) return;
+
+        foreach (var (gameId, pick) in entry.Picks)
+        {
+            if (string.IsNullOrEmpty(pick)) continue;
+            // Only fill games that haven't been decided by reality or a prior user simulation
+            if (!_gameById.TryGetValue(gameId, out var game)) continue;
+            if (game.Status == GameStatus.Final) continue;  // don't override real results
+            _userSimulations[gameId] = pick;
+        }
+
+        RecomputeSimulationState();
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Ghosting
+    // ────────────────────────────────────────────────────────────────────────
+
+    private void ToggleGhost(string entryId)
+    {
+        ghostEntryId = ghostEntryId == entryId ? "" : entryId;
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Bracket rendering helpers (mirror BracketPickerComponent logic but using sim state)
+    // ────────────────────────────────────────────────────────────────────────
+
+    private (string Home, string Away) WhatIfResolveMatchupTeams(HoopsGame game)
+    {
+        if (!_feederGameIds.TryGetValue(game.Id, out var feederIds) || feederIds.Count == 0)
+            return (game.TeamHome ?? "", game.TeamAway ?? "");
+
+        var feeders = feederIds.OrderBy(id => id).ToList();
+        int feederIdx = 0;
+
+        string home = game.TeamHome ?? "";
+        if (IsTBD(home) || HasFeederProvidingTeam(game, home))
+        {
+            if (feederIdx < feeders.Count)
+            {
+                var fid = feeders[feederIdx++];
+                home = (_simState.EffectiveWinners.TryGetValue(fid, out var w) && w != null)
+                    ? w
+                    : GetFeederPlaceholder(fid);
+            }
+            else home = "";
+        }
+
+        string away = game.TeamAway ?? "";
+        if (IsTBD(away) || HasFeederProvidingTeam(game, away))
+        {
+            if (feederIdx < feeders.Count)
+            {
+                var fid = feeders[feederIdx];
+                away = (_simState.EffectiveWinners.TryGetValue(fid, out var w) && w != null)
+                    ? w
+                    : GetFeederPlaceholder(fid);
+            }
+            else away = "";
+        }
+
+        return (home, away);
+    }
+
+    private string GetFeederPlaceholder(string feederId)
+    {
+        if (!_gameById.TryGetValue(feederId, out var feeder)) return "TBD";
+        if (!string.IsNullOrEmpty(feeder.SeedMatchup)) return $"Win of {feeder.SeedMatchup}";
+        return $"{feeder.Round} winner";
+    }
+
+    private int? GetSeedDisplay(HoopsGame game, bool homeSlot)
+    {
+        if (homeSlot && game.TeamHomeSeed.HasValue) return game.TeamHomeSeed;
+        if (!homeSlot && game.TeamAwaySeed.HasValue) return game.TeamAwaySeed;
+
+        var (home, away) = WhatIfResolveMatchupTeams(game);
+        var teamName = homeSlot ? home : away;
+        if (!string.IsNullOrEmpty(teamName) && !IsTBD(teamName) && _seedCache.TryGetValue(teamName, out var seed))
+            return seed;
+
+        return null;
+    }
+
+    private string GetGameLabel(HoopsGame game) => game.Round switch
+    {
+        TournamentRound.FirstFour => "First Four",
+        TournamentRound.RoundOf64 => !string.IsNullOrEmpty(game.SeedMatchup) ? game.SeedMatchup : "R64",
+        TournamentRound.RoundOf32 => "R32",
+        TournamentRound.Sweet16 => "Sweet 16",
+        TournamentRound.Elite8 => "Elite 8",
+        TournamentRound.FinalFour => "Semifinal",
+        TournamentRound.NationalChampionship => "Championship",
+        _ => game.Round.ToString()
+    };
+}

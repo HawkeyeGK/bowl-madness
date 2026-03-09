@@ -7,23 +7,24 @@
         @if (SemiFinal1 != null) {
             var (home, away) = ResolveMatchupTeams?.Invoke(SemiFinal1) ?? ("", "");
             var currentPick = Picks.TryGetValue(SemiFinal1.Id, out var p) ? p : "";
-            
+
             bool homeAvailable = !string.IsNullOrEmpty(home) && home != "TBD";
             bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
             int? homeSeed = GetSeedDisplay?.Invoke(SemiFinal1, true);
             int? awaySeed = GetSeedDisplay?.Invoke(SemiFinal1, false);
 
-            <BracketMatchup 
-                Game="SemiFinal1" 
+            <BracketMatchup
+                Game="SemiFinal1"
                 GameLabel="@GetGameLabel?.Invoke(SemiFinal1)"
                 CurrentPick="@currentPick"
                 IsLocked="IsLocked"
-                HomeName="@home" 
-                HomeSeed="homeSeed" 
+                HomeName="@home"
+                HomeSeed="homeSeed"
                 HomeIsAvailable="homeAvailable"
-                AwayName="@away" 
-                AwaySeed="awaySeed" 
+                AwayName="@away"
+                AwaySeed="awaySeed"
                 AwayIsAvailable="awayAvailable"
+                GhostPick="@(GhostPicks.TryGetValue(SemiFinal1.Id, out var g1) ? g1 : "")"
                 OnPick="HandlePick" />
         }
     </div>
@@ -34,23 +35,24 @@
         @if (Championship != null) {
             var (home, away) = ResolveMatchupTeams?.Invoke(Championship) ?? ("", "");
             var currentPick = Picks.TryGetValue(Championship.Id, out var p) ? p : "";
-            
+
             bool homeAvailable = !string.IsNullOrEmpty(home) && home != "TBD";
             bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
             int? homeSeed = GetSeedDisplay?.Invoke(Championship, true);
             int? awaySeed = GetSeedDisplay?.Invoke(Championship, false);
 
-            <BracketMatchup 
-                Game="Championship" 
+            <BracketMatchup
+                Game="Championship"
                 GameLabel="@GetGameLabel?.Invoke(Championship)"
                 CurrentPick="@currentPick"
                 IsLocked="IsLocked"
-                HomeName="@home" 
-                HomeSeed="homeSeed" 
+                HomeName="@home"
+                HomeSeed="homeSeed"
                 HomeIsAvailable="homeAvailable"
-                AwayName="@away" 
-                AwaySeed="awaySeed" 
+                AwayName="@away"
+                AwaySeed="awaySeed"
                 AwayIsAvailable="awayAvailable"
+                GhostPick="@(GhostPicks.TryGetValue(Championship.Id, out var gc) ? gc : "")"
                 OnPick="HandlePick" />
         }
     </div>
@@ -61,23 +63,24 @@
         @if (SemiFinal2 != null) {
             var (home, away) = ResolveMatchupTeams?.Invoke(SemiFinal2) ?? ("", "");
             var currentPick = Picks.TryGetValue(SemiFinal2.Id, out var p) ? p : "";
-            
+
             bool homeAvailable = !string.IsNullOrEmpty(home) && home != "TBD";
             bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
             int? homeSeed = GetSeedDisplay?.Invoke(SemiFinal2, true);
             int? awaySeed = GetSeedDisplay?.Invoke(SemiFinal2, false);
 
-            <BracketMatchup 
-                Game="SemiFinal2" 
+            <BracketMatchup
+                Game="SemiFinal2"
                 GameLabel="@GetGameLabel?.Invoke(SemiFinal2)"
                 CurrentPick="@currentPick"
                 IsLocked="IsLocked"
-                HomeName="@home" 
-                HomeSeed="homeSeed" 
+                HomeName="@home"
+                HomeSeed="homeSeed"
                 HomeIsAvailable="homeAvailable"
-                AwayName="@away" 
-                AwaySeed="awaySeed" 
+                AwayName="@away"
+                AwaySeed="awaySeed"
                 AwayIsAvailable="awayAvailable"
+                GhostPick="@(GhostPicks.TryGetValue(SemiFinal2.Id, out var g2) ? g2 : "")"
                 OnPick="HandlePick" />
         }
     </div>
@@ -93,6 +96,7 @@
     [Parameter] public Func<HoopsGame, (string Home, string Away)>? ResolveMatchupTeams { get; set; }
     [Parameter] public Func<HoopsGame, bool, int?>? GetSeedDisplay { get; set; }
     [Parameter] public Func<HoopsGame, string>? GetGameLabel { get; set; }
+    [Parameter] public Dictionary<string, string> GhostPicks { get; set; } = new();
 
     [Parameter] public EventCallback<(HoopsGame Game, string Pick)> OnPick { get; set; }
 

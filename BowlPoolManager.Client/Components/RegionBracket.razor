@@ -16,17 +16,18 @@
                 int? homeSeed = GetSeedDisplay?.Invoke(game, true);
                 int? awaySeed = GetSeedDisplay?.Invoke(game, false);
 
-                <BracketMatchup 
-                    Game="game" 
+                <BracketMatchup
+                    Game="game"
                     GameLabel="@GetGameLabel?.Invoke(game)"
                     CurrentPick="@currentPick"
                     IsLocked="IsLocked"
-                    HomeName="@home" 
-                    HomeSeed="homeSeed" 
+                    HomeName="@home"
+                    HomeSeed="homeSeed"
                     HomeIsAvailable="homeAvailable"
-                    AwayName="@away" 
-                    AwaySeed="awaySeed" 
+                    AwayName="@away"
+                    AwaySeed="awaySeed"
                     AwayIsAvailable="awayAvailable"
+                    GhostPick="@(GhostPicks.TryGetValue(game.Id, out var gp) ? gp : "")"
                     OnPick="HandlePick" />
             }
         </div>
@@ -48,7 +49,8 @@
     [Parameter] public Func<HoopsGame, (string Home, string Away)>? ResolveMatchupTeams { get; set; }
     [Parameter] public Func<HoopsGame, bool, int?>? GetSeedDisplay { get; set; }
     [Parameter] public Func<HoopsGame, string>? GetGameLabel { get; set; }
-    
+    [Parameter] public Dictionary<string, string> GhostPicks { get; set; } = new();
+
     [Parameter] public EventCallback<(HoopsGame Game, string Pick)> OnPick { get; set; }
 
     private List<(TournamentRound Round, List<HoopsGame> Games)> Columns = new();

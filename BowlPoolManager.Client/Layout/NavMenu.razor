@@ -98,9 +98,18 @@
 
         @* 4. PATH TO VICTORY *@
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="what-if">
-                <span class="bi bi-signpost-split me-2" aria-hidden="true"></span> Path to Victory
-            </NavLink>
+            @if (SiteContext.ActiveSport == Sport.Basketball)
+            {
+                <NavLink class="nav-link" href="hoops/what-if">
+                    <span class="bi bi-signpost-split me-2" aria-hidden="true"></span> Path to Victory
+                </NavLink>
+            }
+            else
+            {
+                <NavLink class="nav-link" href="what-if">
+                    <span class="bi bi-signpost-split me-2" aria-hidden="true"></span> Path to Victory
+                </NavLink>
+            }
         </div>
 
         @* 5. PRINT BRACKET *@
