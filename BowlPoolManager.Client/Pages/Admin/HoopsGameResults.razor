@@ -105,9 +105,17 @@
                                                 <InputNumber class="form-control form-control-sm" @bind-Value="game.TeamAwayScore" placeholder="–" />
                                             </td>
                                             <td class="text-end">
-                                                <button class="btn btn-sm btn-success" @onclick="() => SaveResult(game)">
-                                                    <i class="bi bi-check-lg"></i> Save
-                                                </button>
+                                                <div class="d-flex gap-1 justify-content-end">
+                                                    <button class="btn btn-sm btn-success" @onclick="() => SaveResult(game)">
+                                                        <i class="bi bi-check-lg"></i> Save
+                                                    </button>
+                                                    @if (game.Status != GameStatus.Scheduled)
+                                                    {
+                                                        <button class="btn btn-sm btn-outline-secondary" title="Reset to Scheduled" @onclick="() => ResetGame(game)">
+                                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                                        </button>
+                                                    }
+                                                </div>
                                             </td>
                                         </tr>
                                     }
@@ -281,6 +289,14 @@
         {
             ShowToast($"Error: {ex.Message}", isError: true);
         }
+    }
+
+    private async Task ResetGame(HoopsGame game)
+    {
+        game.Status = GameStatus.Scheduled;
+        game.TeamHomeScore = null;
+        game.TeamAwayScore = null;
+        await SaveResult(game);
     }
 
     private async Task ForcePropagation()
