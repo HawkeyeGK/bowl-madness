@@ -96,7 +96,7 @@
                                             </button>
                                             @if (!string.IsNullOrEmpty(entry.Id))
                                             {
-                                                <a href="hoops/print-bracket/@entry.Id" target="_blank" class="btn btn-outline-secondary" title="Print Bracket">
+                                                <a href="hoops/print-bracket/@entry.Id?seasonId=@entry.SeasonId" target="_blank" class="btn btn-outline-secondary" title="Print Bracket">
                                                     <i class="bi bi-printer-fill"></i>
                                                 </a>
                                             }
@@ -166,7 +166,7 @@
                     </button>
                     @if (!string.IsNullOrEmpty(activeEntry.Id))
                     {
-                        <a href="hoops/print-bracket/@activeEntry.Id" target="_blank" class="btn btn-outline-secondary me-3" title="Print Bracket">
+                        <a href="hoops/print-bracket/@activeEntry.Id?seasonId=@activeEntry.SeasonId" target="_blank" class="btn btn-outline-secondary me-3" title="Print Bracket">
                             <i class="bi bi-printer-fill"></i> Print Bracket
                         </a>
                     }

@@ -321,6 +321,10 @@ else
     [SupplyParameterFromQuery(Name = "poolId")]
     public string? QueryPoolId { get; set; }
 
+    // Passed from HoopsMyPicks so we use the exact Cosmos partition key (may be "2026" not a season GUID)
+    [SupplyParameterFromQuery(Name = "seasonId")]
+    public string? QuerySeasonId { get; set; }
+
     private List<HoopsGame>? games;
     private List<HoopsPool> pools = new();
     private HoopsPool? currentPool;
@@ -338,23 +342,20 @@ else
     {
         try
         {
-            var season = await SeasonService.GetCurrentSeasonAsync();
-            var seasonId = season?.Id ?? "";
-
-            var poolsTask = Http.GetFromJsonAsync<List<HoopsPool>>($"api/GetHoopsPools?seasonId={seasonId}");
-            var entryTask = FetchEntry(seasonId);
+            // Load all pools without seasonId — matches WhatIf pattern; avoids the "2026" vs GUID quirk
+            var poolsTask = Http.GetFromJsonAsync<List<HoopsPool>>("api/GetHoopsPools");
+            var entryTask = FetchEntry();
 
             await Task.WhenAll(poolsTask, entryTask);
 
-            pools = (await poolsTask ?? new()).Where(p => !p.IsConcluded).ToList();
+            // Show non-archived pools (concluded pools still have printable brackets)
+            pools = (await poolsTask ?? new()).Where(p => !p.IsArchived).ToList();
             userEntry = await entryTask;
 
             // Determine pool
             if (!string.IsNullOrEmpty(EntryId) && userEntry != null)
             {
-                currentPool = pools.FirstOrDefault(p => p.Id == userEntry.PoolId)
-                           ?? (await Http.GetFromJsonAsync<List<HoopsPool>>($"api/GetHoopsPools?seasonId={seasonId}"))
-                              ?.FirstOrDefault(p => p.Id == userEntry.PoolId);
+                currentPool = pools.FirstOrDefault(p => p.Id == userEntry.PoolId);
             }
             else if (!string.IsNullOrEmpty(QueryPoolId))
             {
@@ -378,14 +379,31 @@ else
         catch (Exception ex)
         {
             Console.WriteLine($"HoopsPrintBracket init error: {ex.Message}");
+            games = new(); // Exit the loading state on error
         }
     }
 
-    private async Task<BracketEntry?> FetchEntry(string seasonId)
+    private async Task<BracketEntry?> FetchEntry()
     {
         if (string.IsNullOrEmpty(EntryId)) return null;
-        try { return await Http.GetFromJsonAsync<BracketEntry>($"api/GetHoopsEntry?id={EntryId}&seasonId={seasonId}"); }
-        catch { return null; }
+
+        // Prefer the seasonId passed via URL query param — that's the exact Cosmos partition key
+        if (!string.IsNullOrEmpty(QuerySeasonId))
+        {
+            try { return await Http.GetFromJsonAsync<BracketEntry>($"api/GetHoopsEntry?id={EntryId}&seasonId={QuerySeasonId}"); }
+            catch { }
+        }
+
+        // Fallback: current season GUID
+        try
+        {
+            var season = await SeasonService.GetCurrentSeasonAsync();
+            var seasonId = season?.Id ?? "";
+            if (!string.IsNullOrEmpty(seasonId))
+                return await Http.GetFromJsonAsync<BracketEntry>($"api/GetHoopsEntry?id={EntryId}&seasonId={seasonId}");
+        }
+        catch { }
+        return null;
     }
 
     private async Task OnPoolChanged(ChangeEventArgs e)
@@ -402,7 +420,11 @@ else
 
     private async Task LoadGames()
     {
-        if (currentPool == null) return;
+        if (currentPool == null)
+        {
+            games = new(); // Always exit loading state, even with no pool
+            return;
+        }
 
         try
         {
