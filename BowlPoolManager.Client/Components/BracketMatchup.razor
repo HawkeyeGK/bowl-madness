@@ -8,14 +8,6 @@
     int _wrongPct = 100 - _correctPct;
 }
 <div class="bracket-matchup card shadow-sm border @(string.IsNullOrEmpty(CurrentPick) ? "border-light" : "border-primary border-opacity-50")">
-    @if (_total > 0 && _hasWinner)
-    {
-        <div style="height:5px;display:flex;overflow:hidden;border-radius:calc(var(--bs-card-border-radius, 0.375rem) - 1px) calc(var(--bs-card-border-radius, 0.375rem) - 1px) 0 0;"
-             title="@_correctCount of @_total (@_correctPct%) picked @CurrentPick">
-            <div style="width:@_correctPct%;background-color:#198754;"></div>
-            <div style="width:@_wrongPct%;background-color:#dc3545;"></div>
-        </div>
-    }
     <div class="card-body p-1">
         <div class="d-flex flex-column gap-1">
             <button class="btn btn-sm @(CurrentPick == HomeName && HomeIsAvailable ? "btn-primary" : "btn-outline-secondary") text-start pick-btn d-flex align-items-center"
@@ -28,6 +20,14 @@
                     <i class="bi bi-star-fill ms-1 ghost-indicator" title="This entry's pick" aria-label="This entry's pick"></i>
                 }
             </button>
+            <div style="height:5px;display:flex;overflow:hidden;border-radius:2px;background-color:#dee2e6;"
+                 title="@(_total > 0 && _hasWinner ? $"{_correctCount} of {_total} ({_correctPct}%) picked {CurrentPick}" : "")">
+                @if (_total > 0 && _hasWinner)
+                {
+                    <div style="width:@_correctPct%;background-color:#198754;"></div>
+                    <div style="width:@_wrongPct%;background-color:#dc3545;"></div>
+                }
+            </div>
             <button class="btn btn-sm @(CurrentPick == AwayName && AwayIsAvailable ? "btn-primary" : "btn-outline-secondary") text-start pick-btn d-flex align-items-center"
                     disabled="@(IsLocked || !AwayIsAvailable)"
                     @onclick="() => OnPickClick(AwayName)">
