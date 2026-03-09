@@ -122,6 +122,7 @@ namespace BowlPoolManager.Api.Functions
                 TieBreakerPoints = row.Entry.TieBreakerPoints,
                 TieBreakerDelta = row.TieBreakerDelta,
                 IsPaid = row.Entry.IsPaid,
+                SeasonId = row.Entry.SeasonId,
                 RoundScores = row.RoundScores
             }).ToList();
 

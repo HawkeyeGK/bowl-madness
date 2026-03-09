@@ -32,6 +32,14 @@ These are blocking violations. Any one of them must be fixed before the checkpoi
 
 6. **No duplicate model definitions**: Confirm no type is defined in more than one project. If a type needs to differ between API and client, use a Core base type and project-specific extensions — never duplicate.
 
+## Basketball-Specific Data Quirks (Known Correctness Traps)
+
+These are correctness traps that have caused real bugs. Flag any code that falls into these patterns.
+
+7. **`GetHoopsPools` must not be filtered by `seasonId`**: Some pools were created before the Season document existed and have `SeasonId = "2026"` (a plain year string) rather than the season GUID. Calling `api/GetHoopsPools?seasonId={currentSeasonGuid}` will silently return an empty list. The correct pattern is to call `api/GetHoopsPools` with no seasonId filter, then filter client-side if needed (e.g., by `!p.IsArchived`). Flag any call that passes a GUID-derived seasonId to this endpoint.
+
+8. **`GetHoopsEntry` must use the entry's stored `SeasonId`, not the current season GUID**: Entries are stored in Cosmos with a partition key equal to their pool's `SeasonId` — which may be "2026". Fetching with the current season GUID will return 404. The correct pattern is to pass `entry.SeasonId` (from the entry object itself) as the `seasonId` query param. When the entry is not yet loaded, the value should come from the URL (e.g., `?seasonId=@entry.SeasonId` in anchor tags). Flag any call to `GetHoopsEntry` that derives seasonId from `SeasonService.GetCurrentSeasonAsync()` without a fallback.
+
 ## General Review Criteria
 
 These may produce blocking or non-blocking findings depending on severity:

@@ -42,6 +42,10 @@ namespace BowlPoolManager.Core.Dtos
         [JsonPropertyName("isPaid")]
         public bool IsPaid { get; set; }
 
+        [JsonProperty("seasonId")]
+        [JsonPropertyName("seasonId")]
+        public string SeasonId { get; set; } = string.Empty;
+
         [JsonProperty("roundScores")]
         [JsonPropertyName("roundScores")]
         public Dictionary<TournamentRound, int> RoundScores { get; set; } = new();
