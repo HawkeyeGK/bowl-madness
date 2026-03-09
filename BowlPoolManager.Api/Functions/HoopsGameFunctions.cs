@@ -19,6 +19,7 @@ namespace BowlPoolManager.Api.Functions
         private readonly IUserRepository _userRepo;
         private readonly IBracketGeneratorService _bracketGenerator;
         private readonly IHoopsGameScoringService _scoringService;
+        private readonly IEspnDataService _espnService;
 
         public HoopsGameFunctions(
             ILoggerFactory loggerFactory,
@@ -26,7 +27,8 @@ namespace BowlPoolManager.Api.Functions
             IHoopsPoolRepository poolRepo,
             IUserRepository userRepo,
             IBracketGeneratorService bracketGenerator,
-            IHoopsGameScoringService scoringService)
+            IHoopsGameScoringService scoringService,
+            IEspnDataService espnService)
         {
             _logger = loggerFactory.CreateLogger<HoopsGameFunctions>();
             _gameRepo = gameRepo;
@@ -34,6 +36,7 @@ namespace BowlPoolManager.Api.Functions
             _userRepo = userRepo;
             _bracketGenerator = bracketGenerator;
             _scoringService = scoringService;
+            _espnService = espnService;
         }
 
         [Function("GetHoopsGames")]
@@ -50,9 +53,33 @@ namespace BowlPoolManager.Api.Functions
             var poolGameIds = pool.GameIds.ToHashSet();
             var games = allGames.Where(g => poolGameIds.Contains(g.Id)).ToList();
 
+            // Lazy-load live score refresh (throttled to once every 2 minutes)
+            await _scoringService.CheckAndRefreshScoresAsync(games);
+
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(games);
             return response;
+        }
+
+        [Function("GetRawHoopsGames")]
+        public async Task<HttpResponseData> GetRawHoopsGames(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
+        {
+            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
+            if (!authResult.IsValid) return authResult.ErrorResponse!;
+
+            try
+            {
+                var games = await _espnService.GetScoreboardGamesAsync();
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(games);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetRawHoopsGames failed.");
+                return req.CreateResponse(HttpStatusCode.InternalServerError);
+            }
         }
 
         [Function("GenerateBracket")]

@@ -1,0 +1,430 @@
+@page "/admin/hoops/gamelinker"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core.Dtos
+@using BowlPoolManager.Client.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "SuperAdmin")]
+
+@inject IHoopsPoolService PoolService
+@inject IHoopsGameService GameService
+@inject IConfigurationService ConfigurationService
+@inject HttpClient Http
+
+<PageTitle>Hoops Game Linker</PageTitle>
+
+<div class="container-fluid mt-3 px-4">
+    <div class="d-flex justify-content-between align-items-end mb-3">
+        <div class="d-flex align-items-center gap-3">
+            <h1 class="h3 fw-bold mb-0"><i class="bi bi-link-45deg text-primary"></i> Hoops Game Linker</h1>
+        </div>
+        <span class="badge bg-danger">Super Admin Zone</span>
+    </div>
+
+    @* Pool Selector *@
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <label class="form-label fw-bold">Select Pool:</label>
+            <select class="form-select" value="@_selectedPoolId" @onchange="OnPoolChanged">
+                <option value="">-- Select Pool --</option>
+                @if (_pools != null)
+                {
+                    @foreach (var p in _pools)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    }
+    else if (string.IsNullOrEmpty(_selectedPoolId))
+    {
+        <div class="alert alert-secondary">Select a pool to view its bracket games.</div>
+    }
+    else if (!_localGames.Any())
+    {
+        <div class="alert alert-warning">No games found. Generate a bracket first.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Round</th>
+                        <th>Local Game</th>
+                        <th style="min-width: 300px;">Link Map (Local &rarr; API)</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var game in _localGames.OrderBy(g => (int)g.Round).ThenBy(g => g.Region).ThenBy(g => g.Id))
+                    {
+                        <tr class="@(IsLinked(game) ? "table-success" : "")">
+                            <td>
+                                <span class="badge bg-secondary">@GetRoundLabel(game.Round)</span>
+                                @if (!string.IsNullOrEmpty(game.Region))
+                                {
+                                    <div class="small text-muted mt-1">@game.Region</div>
+                                }
+                            </td>
+                            <td>
+                                <strong>@game.TeamHome</strong> vs <strong>@game.TeamAway</strong>
+                                @if (!string.IsNullOrEmpty(game.SeedMatchup))
+                                {
+                                    <div class="small text-muted">Seeds: @game.SeedMatchup</div>
+                                }
+                            </td>
+                            <td>
+                                @if (IsLinked(game))
+                                {
+                                    <div class="bg-white rounded p-1 border shadow-sm" style="max-width: 350px;">
+                                        <table class="table table-sm table-borderless mb-0" style="font-size: 0.85rem;">
+                                            <tbody>
+                                                <tr>
+                                                    <td class="text-end fw-bold py-0 pe-1">@game.TeamHome</td>
+                                                    <td class="text-center text-muted py-0 px-1">&rarr;</td>
+                                                    <td class="text-start text-success fw-bold py-0 ps-1">@game.ApiHomeTeam</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="text-end fw-bold py-0 pe-1">@game.TeamAway</td>
+                                                    <td class="text-center text-muted py-0 px-1">&rarr;</td>
+                                                    <td class="text-start text-success fw-bold py-0 ps-1">@game.ApiAwayTeam</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark">Unlinked</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-outline-primary btn-sm" @onclick="() => OpenLinkModal(game)">
+                                    @(IsLinked(game) ? "Edit Link" : "Link Game")
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@if (_showModal && _selectedLocalGame != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        Link Game: @_selectedLocalGame.TeamHome vs @_selectedLocalGame.TeamAway
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">1. Select Matching ESPN Game:</label>
+                        @if (_externalGames.Any())
+                        {
+                            <select class="form-select" @onchange="OnApiGameSelected">
+                                <option value="">-- Choose Game --</option>
+                                @foreach (var ext in _externalGames.OrderBy(x => x.HomeTeam))
+                                {
+                                    <option value="@ext.Id" selected="@(_selectedApiGame?.Id == ext.Id)">
+                                        @ext.HomeTeam vs @ext.AwayTeam (@ext.StatusName ?? "Scheduled")
+                                    </option>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info small mb-0">
+                                No live ESPN games found. Games appear here when the tournament is in progress.
+                                You can still manually enter an ESPN game ID below.
+                            </div>
+                            <div class="mt-2">
+                                <input type="text" class="form-control" placeholder="ESPN game ID (e.g. 401638673)"
+                                       @bind="_manualEspnId" @bind:event="oninput" />
+                            </div>
+                        }
+                    </div>
+
+                    @if (_selectedApiGame != null || !string.IsNullOrEmpty(_manualEspnId))
+                    {
+                        <div class="card bg-light">
+                            <div class="card-header fw-bold small text-uppercase">
+                                2. Map Teams
+                            </div>
+                            <div class="card-body">
+                                <p class="small text-muted mb-3">
+                                    Match your local teams to the names provided by the ESPN API.
+                                </p>
+
+                                <div class="row align-items-center mb-3">
+                                    <div class="col-4 text-end fw-bold">
+                                        @_selectedLocalGame.TeamHome
+                                    </div>
+                                    <div class="col-1 text-center text-muted">&rarr;</div>
+                                    <div class="col-7">
+                                        @if (_availableApiTeams.Any())
+                                        {
+                                            <select class="form-select" @bind="_proposedApiHome">
+                                                <option value="">-- Select API Team --</option>
+                                                @foreach (var team in _availableApiTeams)
+                                                {
+                                                    <option value="@team">@team</option>
+                                                }
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            <input type="text" class="form-control" placeholder="API team name"
+                                                   @bind="_proposedApiHome" />
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="row align-items-center">
+                                    <div class="col-4 text-end fw-bold">
+                                        @_selectedLocalGame.TeamAway
+                                    </div>
+                                    <div class="col-1 text-center text-muted">&rarr;</div>
+                                    <div class="col-7">
+                                        @if (_availableApiTeams.Any())
+                                        {
+                                            <select class="form-select" @bind="_proposedApiAway">
+                                                <option value="">-- Select API Team --</option>
+                                                @foreach (var team in _availableApiTeams)
+                                                {
+                                                    <option value="@team">@team</option>
+                                                }
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            <input type="text" class="form-control" placeholder="API team name"
+                                                   @bind="_proposedApiAway" />
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                    <button type="button" class="btn btn-primary"
+                            disabled="@(!CanSave || _isSaving)"
+                            @onclick="SaveLink">
+                        @if (_isSaving) { <span>Saving...</span> } else { <span>Confirm Link</span> }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _isLoading = false;
+    private bool _isSaving = false;
+    private bool _showModal = false;
+
+    private List<HoopsPool> _pools = new();
+    private string _selectedPoolId = string.Empty;
+    private HoopsPool? _selectedPool;
+
+    private List<HoopsGame> _localGames = new();
+    private List<EspnScoreboardGameDto> _externalGames = new();
+    private List<TeamInfo> _allTeams = new();
+
+    private HoopsGame? _selectedLocalGame;
+    private EspnScoreboardGameDto? _selectedApiGame;
+    private List<string> _availableApiTeams = new();
+    private string _proposedApiHome = string.Empty;
+    private string _proposedApiAway = string.Empty;
+    private string _manualEspnId = string.Empty;
+
+    private bool CanSave =>
+        (!string.IsNullOrEmpty(_selectedApiGame?.Id) || !string.IsNullOrEmpty(_manualEspnId))
+        && !string.IsNullOrEmpty(_proposedApiHome)
+        && !string.IsNullOrEmpty(_proposedApiAway)
+        && _proposedApiHome != _proposedApiAway;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _pools = await PoolService.GetPoolsAsync() ?? new();
+    }
+
+    private async Task OnPoolChanged(ChangeEventArgs e)
+    {
+        _selectedPoolId = e.Value?.ToString() ?? string.Empty;
+        _selectedPool = _pools.FirstOrDefault(p => p.Id == _selectedPoolId);
+        _localGames = new();
+
+        if (!string.IsNullOrEmpty(_selectedPoolId))
+            await LoadGames();
+    }
+
+    private async Task LoadGames()
+    {
+        _isLoading = true;
+        try
+        {
+            var gamesTask = GameService.GetGamesAsync(_selectedPoolId);
+            var espnTask = Http.GetFromJsonAsync<List<EspnScoreboardGameDto>>("api/GetRawHoopsGames");
+            var teamsTask = ConfigurationService.GetBasketballTeamsAsync();
+
+            await Task.WhenAll(gamesTask, espnTask, teamsTask);
+
+            _localGames = await gamesTask ?? new();
+            _externalGames = await espnTask ?? new();
+            _allTeams = await teamsTask ?? new();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"HoopsGameLinker load error: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private bool IsLinked(HoopsGame game) => !string.IsNullOrEmpty(game.ExternalId);
+
+    private void OpenLinkModal(HoopsGame game)
+    {
+        _selectedLocalGame = game;
+        _selectedApiGame = null;
+        _availableApiTeams = new();
+        _manualEspnId = string.Empty;
+
+        // Preserve existing mapping for edits
+        _proposedApiHome = game.ApiHomeTeam ?? string.Empty;
+        _proposedApiAway = game.ApiAwayTeam ?? string.Empty;
+
+        if (!string.IsNullOrEmpty(game.ExternalId))
+        {
+            var match = _externalGames.FirstOrDefault(x => x.Id == game.ExternalId);
+            if (match != null)
+            {
+                SelectApiGameInternal(match);
+                // Don't overwrite existing user-confirmed mappings
+                if (!string.IsNullOrEmpty(game.ApiHomeTeam)) _proposedApiHome = game.ApiHomeTeam;
+                if (!string.IsNullOrEmpty(game.ApiAwayTeam)) _proposedApiAway = game.ApiAwayTeam;
+            }
+            else
+            {
+                _manualEspnId = game.ExternalId;
+            }
+        }
+
+        _showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+        _selectedLocalGame = null;
+        _selectedApiGame = null;
+    }
+
+    private void OnApiGameSelected(ChangeEventArgs e)
+    {
+        var id = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(id))
+        {
+            var match = _externalGames.FirstOrDefault(x => x.Id == id);
+            SelectApiGameInternal(match);
+        }
+        else
+        {
+            _selectedApiGame = null;
+            _availableApiTeams = new();
+        }
+    }
+
+    private void SelectApiGameInternal(EspnScoreboardGameDto? match)
+    {
+        _selectedApiGame = match;
+        _availableApiTeams = new();
+        if (match != null)
+        {
+            if (!string.IsNullOrEmpty(match.HomeTeam)) _availableApiTeams.Add(match.HomeTeam);
+            if (!string.IsNullOrEmpty(match.AwayTeam)) _availableApiTeams.Add(match.AwayTeam);
+
+            if (string.IsNullOrEmpty(_proposedApiHome) && !string.IsNullOrEmpty(match.HomeTeam))
+                _proposedApiHome = match.HomeTeam;
+            if (string.IsNullOrEmpty(_proposedApiAway) && !string.IsNullOrEmpty(match.AwayTeam))
+                _proposedApiAway = match.AwayTeam;
+        }
+    }
+
+    private async Task SaveLink()
+    {
+        if (_selectedLocalGame == null) return;
+
+        _isSaving = true;
+        try
+        {
+            _selectedLocalGame.ExternalId = _selectedApiGame?.Id ?? _manualEspnId;
+            _selectedLocalGame.ApiHomeTeam = _proposedApiHome;
+            _selectedLocalGame.ApiAwayTeam = _proposedApiAway;
+
+            // Denormalize team info from local team config if available
+            if (_selectedApiGame != null)
+            {
+                var homeTeam = _allTeams.FirstOrDefault(t => t.SchoolId == _selectedApiGame.HomeId)
+                    ?? _allTeams.FirstOrDefault(t => string.Equals(t.School, _proposedApiHome, StringComparison.OrdinalIgnoreCase));
+                if (homeTeam != null)
+                {
+                    _selectedLocalGame.TeamHomeId = homeTeam.SchoolId;
+                    _selectedLocalGame.HomeTeamInfo = homeTeam.ToDenormalized();
+                }
+
+                var awayTeam = _allTeams.FirstOrDefault(t => t.SchoolId == _selectedApiGame.AwayId)
+                    ?? _allTeams.FirstOrDefault(t => string.Equals(t.School, _proposedApiAway, StringComparison.OrdinalIgnoreCase));
+                if (awayTeam != null)
+                {
+                    _selectedLocalGame.TeamAwayId = awayTeam.SchoolId;
+                    _selectedLocalGame.AwayTeamInfo = awayTeam.ToDenormalized();
+                }
+            }
+
+            var saved = await GameService.SaveGameAsync(_selectedLocalGame);
+            if (saved != null)
+                CloseModal();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"HoopsGameLinker save error: {ex.Message}");
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private static string GetRoundLabel(TournamentRound round) => round switch
+    {
+        TournamentRound.FirstFour => "First Four",
+        TournamentRound.RoundOf64 => "Round of 64",
+        TournamentRound.RoundOf32 => "Round of 32",
+        TournamentRound.Sweet16 => "Sweet 16",
+        TournamentRound.Elite8 => "Elite 8",
+        TournamentRound.FinalFour => "Final Four",
+        TournamentRound.NationalChampionship => "Championship",
+        _ => round.ToString()
+    };
+}

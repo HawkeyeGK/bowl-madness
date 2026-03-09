@@ -8,11 +8,141 @@ namespace BowlPoolManager.Api.Services
     {
         private readonly ILogger<HoopsGameScoringService> _logger;
         private readonly IHoopsGameRepository _gameRepo;
+        private readonly IEspnDataService _espnService;
 
-        public HoopsGameScoringService(ILogger<HoopsGameScoringService> logger, IHoopsGameRepository gameRepo)
+        // Throttling state — shared across all requests (singleton service)
+        private static DateTime _lastRefresh = DateTime.MinValue;
+        private static readonly SemaphoreSlim _refreshLock = new SemaphoreSlim(1, 1);
+        private const int RefreshIntervalMinutes = 2;
+
+        public HoopsGameScoringService(ILogger<HoopsGameScoringService> logger, IHoopsGameRepository gameRepo, IEspnDataService espnService)
         {
             _logger = logger;
             _gameRepo = gameRepo;
+            _espnService = espnService;
+        }
+
+        public async Task CheckAndRefreshScoresAsync(List<HoopsGame> games)
+        {
+            if (DateTime.UtcNow <= _lastRefresh.AddMinutes(RefreshIntervalMinutes)) return;
+
+            await _refreshLock.WaitAsync();
+            try
+            {
+                if (DateTime.UtcNow > _lastRefresh.AddMinutes(RefreshIntervalMinutes))
+                {
+                    _logger.LogInformation("Lazy loading: refreshing hoops scores from ESPN scoreboard...");
+                    await PerformScoreUpdateAsync(games);
+                    _lastRefresh = DateTime.UtcNow;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error refreshing hoops scores from ESPN.");
+            }
+            finally
+            {
+                _refreshLock.Release();
+            }
+        }
+
+        private async Task PerformScoreUpdateAsync(List<HoopsGame> games)
+        {
+            var linkedGames = games
+                .Where(g => !string.IsNullOrEmpty(g.ExternalId) && g.Status != GameStatus.Final)
+                .ToList();
+
+            if (!linkedGames.Any()) return;
+
+            var apiGames = await _espnService.GetScoreboardGamesAsync();
+            var batchUpdates = new List<HoopsGame>();
+            string? seasonId = linkedGames.FirstOrDefault()?.SeasonId;
+
+            foreach (var localGame in linkedGames)
+            {
+                var apiGame = apiGames.FirstOrDefault(x => x.Id == localGame.ExternalId);
+                if (apiGame == null) continue;
+
+                bool gameChanged = false;
+
+                // Match home score
+                int? homeScore = null;
+                if (!string.IsNullOrEmpty(localGame.ApiHomeTeam))
+                {
+                    if (string.Equals(apiGame.HomeTeam, localGame.ApiHomeTeam, StringComparison.OrdinalIgnoreCase))
+                        homeScore = apiGame.HomePoints;
+                    else if (string.Equals(apiGame.AwayTeam, localGame.ApiHomeTeam, StringComparison.OrdinalIgnoreCase))
+                        homeScore = apiGame.AwayPoints;
+                }
+                if (homeScore.HasValue && homeScore != localGame.TeamHomeScore)
+                {
+                    localGame.TeamHomeScore = homeScore;
+                    gameChanged = true;
+                }
+
+                // Match away score
+                int? awayScore = null;
+                if (!string.IsNullOrEmpty(localGame.ApiAwayTeam))
+                {
+                    if (string.Equals(apiGame.HomeTeam, localGame.ApiAwayTeam, StringComparison.OrdinalIgnoreCase))
+                        awayScore = apiGame.HomePoints;
+                    else if (string.Equals(apiGame.AwayTeam, localGame.ApiAwayTeam, StringComparison.OrdinalIgnoreCase))
+                        awayScore = apiGame.AwayPoints;
+                }
+                if (awayScore.HasValue && awayScore != localGame.TeamAwayScore)
+                {
+                    localGame.TeamAwayScore = awayScore;
+                    gameChanged = true;
+                }
+
+                // Update status and game detail
+                var oldStatus = localGame.Status;
+                var oldDetail = localGame.GameDetail;
+
+                if (apiGame.Completed ||
+                    string.Equals(apiGame.StatusName, "STATUS_FINAL", StringComparison.OrdinalIgnoreCase))
+                {
+                    localGame.Status = GameStatus.Final;
+                    localGame.GameDetail = "Final";
+                }
+                else if (string.Equals(apiGame.StatusName, "STATUS_IN_PROGRESS", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(apiGame.StatusName, "STATUS_HALFTIME", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(apiGame.StatusName, "STATUS_END_PERIOD", StringComparison.OrdinalIgnoreCase))
+                {
+                    localGame.Status = GameStatus.InProgress;
+
+                    if (string.Equals(apiGame.StatusName, "STATUS_HALFTIME", StringComparison.OrdinalIgnoreCase))
+                    {
+                        localGame.GameDetail = "Halftime";
+                    }
+                    else if (apiGame.Period.HasValue)
+                    {
+                        string half = apiGame.Period == 1 ? "1st Half" : apiGame.Period == 2 ? "2nd Half" : "OT";
+                        localGame.GameDetail = $"{half} • {apiGame.DisplayClock ?? "0:00"}";
+                    }
+                    else
+                    {
+                        localGame.GameDetail = "In Progress";
+                    }
+                }
+
+                if (localGame.Status != oldStatus || localGame.GameDetail != oldDetail)
+                    gameChanged = true;
+
+                if (gameChanged)
+                {
+                    if (!batchUpdates.Contains(localGame))
+                        batchUpdates.Add(localGame);
+
+                    PropagateWinner(localGame, games, batchUpdates);
+                }
+            }
+
+            if (batchUpdates.Any() && !string.IsNullOrEmpty(seasonId))
+            {
+                _logger.LogInformation("Hoops scores updated. Saving {Count} games.", batchUpdates.Count);
+                await _gameRepo.SaveGamesAsBatchAsync(batchUpdates, seasonId);
+            }
         }
 
         public async Task ProcessGameUpdateAsync(HoopsGame game)

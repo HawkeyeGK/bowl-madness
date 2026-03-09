@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using BowlPoolManager.Core.Domain;
+using BowlPoolManager.Core.Dtos;
 
 namespace BowlPoolManager.Api.Services
 {
@@ -11,6 +12,7 @@ namespace BowlPoolManager.Api.Services
         private readonly ILogger<EspnDataService> _logger;
         private const string TeamsUrl = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams?limit=1000";
         private const string SearchUrl = "https://site.api.espn.com/apis/search/v2";
+        private const string ScoreboardUrl = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?limit=100";
 
         public EspnDataService(HttpClient httpClient, ILogger<EspnDataService> logger)
         {
@@ -109,6 +111,87 @@ namespace BowlPoolManager.Api.Services
             {
                 _logger.LogError(ex, "Failed to search ESPN teams for query '{Query}'.", query);
                 return new List<TeamInfo>();
+            }
+        }
+
+        public async Task<List<EspnScoreboardGameDto>> GetScoreboardGamesAsync()
+        {
+            try
+            {
+                var json = await _httpClient.GetStringAsync(ScoreboardUrl);
+                var root = JObject.Parse(json);
+
+                var events = root["events"];
+                if (events == null)
+                {
+                    _logger.LogWarning("ESPN scoreboard response contained no events.");
+                    return new List<EspnScoreboardGameDto>();
+                }
+
+                var results = new List<EspnScoreboardGameDto>();
+
+                foreach (var evt in events)
+                {
+                    var competition = evt["competitions"]?.FirstOrDefault();
+                    if (competition == null) continue;
+
+                    var competitors = competition["competitors"];
+                    if (competitors == null) continue;
+
+                    string? homeTeam = null, awayTeam = null;
+                    int? homeId = null, awayId = null;
+                    int? homePoints = null, awayPoints = null;
+
+                    foreach (var competitor in competitors)
+                    {
+                        var homeAway = competitor["homeAway"]?.ToString();
+                        var teamName = competitor["team"]?["displayName"]?.ToString();
+                        int.TryParse(competitor["team"]?["id"]?.ToString(), out var teamId);
+                        int.TryParse(competitor["score"]?.ToString(), out var score);
+
+                        if (string.Equals(homeAway, "home", StringComparison.OrdinalIgnoreCase))
+                        {
+                            homeTeam = teamName;
+                            homeId = teamId > 0 ? teamId : null;
+                            homePoints = score > 0 ? score : null;
+                        }
+                        else
+                        {
+                            awayTeam = teamName;
+                            awayId = teamId > 0 ? teamId : null;
+                            awayPoints = score > 0 ? score : null;
+                        }
+                    }
+
+                    var statusType = competition["status"]?["type"];
+                    var statusName = statusType?["name"]?.ToString();
+                    var completed = (bool?)statusType?["completed"] ?? false;
+                    var period = (int?)competition["status"]?["period"];
+                    var displayClock = competition["status"]?["displayClock"]?.ToString();
+
+                    results.Add(new EspnScoreboardGameDto
+                    {
+                        Id = evt["id"]?.ToString() ?? string.Empty,
+                        HomeTeam = homeTeam,
+                        AwayTeam = awayTeam,
+                        HomeId = homeId,
+                        AwayId = awayId,
+                        HomePoints = homePoints,
+                        AwayPoints = awayPoints,
+                        Completed = completed,
+                        StatusName = statusName,
+                        Period = period,
+                        DisplayClock = displayClock
+                    });
+                }
+
+                _logger.LogInformation("ESPN scoreboard returned {Count} games.", results.Count);
+                return results;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to fetch/parse ESPN scoreboard.");
+                return new List<EspnScoreboardGameDto>();
             }
         }
     }
