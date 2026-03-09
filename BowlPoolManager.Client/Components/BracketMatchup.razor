@@ -26,8 +26,8 @@
             <div style="height:8px;display:flex;overflow:hidden;border-radius:2px;background-color:#dee2e6;">
                 @if (_total > 0 && _hasWinner)
                 {
-                    <div style="width:@_correctPct%;background-color:#198754;"></div>
-                    <div style="width:@_wrongPct%;background-color:#dc3545;"></div>
+                    @if (_correctPct > 0) { <div style="width:@_correctPct%;background-color:#198754;flex-shrink:0;"></div> }
+                    @if (_wrongPct > 0)   { <div style="width:@_wrongPct%;background-color:#dc3545;flex-shrink:0;"></div> }
                 }
             </div>
             <button class="btn btn-sm @(CurrentPick == AwayName && AwayIsAvailable ? "btn-primary" : "btn-outline-secondary") text-start pick-btn d-flex align-items-center"
