@@ -94,6 +94,12 @@
                                             <button class="btn btn-outline-primary flex-grow-1" @onclick="() => EditEntry(entry)">
                                                 <i class="bi bi-pencil-square"></i> View/Edit
                                             </button>
+                                            @if (!string.IsNullOrEmpty(entry.Id))
+                                            {
+                                                <a href="hoops/print-bracket/@entry.Id" target="_blank" class="btn btn-outline-secondary" title="Print Bracket">
+                                                    <i class="bi bi-printer-fill"></i>
+                                                </a>
+                                            }
                                             <button class="btn btn-outline-danger" @onclick="() => DeleteEntry(entry)" title="Delete">
                                                 <i class="bi bi-trash-fill"></i>
                                             </button>
@@ -158,6 +164,12 @@
                     <button class="btn btn-outline-secondary me-3" @onclick="BackToDashboard">
                         <i class="bi bi-arrow-left"></i> Back
                     </button>
+                    @if (!string.IsNullOrEmpty(activeEntry.Id))
+                    {
+                        <a href="hoops/print-bracket/@activeEntry.Id" target="_blank" class="btn btn-outline-secondary me-3" title="Print Bracket">
+                            <i class="bi bi-printer-fill"></i> Print Bracket
+                        </a>
+                    }
                     <div>
                         <h2 class="fw-bold mb-0">
                             @(string.IsNullOrEmpty(activeEntry.Id) ? "New Entry" : "Edit Entry")
