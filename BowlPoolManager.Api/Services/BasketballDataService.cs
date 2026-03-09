@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.Net.Http.Headers;
 using BowlPoolManager.Core.Domain;
+using BowlPoolManager.Core.Dtos;
 
 namespace BowlPoolManager.Api.Services
 {
@@ -46,6 +48,46 @@ namespace BowlPoolManager.Api.Services
                 _logger.LogError(ex, "Failed to fetch/deserialize basketball teams.");
                 return new List<TeamInfo>();
             }
+        }
+
+        public async Task<List<BasketballGameDto>> GetScoreboardGamesAsync()
+        {
+            var json = await GetRawScoreboardJsonAsync();
+            if (string.IsNullOrEmpty(json) || json.StartsWith("Error"))
+                return new List<BasketballGameDto>();
+
+            try
+            {
+                var token = JToken.Parse(json);
+                if (token is JArray arr)
+                {
+                    return arr.Select(g => new BasketballGameDto
+                    {
+                        Id = (int?)g["id"] ?? 0,
+                        Completed = (bool?)g["completed"] ?? false,
+                        StatusRaw = (string?)g["status"],
+                        Period = (int?)g["period"],
+                        Clock = (string?)g["clock"],
+                        HomeRaw = g["homeTeam"]?.ToObject<Dictionary<string, object>>(),
+                        HomePointsRoot = (int?)g["homePoints"],
+                        AwayRaw = g["awayTeam"]?.ToObject<Dictionary<string, object>>(),
+                        AwayPointsRoot = (int?)g["awayPoints"],
+                        Notes = (string?)g["notes"]
+                    }).ToList();
+                }
+
+                return new List<BasketballGameDto>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Basketball scoreboard deserialization failed.");
+                return new List<BasketballGameDto>();
+            }
+        }
+
+        public async Task<string> GetRawScoreboardJsonAsync()
+        {
+            return await ExecuteRequestAsync("/scoreboard");
         }
 
         private async Task<string> ExecuteRequestAsync(string relativeUrl)

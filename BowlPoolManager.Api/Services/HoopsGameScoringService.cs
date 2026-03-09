@@ -8,18 +8,18 @@ namespace BowlPoolManager.Api.Services
     {
         private readonly ILogger<HoopsGameScoringService> _logger;
         private readonly IHoopsGameRepository _gameRepo;
-        private readonly IEspnDataService _espnService;
+        private readonly IBasketballDataService _basketballDataService;
 
         // Throttling state — shared across all requests (singleton service)
         private static DateTime _lastRefresh = DateTime.MinValue;
         private static readonly SemaphoreSlim _refreshLock = new SemaphoreSlim(1, 1);
         private const int RefreshIntervalMinutes = 2;
 
-        public HoopsGameScoringService(ILogger<HoopsGameScoringService> logger, IHoopsGameRepository gameRepo, IEspnDataService espnService)
+        public HoopsGameScoringService(ILogger<HoopsGameScoringService> logger, IHoopsGameRepository gameRepo, IBasketballDataService basketballDataService)
         {
             _logger = logger;
             _gameRepo = gameRepo;
-            _espnService = espnService;
+            _basketballDataService = basketballDataService;
         }
 
         public async Task CheckAndRefreshScoresAsync(List<HoopsGame> games)
@@ -31,14 +31,14 @@ namespace BowlPoolManager.Api.Services
             {
                 if (DateTime.UtcNow > _lastRefresh.AddMinutes(RefreshIntervalMinutes))
                 {
-                    _logger.LogInformation("Lazy loading: refreshing hoops scores from ESPN scoreboard...");
+                    _logger.LogInformation("Lazy loading: refreshing hoops scores from CollegeBasketballData scoreboard...");
                     await PerformScoreUpdateAsync(games);
                     _lastRefresh = DateTime.UtcNow;
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error refreshing hoops scores from ESPN.");
+                _logger.LogError(ex, "Error refreshing hoops scores from CollegeBasketballData.");
             }
             finally
             {
@@ -54,13 +54,13 @@ namespace BowlPoolManager.Api.Services
 
             if (!linkedGames.Any()) return;
 
-            var apiGames = await _espnService.GetScoreboardGamesAsync();
+            var apiGames = await _basketballDataService.GetScoreboardGamesAsync();
             var batchUpdates = new List<HoopsGame>();
             string? seasonId = linkedGames.FirstOrDefault()?.SeasonId;
 
             foreach (var localGame in linkedGames)
             {
-                var apiGame = apiGames.FirstOrDefault(x => x.Id == localGame.ExternalId);
+                var apiGame = apiGames.FirstOrDefault(x => x.Id.ToString() == localGame.ExternalId);
                 if (apiGame == null) continue;
 
                 bool gameChanged = false;
@@ -100,25 +100,19 @@ namespace BowlPoolManager.Api.Services
                 var oldDetail = localGame.GameDetail;
 
                 if (apiGame.Completed ||
-                    string.Equals(apiGame.StatusName, "STATUS_FINAL", StringComparison.OrdinalIgnoreCase))
+                    string.Equals(apiGame.StatusRaw, "completed", StringComparison.OrdinalIgnoreCase))
                 {
                     localGame.Status = GameStatus.Final;
                     localGame.GameDetail = "Final";
                 }
-                else if (string.Equals(apiGame.StatusName, "STATUS_IN_PROGRESS", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(apiGame.StatusName, "STATUS_HALFTIME", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(apiGame.StatusName, "STATUS_END_PERIOD", StringComparison.OrdinalIgnoreCase))
+                else if (string.Equals(apiGame.StatusRaw, "in_progress", StringComparison.OrdinalIgnoreCase))
                 {
                     localGame.Status = GameStatus.InProgress;
 
-                    if (string.Equals(apiGame.StatusName, "STATUS_HALFTIME", StringComparison.OrdinalIgnoreCase))
-                    {
-                        localGame.GameDetail = "Halftime";
-                    }
-                    else if (apiGame.Period.HasValue)
+                    if (apiGame.Period.HasValue)
                     {
                         string half = apiGame.Period == 1 ? "1st Half" : apiGame.Period == 2 ? "2nd Half" : "OT";
-                        localGame.GameDetail = $"{half} • {apiGame.DisplayClock ?? "0:00"}";
+                        localGame.GameDetail = $"{half} • {apiGame.Clock ?? "0:00"}";
                     }
                     else
                     {

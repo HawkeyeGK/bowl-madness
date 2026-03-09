@@ -140,8 +140,8 @@
                                 <option value="">-- Choose Game --</option>
                                 @foreach (var ext in _externalGames.OrderBy(x => x.HomeTeam))
                                 {
-                                    <option value="@ext.Id" selected="@(_selectedApiGame?.Id == ext.Id)">
-                                        @ext.HomeTeam vs @ext.AwayTeam (@ext.StatusName ?? "Scheduled")
+                                    <option value="@ext.Id" selected="@(_selectedApiGame?.Id == ext.Id ? "selected" : null)">
+                                        @ext.HomeTeam vs @ext.AwayTeam (@ext.StatusRaw ?? "Scheduled")
                                     </option>
                                 }
                             </select>
@@ -245,18 +245,18 @@
     private HoopsPool? _selectedPool;
 
     private List<HoopsGame> _localGames = new();
-    private List<EspnScoreboardGameDto> _externalGames = new();
+    private List<BasketballGameDto> _externalGames = new();
     private List<TeamInfo> _allTeams = new();
 
     private HoopsGame? _selectedLocalGame;
-    private EspnScoreboardGameDto? _selectedApiGame;
+    private BasketballGameDto? _selectedApiGame;
     private List<string> _availableApiTeams = new();
     private string _proposedApiHome = string.Empty;
     private string _proposedApiAway = string.Empty;
     private string _manualEspnId = string.Empty;
 
     private bool CanSave =>
-        (!string.IsNullOrEmpty(_selectedApiGame?.Id) || !string.IsNullOrEmpty(_manualEspnId))
+        (_selectedApiGame != null || !string.IsNullOrEmpty(_manualEspnId))
         && !string.IsNullOrEmpty(_proposedApiHome)
         && !string.IsNullOrEmpty(_proposedApiAway)
         && _proposedApiHome != _proposedApiAway;
@@ -282,7 +282,7 @@
         try
         {
             var gamesTask = GameService.GetGamesAsync(_selectedPoolId);
-            var espnTask = Http.GetFromJsonAsync<List<EspnScoreboardGameDto>>("api/GetRawHoopsGames");
+            var espnTask = Http.GetFromJsonAsync<List<BasketballGameDto>>("api/GetRawHoopsGames");
             var teamsTask = ConfigurationService.GetBasketballTeamsAsync();
 
             await Task.WhenAll(gamesTask, espnTask, teamsTask);
@@ -316,7 +316,7 @@
 
         if (!string.IsNullOrEmpty(game.ExternalId))
         {
-            var match = _externalGames.FirstOrDefault(x => x.Id == game.ExternalId);
+            var match = _externalGames.FirstOrDefault(x => x.Id.ToString() == game.ExternalId);
             if (match != null)
             {
                 SelectApiGameInternal(match);
@@ -343,9 +343,9 @@
     private void OnApiGameSelected(ChangeEventArgs e)
     {
         var id = e.Value?.ToString();
-        if (!string.IsNullOrEmpty(id))
+        if (int.TryParse(id, out int parsedId))
         {
-            var match = _externalGames.FirstOrDefault(x => x.Id == id);
+            var match = _externalGames.FirstOrDefault(x => x.Id == parsedId);
             SelectApiGameInternal(match);
         }
         else
@@ -355,7 +355,7 @@
         }
     }
 
-    private void SelectApiGameInternal(EspnScoreboardGameDto? match)
+    private void SelectApiGameInternal(BasketballGameDto? match)
     {
         _selectedApiGame = match;
         _availableApiTeams = new();
@@ -378,7 +378,7 @@
         _isSaving = true;
         try
         {
-            _selectedLocalGame.ExternalId = _selectedApiGame?.Id ?? _manualEspnId;
+            _selectedLocalGame.ExternalId = _selectedApiGame != null ? _selectedApiGame.Id.ToString() : _manualEspnId;
             _selectedLocalGame.ApiHomeTeam = _proposedApiHome;
             _selectedLocalGame.ApiAwayTeam = _proposedApiAway;
 

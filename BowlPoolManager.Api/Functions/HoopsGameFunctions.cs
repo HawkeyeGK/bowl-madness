@@ -19,7 +19,7 @@ namespace BowlPoolManager.Api.Functions
         private readonly IUserRepository _userRepo;
         private readonly IBracketGeneratorService _bracketGenerator;
         private readonly IHoopsGameScoringService _scoringService;
-        private readonly IEspnDataService _espnService;
+        private readonly IBasketballDataService _basketballDataService;
 
         public HoopsGameFunctions(
             ILoggerFactory loggerFactory,
@@ -28,7 +28,7 @@ namespace BowlPoolManager.Api.Functions
             IUserRepository userRepo,
             IBracketGeneratorService bracketGenerator,
             IHoopsGameScoringService scoringService,
-            IEspnDataService espnService)
+            IBasketballDataService basketballDataService)
         {
             _logger = loggerFactory.CreateLogger<HoopsGameFunctions>();
             _gameRepo = gameRepo;
@@ -36,7 +36,7 @@ namespace BowlPoolManager.Api.Functions
             _userRepo = userRepo;
             _bracketGenerator = bracketGenerator;
             _scoringService = scoringService;
-            _espnService = espnService;
+            _basketballDataService = basketballDataService;
         }
 
         [Function("GetHoopsGames")]
@@ -70,7 +70,7 @@ namespace BowlPoolManager.Api.Functions
 
             try
             {
-                var games = await _espnService.GetScoreboardGamesAsync();
+                var games = await _basketballDataService.GetScoreboardGamesAsync();
                 var response = req.CreateResponse(HttpStatusCode.OK);
                 await response.WriteAsJsonAsync(games);
                 return response;
