@@ -1,0 +1,253 @@
+@page "/admin/hoops/payments"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@using Microsoft.AspNetCore.Authorization
+@using BowlPoolManager.Client.Services
+@using System.Net.Http.Json
+@attribute [Authorize(Roles = "SuperAdmin,Admin")]
+@inject HttpClient Http
+
+<PageTitle>Bracket Payment Manager</PageTitle>
+
+<div class="container-fluid mt-3 px-4">
+    <div class="d-flex justify-content-between align-items-end mb-3">
+        <div class="d-flex flex-column gap-2">
+            <div class="d-flex align-items-center gap-3">
+                <h1 class="h3 fw-bold mb-0"><i class="bi bi-cash-coin text-warning"></i> Bracket Payment Manager</h1>
+            </div>
+        </div>
+        <a href="admin/dashboard" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Dashboard
+        </a>
+    </div>
+
+    @* --- FILTERS --- *@
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Select Pool</label>
+                    <select class="form-select" @bind="SelectedPoolId" disabled="@(Pools.Count == 0)">
+                        <option value="">-- All Pools --</option>
+                        @foreach (var pool in Pools)
+                        {
+                            <option value="@pool.Id">@pool.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="unpaidOnly" @bind="ShowUnpaidOnly">
+                        <label class="form-check-label user-select-none" for="unpaidOnly">Show Unpaid Only</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* --- ENTRIES TABLE --- *@
+    @if (IsLoading)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (FilteredEntries.Count == 0)
+    {
+        <div class="alert alert-info text-center">
+            No entries found for the selected criteria.
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm border-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th scope="col" class="ps-4 cursor-pointer" style="cursor: pointer;" @onclick="@(() => Sort("PlayerName"))">
+                                Player Name @GetSortIcon("PlayerName")
+                            </th>
+                            <th scope="col" class="cursor-pointer" style="cursor: pointer;" @onclick="@(() => Sort("Email"))">
+                                Email @GetSortIcon("Email")
+                            </th>
+                            <th scope="col" class="cursor-pointer" style="cursor: pointer;" @onclick="@(() => Sort("Pool"))">
+                                Pool @GetSortIcon("Pool")
+                            </th>
+                            <th scope="col" class="cursor-pointer" style="cursor: pointer;" @onclick="@(() => Sort("Status"))">
+                                Payment Status @GetSortIcon("Status")
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in FilteredEntries)
+                        {
+                            <tr>
+                                <td class="ps-4">
+                                    <span class="fw-bold text-dark">@entry.PlayerName</span>
+                                </td>
+                                <td>
+                                    <span class="small text-muted">@GetUserEmail(entry.UserId)</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border">@GetPoolName(entry.PoolId)</span>
+                                </td>
+                                <td>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="pay-@entry.Id"
+                                               checked="@entry.IsPaid"
+                                               @onchange="@(e => TogglePayment(entry, (bool?)e.Value ?? false))">
+                                        <label class="form-check-label fw-bold @(entry.IsPaid ? "text-success" : "text-danger")" for="pay-@entry.Id">
+                                            @(entry.IsPaid ? "PAID" : "UNPAID")
+                                        </label>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer bg-white text-muted small">
+                Showing @FilteredEntries.Count entries
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool IsLoading = true;
+    private string SelectedPoolId = "";
+    private bool ShowUnpaidOnly = false;
+    private string CurrentSortColumn = "PlayerName";
+    private bool IsAscending = true;
+
+    private List<HoopsPool> Pools = new();
+    private List<BracketEntry> AllEntries = new();
+    private Dictionary<string, string> UserEmailMap = new();
+
+    private List<BracketEntry> FilteredEntries
+    {
+        get
+        {
+            var query = AllEntries
+                .Where(e => (string.IsNullOrEmpty(SelectedPoolId) || e.PoolId == SelectedPoolId) &&
+                            (!ShowUnpaidOnly || !e.IsPaid));
+
+            switch (CurrentSortColumn)
+            {
+                case "PlayerName":
+                    query = IsAscending ? query.OrderBy(e => e.PlayerName) : query.OrderByDescending(e => e.PlayerName);
+                    break;
+                case "Email":
+                    query = IsAscending
+                        ? query.OrderBy(e => GetUserEmail(e.UserId))
+                        : query.OrderByDescending(e => GetUserEmail(e.UserId));
+                    break;
+                case "Pool":
+                    query = IsAscending
+                        ? query.OrderBy(e => GetPoolName(e.PoolId))
+                        : query.OrderByDescending(e => GetPoolName(e.PoolId));
+                    break;
+                case "Status":
+                    query = IsAscending ? query.OrderBy(e => e.IsPaid) : query.OrderByDescending(e => e.IsPaid);
+                    break;
+            }
+
+            return query.ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        IsLoading = true;
+        try
+        {
+            // Load all hoops pools (no seasonId — pools may use "2026" partition key)
+            Pools = await Http.GetFromJsonAsync<List<HoopsPool>>("api/GetHoopsPools") ?? new();
+
+            // Load users for email lookup
+            var users = await Http.GetFromJsonAsync<List<UserProfile>>("api/GetUsers") ?? new();
+            UserEmailMap = users.ToDictionary(u => u.Id, u => u.Email);
+
+            // Load entries for each pool using each pool's own SeasonId
+            AllEntries.Clear();
+            foreach (var pool in Pools)
+            {
+                var poolEntries = await Http.GetFromJsonAsync<List<BracketEntry>>(
+                    $"api/GetHoopsEntries?poolId={pool.Id}&seasonId={pool.SeasonId}");
+                if (poolEntries != null)
+                {
+                    AllEntries.AddRange(poolEntries);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading data: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private string GetPoolName(string poolId)
+    {
+        var pool = Pools.FirstOrDefault(p => p.Id == poolId);
+        return pool?.Name ?? "Unknown Pool";
+    }
+
+    private string GetUserEmail(string userId)
+    {
+        return UserEmailMap.TryGetValue(userId, out var email) ? email : "Admin Entered";
+    }
+
+    private void Sort(string column)
+    {
+        if (CurrentSortColumn == column)
+        {
+            IsAscending = !IsAscending;
+        }
+        else
+        {
+            CurrentSortColumn = column;
+            IsAscending = true;
+        }
+    }
+
+    private string GetSortIcon(string column)
+    {
+        if (CurrentSortColumn != column) return "↕";
+        return IsAscending ? "↑" : "↓";
+    }
+
+    private async Task TogglePayment(BracketEntry entry, bool isPaid)
+    {
+        try
+        {
+            // Optimistic update
+            entry.IsPaid = isPaid;
+
+            var response = await Http.PostAsync(
+                $"api/SetHoopsEntryPaidStatus?id={entry.Id}&isPaid={isPaid}&seasonId={entry.SeasonId}", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                // Revert on failure
+                entry.IsPaid = !isPaid;
+                Console.WriteLine("Failed to update payment status.");
+            }
+        }
+        catch (Exception ex)
+        {
+            entry.IsPaid = !isPaid;
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+}
