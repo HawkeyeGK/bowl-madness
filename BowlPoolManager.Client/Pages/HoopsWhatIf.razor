@@ -887,7 +887,21 @@
     {
         if (!_gameById.TryGetValue(feederId, out var feeder)) return "TBD";
         if (!string.IsNullOrEmpty(feeder.SeedMatchup)) return $"Win of {feeder.SeedMatchup}";
-        return $"{feeder.Round} winner";
+        if (!string.IsNullOrEmpty(feeder.Region)) return $"{feeder.Region} winner";
+
+        // For Final Four games (Championship feeders), build "Region1/Region2 winner"
+        if (_feederGameIds.TryGetValue(feederId, out var e8Ids))
+        {
+            var regions = e8Ids
+                .Select(id => _gameById.TryGetValue(id, out var g) ? g.Region ?? "" : "")
+                .Where(r => r.Length > 0)
+                .OrderBy(r => r)
+                .ToList();
+            if (regions.Count > 0)
+                return $"{string.Join("/", regions)} winner";
+        }
+
+        return "TBD";
     }
 
     private int? GetSeedDisplay(HoopsGame game, bool homeSlot)
