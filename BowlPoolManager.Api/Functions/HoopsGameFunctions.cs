@@ -53,6 +53,16 @@ namespace BowlPoolManager.Api.Functions
             var poolGameIds = pool.GameIds.ToHashSet();
             var games = allGames.Where(g => poolGameIds.Contains(g.Id)).ToList();
 
+            // Hydrate PointValue from PointsPerRound (in-memory only — never persisted)
+            if (pool.PointsPerRound != null)
+            {
+                foreach (var game in games)
+                {
+                    if (pool.PointsPerRound.TryGetValue(game.Round, out var pts))
+                        game.PointValue = pts;
+                }
+            }
+
             // Lazy-load live score refresh (throttled to once every 2 minutes)
             await _scoringService.CheckAndRefreshScoresAsync(games);
 
