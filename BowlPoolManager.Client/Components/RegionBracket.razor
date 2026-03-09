@@ -6,32 +6,34 @@
     {
         <div class="bracket-column round-@(round)">
             <div class="bracket-column-header">@RoundLabel(round)</div>
-            @foreach(var game in roundGames)
-            {
-                var (home, away) = ResolveMatchupTeams?.Invoke(game) ?? ("", "");
-                var currentPick = Picks.TryGetValue(game.Id, out var p) ? p : "";
+            <div class="bracket-games">
+                @foreach(var game in roundGames)
+                {
+                    var (home, away) = ResolveMatchupTeams?.Invoke(game) ?? ("", "");
+                    var currentPick = Picks.TryGetValue(game.Id, out var p) ? p : "";
 
-                bool homeAvailable = !string.IsNullOrEmpty(home) && home != "TBD";
-                bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
-                int? homeSeed = GetSeedDisplay?.Invoke(game, true);
-                int? awaySeed = GetSeedDisplay?.Invoke(game, false);
-                var pickCounts = AllPickCounts.TryGetValue(game.Id, out var pc) ? pc : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                    bool homeAvailable = !string.IsNullOrEmpty(home) && home != "TBD";
+                    bool awayAvailable = !string.IsNullOrEmpty(away) && away != "TBD";
+                    int? homeSeed = GetSeedDisplay?.Invoke(game, true);
+                    int? awaySeed = GetSeedDisplay?.Invoke(game, false);
+                    var pickCounts = AllPickCounts.TryGetValue(game.Id, out var pc) ? pc : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-                <BracketMatchup
-                    Game="game"
-                    GameLabel="@GetGameLabel?.Invoke(game)"
-                    CurrentPick="@currentPick"
-                    IsLocked="IsLocked"
-                    HomeName="@home"
-                    HomeSeed="homeSeed"
-                    HomeIsAvailable="homeAvailable"
-                    AwayName="@away"
-                    AwaySeed="awaySeed"
-                    AwayIsAvailable="awayAvailable"
-                    PickCounts="pickCounts"
-                    GhostPick="@(GhostPicks.TryGetValue(game.Id, out var gp) ? gp : "")"
-                    OnPick="HandlePick" />
-            }
+                    <BracketMatchup
+                        Game="game"
+                        GameLabel="@GetGameLabel?.Invoke(game)"
+                        CurrentPick="@currentPick"
+                        IsLocked="IsLocked"
+                        HomeName="@home"
+                        HomeSeed="homeSeed"
+                        HomeIsAvailable="homeAvailable"
+                        AwayName="@away"
+                        AwaySeed="awaySeed"
+                        AwayIsAvailable="awayAvailable"
+                        PickCounts="pickCounts"
+                        GhostPick="@(GhostPicks.TryGetValue(game.Id, out var gp) ? gp : "")"
+                        OnPick="HandlePick" />
+                }
+            </div>
         </div>
         
         @if (round != TournamentRound.Elite8)

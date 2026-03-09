@@ -15,10 +15,35 @@
     flex-direction: column;
     width: 220px;
     flex-shrink: 0;
-    justify-content: space-around;
     position: relative;
     z-index: 2;
 }
+
+.bracket-games {
+    display: grid;
+    grid-template-rows: repeat(8, 1fr);
+    flex-grow: 1;
+    gap: 0;
+}
+
+.bracket-games ::deep .bracket-matchup {
+    align-self: center;
+    margin-bottom: 0;
+}
+
+/* Explicit round placements based on 8-row grid */
+/* R32: 4 games. Spans 2 rows each: 1/2, 3/4, 5/6, 7/8 */
+.round-RoundOf32 .bracket-games ::deep .bracket-matchup:nth-child(1) { grid-row: 1 / span 2; }
+.round-RoundOf32 .bracket-games ::deep .bracket-matchup:nth-child(2) { grid-row: 3 / span 2; }
+.round-RoundOf32 .bracket-games ::deep .bracket-matchup:nth-child(3) { grid-row: 5 / span 2; }
+.round-RoundOf32 .bracket-games ::deep .bracket-matchup:nth-child(4) { grid-row: 7 / span 2; }
+
+/* Sweet 16: 2 games. Top aligns with 5v12 (row 3). Bottom with 3v14 (row 6). */
+.round-Sweet16 .bracket-games ::deep .bracket-matchup:nth-child(1) { grid-row: 3; }
+.round-Sweet16 .bracket-games ::deep .bracket-matchup:nth-child(2) { grid-row: 6; }
+
+/* Elite 8: 1 game. Splits 4v13 and 6v11 (rows 4/5) */
+.round-Elite8 .bracket-games ::deep .bracket-matchup:nth-child(1) { grid-row: 4 / span 2; }
 
 .bracket-connector {
     width: 15px;
