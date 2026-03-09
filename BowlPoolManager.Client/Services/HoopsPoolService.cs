@@ -56,5 +56,23 @@ namespace BowlPoolManager.Client.Services
             if (!response.IsSuccessStatusCode) return null;
             return await response.Content.ReadFromJsonAsync<HoopsPool>();
         }
+
+        public async Task<bool> ArchivePoolAsync(string poolId)
+        {
+            var response = await _http.PostAsync($"api/ArchiveHoopsPool/{poolId}", null);
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<PoolArchive?> GetArchiveAsync(string poolId)
+        {
+            try
+            {
+                return await _http.GetFromJsonAsync<PoolArchive>($"api/HoopsArchives/{poolId}");
+            }
+            catch (HttpRequestException)
+            {
+                return null;
+            }
+        }
     }
 }

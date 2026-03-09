@@ -81,6 +81,20 @@
                                                     title="@(pool.IsConcluded ? "Reopen Pool" : "Conclude Pool")">
                                                 <i class="bi @(pool.IsConcluded ? "bi-unlock" : "bi-lock")"></i>
                                             </button>
+                                            @if (pool.IsConcluded)
+                                            {
+                                                <button class="btn btn-sm btn-outline-secondary me-1"
+                                                        @onclick="() => ArchivePool(pool)"
+                                                        title="Archive Pool">
+                                                    <i class="bi bi-archive"></i>
+                                                </button>
+                                            }
+                                        }
+                                        @if (pool.IsArchived)
+                                        {
+                                            <a href="hoops/history/@pool.Id" class="btn btn-sm btn-outline-secondary me-1" title="View Archive">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
                                         }
                                         <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditPool(pool)">
                                             <i class="bi bi-pencil"></i> Edit
@@ -337,5 +351,21 @@
             await LoadPools();
         else
             _isLoading = false;
+    }
+
+    private async Task ArchivePool(HoopsPool pool)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Archive '{pool.Name}'? This will snapshot the current standings and mark the pool as archived."))
+            return;
+
+        _isLoading = true;
+        var success = await PoolService.ArchivePoolAsync(pool.Id);
+        if (success)
+            await LoadPools();
+        else
+        {
+            await JS.InvokeVoidAsync("alert", "Failed to archive pool. Make sure the pool is concluded first.");
+            _isLoading = false;
+        }
     }
 }

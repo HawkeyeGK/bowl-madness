@@ -157,6 +157,79 @@ namespace BowlPoolManager.Tests.Core
             game.PointValue.Should().Be(0);
         }
 
+        [Fact]
+        public void ArchiveGame_BasketballFields_ShouldDefaultToNull()
+        {
+            // Act
+            var game = new ArchiveGame();
+
+            // Assert
+            game.Round.Should().BeNull();
+            game.Region.Should().BeNull();
+            game.TeamHomeSeed.Should().BeNull();
+            game.TeamAwaySeed.Should().BeNull();
+        }
+
+        [Fact]
+        public void ArchiveGame_ShouldStoreBasketballFields_WhenSetExplicitly()
+        {
+            // Arrange & Act
+            var game = new ArchiveGame
+            {
+                Round = TournamentRound.Sweet16,
+                Region = "East",
+                TeamHomeSeed = 1,
+                TeamAwaySeed = 4
+            };
+
+            // Assert
+            game.Round.Should().Be(TournamentRound.Sweet16);
+            game.Region.Should().Be("East");
+            game.TeamHomeSeed.Should().Be(1);
+            game.TeamAwaySeed.Should().Be(4);
+        }
+
+        [Fact]
+        public void ArchiveGame_Round_ShouldAcceptAllBasketballRounds()
+        {
+            // Verifies the Round field can hold each basketball TournamentRound value.
+            var rounds = new[]
+            {
+                TournamentRound.FirstFour,
+                TournamentRound.RoundOf64,
+                TournamentRound.RoundOf32,
+                TournamentRound.Sweet16,
+                TournamentRound.Elite8,
+                TournamentRound.FinalFour,
+                TournamentRound.NationalChampionship
+            };
+
+            foreach (var round in rounds)
+            {
+                var game = new ArchiveGame { Round = round };
+                game.Round.Should().Be(round);
+            }
+        }
+
+        [Fact]
+        public void ArchiveGame_BasketballFields_ShouldBeNullableAndIndependentOfScores()
+        {
+            // A football archive game (no basketball fields) should still compute WinningTeamName correctly.
+            var game = new ArchiveGame
+            {
+                TeamHome = "Alabama",
+                TeamAway = "Georgia",
+                TeamHomeScore = 31,
+                TeamAwayScore = 24,
+                Round = null,
+                Region = null,
+                TeamHomeSeed = null,
+                TeamAwaySeed = null
+            };
+
+            game.WinningTeamName.Should().Be("Alabama");
+        }
+
         #endregion
 
         #region ArchiveStanding Tests

@@ -53,10 +53,26 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("startTime")]
         public DateTime StartTime { get; set; } = DateTime.UtcNow;
 
-
         [JsonProperty("bowlName")]
         [JsonPropertyName("bowlName")]
         public string BowlName { get; set; } = string.Empty;
+
+        // Basketball-specific fields (null for football archives)
+        [JsonProperty("round")]
+        [JsonPropertyName("round")]
+        public TournamentRound? Round { get; set; }
+
+        [JsonProperty("region")]
+        [JsonPropertyName("region")]
+        public string? Region { get; set; }
+
+        [JsonProperty("teamHomeSeed")]
+        [JsonPropertyName("teamHomeSeed")]
+        public int? TeamHomeSeed { get; set; }
+
+        [JsonProperty("teamAwaySeed")]
+        [JsonPropertyName("teamAwaySeed")]
+        public int? TeamAwaySeed { get; set; }
 
         [JsonProperty("teamHome")]
         [JsonPropertyName("teamHome")]

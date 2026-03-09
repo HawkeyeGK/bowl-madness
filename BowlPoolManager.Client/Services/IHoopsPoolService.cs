@@ -10,5 +10,7 @@ namespace BowlPoolManager.Client.Services
         Task<HoopsPool?> UpdatePoolAsync(HoopsPool pool);
         Task<bool> DeletePoolAsync(string poolId);
         Task<HoopsPool?> ToggleConclusionAsync(string poolId);
+        Task<bool> ArchivePoolAsync(string poolId);
+        Task<PoolArchive?> GetArchiveAsync(string poolId);
     }
 }
