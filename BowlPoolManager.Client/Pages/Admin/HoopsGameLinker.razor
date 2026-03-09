@@ -133,7 +133,7 @@
                 <div class="modal-body">
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">1. Select Matching ESPN Game:</label>
+                        <label class="form-label fw-bold">1. Select Matching API Game:</label>
                         @if (_externalGames.Any())
                         {
                             <select class="form-select" @onchange="OnApiGameSelected">
@@ -149,17 +149,17 @@
                         else
                         {
                             <div class="alert alert-info small mb-0">
-                                No live ESPN games found. Games appear here when the tournament is in progress.
-                                You can still manually enter an ESPN game ID below.
+                                No live games found in the CollegeBasketballData scoreboard. Games appear here when the tournament is in progress.
+                                You can still manually enter a game ID below.
                             </div>
                             <div class="mt-2">
-                                <input type="text" class="form-control" placeholder="ESPN game ID (e.g. 401638673)"
-                                       @bind="_manualEspnId" @bind:event="oninput" />
+                                <input type="text" class="form-control" placeholder="CollegeBasketballData game ID"
+                                       @bind="_manualGameId" @bind:event="oninput" />
                             </div>
                         }
                     </div>
 
-                    @if (_selectedApiGame != null || !string.IsNullOrEmpty(_manualEspnId))
+                    @if (_selectedApiGame != null || !string.IsNullOrEmpty(_manualGameId))
                     {
                         <div class="card bg-light">
                             <div class="card-header fw-bold small text-uppercase">
@@ -167,7 +167,7 @@
                             </div>
                             <div class="card-body">
                                 <p class="small text-muted mb-3">
-                                    Match your local teams to the names provided by the ESPN API.
+                                    Match your local teams to the names provided by the CollegeBasketballData API.
                                 </p>
 
                                 <div class="row align-items-center mb-3">
@@ -253,10 +253,10 @@
     private List<string> _availableApiTeams = new();
     private string _proposedApiHome = string.Empty;
     private string _proposedApiAway = string.Empty;
-    private string _manualEspnId = string.Empty;
+    private string _manualGameId = string.Empty;
 
     private bool CanSave =>
-        (_selectedApiGame != null || !string.IsNullOrEmpty(_manualEspnId))
+        (_selectedApiGame != null || !string.IsNullOrEmpty(_manualGameId))
         && !string.IsNullOrEmpty(_proposedApiHome)
         && !string.IsNullOrEmpty(_proposedApiAway)
         && _proposedApiHome != _proposedApiAway;
@@ -282,13 +282,13 @@
         try
         {
             var gamesTask = GameService.GetGamesAsync(_selectedPoolId);
-            var espnTask = Http.GetFromJsonAsync<List<BasketballGameDto>>("api/GetRawHoopsGames");
+            var cbdTask = Http.GetFromJsonAsync<List<BasketballGameDto>>("api/GetRawHoopsGames");
             var teamsTask = ConfigurationService.GetBasketballTeamsAsync();
 
-            await Task.WhenAll(gamesTask, espnTask, teamsTask);
+            await Task.WhenAll(gamesTask, cbdTask, teamsTask);
 
             _localGames = await gamesTask ?? new();
-            _externalGames = await espnTask ?? new();
+            _externalGames = await cbdTask ?? new();
             _allTeams = await teamsTask ?? new();
         }
         catch (Exception ex)
@@ -308,7 +308,7 @@
         _selectedLocalGame = game;
         _selectedApiGame = null;
         _availableApiTeams = new();
-        _manualEspnId = string.Empty;
+        _manualGameId = string.Empty;
 
         // Preserve existing mapping for edits
         _proposedApiHome = game.ApiHomeTeam ?? string.Empty;
@@ -326,7 +326,7 @@
             }
             else
             {
-                _manualEspnId = game.ExternalId;
+                _manualGameId = game.ExternalId;
             }
         }
 
@@ -378,7 +378,7 @@
         _isSaving = true;
         try
         {
-            _selectedLocalGame.ExternalId = _selectedApiGame != null ? _selectedApiGame.Id.ToString() : _manualEspnId;
+            _selectedLocalGame.ExternalId = _selectedApiGame != null ? _selectedApiGame.Id.ToString() : _manualGameId;
             _selectedLocalGame.ApiHomeTeam = _proposedApiHome;
             _selectedLocalGame.ApiAwayTeam = _proposedApiAway;
 
