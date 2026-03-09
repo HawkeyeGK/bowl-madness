@@ -13,7 +13,7 @@
                 <span class="team-name text-truncate flex-grow-1">@(HomeIsAvailable ? HomeName : "TBD")</span>
                 @if (!string.IsNullOrEmpty(GhostPick) && string.Equals(GhostPick, HomeName, StringComparison.OrdinalIgnoreCase) && HomeIsAvailable)
                 {
-                    <span class="ms-1 ghost-indicator" title="Ghosted pick" aria-label="Ghosted pick">●</span>
+                    <i class="bi bi-star-fill ms-1 ghost-indicator" title="This entry's pick" aria-label="This entry's pick"></i>
                 }
             </button>
             <button class="btn btn-sm @(CurrentPick == AwayName && AwayIsAvailable ? "btn-primary" : "btn-outline-secondary") text-start pick-btn d-flex align-items-center"
@@ -23,7 +23,7 @@
                 <span class="team-name text-truncate flex-grow-1">@(AwayIsAvailable ? AwayName : "TBD")</span>
                 @if (!string.IsNullOrEmpty(GhostPick) && string.Equals(GhostPick, AwayName, StringComparison.OrdinalIgnoreCase) && AwayIsAvailable)
                 {
-                    <span class="ms-1 ghost-indicator" title="Ghosted pick" aria-label="Ghosted pick">●</span>
+                    <i class="bi bi-star-fill ms-1 ghost-indicator" title="This entry's pick" aria-label="This entry's pick"></i>
                 }
             </button>
         </div>
