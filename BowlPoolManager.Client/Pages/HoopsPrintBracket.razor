@@ -81,106 +81,108 @@ else
             </div>
         }
 
-        @* ── REGIONAL BRACKETS (2×2 grid) ── *@
+        @* ── REGIONAL BRACKETS ── *@
+        @* Left side: R64→E8 (fanning inward right); Right side: E8→R64 (fanning inward left — mirrored) *@
         <div class="section-label">REGIONAL BRACKETS</div>
-        <div class="regions-grid">
-            @foreach (var region in regions)
-            {
-                var r64 = GetRoundOrdered(region, TournamentRound.RoundOf64);
-                var r32 = OrderByFeeder(GetRoundGames(region, TournamentRound.RoundOf32), r64);
-                var s16 = OrderByFeeder(GetRoundGames(region, TournamentRound.Sweet16), r32);
-                var e8  = OrderByFeeder(GetRoundGames(region, TournamentRound.Elite8), s16);
+        <div class="regions-two-col">
 
-                <div class="region-section">
-                    <div class="region-name">@region.ToUpper()</div>
-                    <div class="region-bracket">
-
-                        @* R64 *@
-                        <div class="round-col">
-                            <div class="round-hdr">R64</div>
-                            <div class="games-col">
-                                @foreach (var game in r64)
-                                {
+            @* LEFT SIDE — rounds progress left → right (R64 on far left, E8 near center) *@
+            <div class="region-col">
+                @foreach (var region in leftRegions)
+                {
+                    var r64 = GetRoundOrdered(region, TournamentRound.RoundOf64);
+                    var r32 = OrderByFeeder(GetRoundGames(region, TournamentRound.RoundOf32), r64);
+                    var s16 = OrderByFeeder(GetRoundGames(region, TournamentRound.Sweet16), r32);
+                    var e8  = OrderByFeeder(GetRoundGames(region, TournamentRound.Elite8), s16);
+                    <div class="region-section">
+                        <div class="region-name">@region.ToUpper()</div>
+                        <div class="region-bracket">
+                            <div class="round-col"><div class="round-hdr">R64</div><div class="games-col">
+                                @foreach (var game in r64) {
                                     <div class="match-card">
-                                        <div class="team-slot @GetPickClass(game, game.TeamHome)">
-                                            <span class="seed-badge">@game.TeamHomeSeed</span>
-                                            <span class="tname">@Ellipsis(game.TeamHome)</span>
-                                        </div>
-                                        <div class="team-slot bottom-team @GetPickClass(game, game.TeamAway)">
-                                            <span class="seed-badge">@game.TeamAwaySeed</span>
-                                            <span class="tname">@Ellipsis(game.TeamAway)</span>
-                                        </div>
+                                        <div class="team-slot @GetPickClass(game, game.TeamHome)"><span class="seed-badge">@game.TeamHomeSeed</span><span class="tname">@Ellipsis(game.TeamHome)</span></div>
+                                        <div class="team-slot bottom-team @GetPickClass(game, game.TeamAway)"><span class="seed-badge">@game.TeamAwaySeed</span><span class="tname">@Ellipsis(game.TeamAway)</span></div>
                                     </div>
                                 }
-                            </div>
-                        </div>
-
-                        @* R32 *@
-                        <div class="round-col">
-                            <div class="round-hdr">R32</div>
-                            <div class="games-col">
-                                @foreach (var game in r32)
-                                {
-                                    var (h, a) = ResolveTeams(game);
+                            </div></div>
+                            <div class="round-col"><div class="round-hdr">R32</div><div class="games-col">
+                                @foreach (var game in r32) { var (h, a) = ResolveTeams(game);
                                     <div class="match-card">
-                                        <div class="team-slot @GetPickClass(game, h)">
-                                            <span class="seed-badge">@GetSeed(h)</span>
-                                            <span class="tname">@Ellipsis(h)</span>
-                                        </div>
-                                        <div class="team-slot bottom-team @GetPickClass(game, a)">
-                                            <span class="seed-badge">@GetSeed(a)</span>
-                                            <span class="tname">@Ellipsis(a)</span>
-                                        </div>
+                                        <div class="team-slot @GetPickClass(game, h)"><span class="seed-badge">@GetSeed(h)</span><span class="tname">@Ellipsis(h)</span></div>
+                                        <div class="team-slot bottom-team @GetPickClass(game, a)"><span class="seed-badge">@GetSeed(a)</span><span class="tname">@Ellipsis(a)</span></div>
                                     </div>
                                 }
-                            </div>
-                        </div>
-
-                        @* S16 *@
-                        <div class="round-col">
-                            <div class="round-hdr">S16</div>
-                            <div class="games-col">
-                                @foreach (var game in s16)
-                                {
-                                    var (h, a) = ResolveTeams(game);
+                            </div></div>
+                            <div class="round-col"><div class="round-hdr">S16</div><div class="games-col">
+                                @foreach (var game in s16) { var (h, a) = ResolveTeams(game);
                                     <div class="match-card">
-                                        <div class="team-slot @GetPickClass(game, h)">
-                                            <span class="seed-badge">@GetSeed(h)</span>
-                                            <span class="tname">@Ellipsis(h)</span>
-                                        </div>
-                                        <div class="team-slot bottom-team @GetPickClass(game, a)">
-                                            <span class="seed-badge">@GetSeed(a)</span>
-                                            <span class="tname">@Ellipsis(a)</span>
-                                        </div>
+                                        <div class="team-slot @GetPickClass(game, h)"><span class="seed-badge">@GetSeed(h)</span><span class="tname">@Ellipsis(h)</span></div>
+                                        <div class="team-slot bottom-team @GetPickClass(game, a)"><span class="seed-badge">@GetSeed(a)</span><span class="tname">@Ellipsis(a)</span></div>
                                     </div>
                                 }
-                            </div>
-                        </div>
-
-                        @* E8 *@
-                        <div class="round-col last-col">
-                            <div class="round-hdr">E8</div>
-                            <div class="games-col">
-                                @foreach (var game in e8)
-                                {
-                                    var (h, a) = ResolveTeams(game);
+                            </div></div>
+                            <div class="round-col"><div class="round-hdr">E8</div><div class="games-col">
+                                @foreach (var game in e8) { var (h, a) = ResolveTeams(game);
                                     <div class="match-card no-right-line">
-                                        <div class="team-slot @GetPickClass(game, h)">
-                                            <span class="seed-badge">@GetSeed(h)</span>
-                                            <span class="tname">@Ellipsis(h)</span>
-                                        </div>
-                                        <div class="team-slot bottom-team @GetPickClass(game, a)">
-                                            <span class="seed-badge">@GetSeed(a)</span>
-                                            <span class="tname">@Ellipsis(a)</span>
-                                        </div>
+                                        <div class="team-slot @GetPickClass(game, h)"><span class="seed-badge">@GetSeed(h)</span><span class="tname">@Ellipsis(h)</span></div>
+                                        <div class="team-slot bottom-team @GetPickClass(game, a)"><span class="seed-badge">@GetSeed(a)</span><span class="tname">@Ellipsis(a)</span></div>
                                     </div>
                                 }
-                            </div>
+                            </div></div>
                         </div>
-
                     </div>
-                </div>
-            }
+                }
+            </div>
+
+            @* RIGHT SIDE — rounds progress right → left (E8 near center, R64 on far right) *@
+            <div class="region-col">
+                @foreach (var region in rightRegions)
+                {
+                    var r64 = GetRoundOrdered(region, TournamentRound.RoundOf64);
+                    var r32 = OrderByFeeder(GetRoundGames(region, TournamentRound.RoundOf32), r64);
+                    var s16 = OrderByFeeder(GetRoundGames(region, TournamentRound.Sweet16), r32);
+                    var e8  = OrderByFeeder(GetRoundGames(region, TournamentRound.Elite8), s16);
+                    <div class="region-section">
+                        <div class="region-name">@region.ToUpper()</div>
+                        <div class="region-bracket reversed">
+                            @* Columns rendered E8→R64; connector lines point left (::before) *@
+                            <div class="round-col"><div class="round-hdr">E8</div><div class="games-col">
+                                @foreach (var game in e8) { var (h, a) = ResolveTeams(game);
+                                    <div class="match-card no-left-line">
+                                        <div class="team-slot @GetPickClass(game, h)"><span class="seed-badge">@GetSeed(h)</span><span class="tname">@Ellipsis(h)</span></div>
+                                        <div class="team-slot bottom-team @GetPickClass(game, a)"><span class="seed-badge">@GetSeed(a)</span><span class="tname">@Ellipsis(a)</span></div>
+                                    </div>
+                                }
+                            </div></div>
+                            <div class="round-col"><div class="round-hdr">S16</div><div class="games-col">
+                                @foreach (var game in s16) { var (h, a) = ResolveTeams(game);
+                                    <div class="match-card">
+                                        <div class="team-slot @GetPickClass(game, h)"><span class="seed-badge">@GetSeed(h)</span><span class="tname">@Ellipsis(h)</span></div>
+                                        <div class="team-slot bottom-team @GetPickClass(game, a)"><span class="seed-badge">@GetSeed(a)</span><span class="tname">@Ellipsis(a)</span></div>
+                                    </div>
+                                }
+                            </div></div>
+                            <div class="round-col"><div class="round-hdr">R32</div><div class="games-col">
+                                @foreach (var game in r32) { var (h, a) = ResolveTeams(game);
+                                    <div class="match-card">
+                                        <div class="team-slot @GetPickClass(game, h)"><span class="seed-badge">@GetSeed(h)</span><span class="tname">@Ellipsis(h)</span></div>
+                                        <div class="team-slot bottom-team @GetPickClass(game, a)"><span class="seed-badge">@GetSeed(a)</span><span class="tname">@Ellipsis(a)</span></div>
+                                    </div>
+                                }
+                            </div></div>
+                            <div class="round-col"><div class="round-hdr">R64</div><div class="games-col">
+                                @foreach (var game in r64) {
+                                    <div class="match-card">
+                                        <div class="team-slot @GetPickClass(game, game.TeamHome)"><span class="seed-badge">@game.TeamHomeSeed</span><span class="tname">@Ellipsis(game.TeamHome)</span></div>
+                                        <div class="team-slot bottom-team @GetPickClass(game, game.TeamAway)"><span class="seed-badge">@game.TeamAwaySeed</span><span class="tname">@Ellipsis(game.TeamAway)</span></div>
+                                    </div>
+                                }
+                            </div></div>
+                        </div>
+                    </div>
+                }
+            </div>
+
         </div>
 
         @* ── FINAL FOUR + CHAMPIONSHIP ── *@
@@ -284,8 +286,9 @@ else
     .ff-card { flex: 1; border: 1px solid var(--border); padding: 2px 4px; font-size: 0.68rem; background: #fafafa; }
     .ff-card-header { font-weight: bold; font-size: 0.6rem; border-bottom: 1px solid #ddd; margin-bottom: 2px; color: #333; }
 
-    /* ── Regions grid ── */
-    .regions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 4px; }
+    /* ── Regions layout ── */
+    .regions-two-col { display: flex; gap: 6px; margin-bottom: 4px; }
+    .region-col { display: flex; flex-direction: column; flex: 1; gap: 4px; }
     .region-section { border: 1px solid #bbb; padding: 2px 3px; }
     .region-name { font-size: 0.62rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; background: #e9e9e9; padding: 1px 4px; margin: -2px -3px 2px -3px; }
     .region-bracket { display: flex; height: 260px; }
@@ -295,9 +298,14 @@ else
     .round-hdr { text-align: center; font-size: 0.58rem; font-weight: bold; text-transform: uppercase; background: #f0f0f0; border: 1px solid #ccc; height: 14px; line-height: 13px; margin-bottom: 2px; }
     .games-col { display: flex; flex-direction: column; justify-content: space-around; flex: 1; }
 
-    /* ── Match cards ── */
+    /* ── Match cards — left-side regions (connector stubs point right) ── */
     .match-card { border: 1px solid #aaa; background: #fff; position: relative; margin: 0 2px; }
     .match-card:not(.no-right-line)::after { content: ''; position: absolute; right: -4px; top: 50%; width: 4px; height: 1px; background: #000; }
+
+    /* ── Right-side regions (reversed): connector stubs point left ── */
+    .reversed .match-card::after { display: none; }
+    .reversed .match-card:not(.no-left-line)::before { content: ''; position: absolute; left: -4px; top: 50%; width: 4px; height: 1px; background: #000; }
+
     .team-slot { display: flex; align-items: center; height: 14px; padding: 0 2px; font-size: 0.6rem; overflow: hidden; white-space: nowrap; }
     .team-slot.bottom-team { border-top: 1px solid #ddd; }
     .seed-badge { font-weight: bold; color: #555; min-width: 14px; text-align: right; margin-right: 2px; font-size: 0.58rem; flex-shrink: 0; }
@@ -333,7 +341,10 @@ else
     private List<HoopsGame> firstFourGames = new();
     private List<HoopsGame> finalFourGames = new();
     private List<HoopsGame> champGames = new();
-    private List<string> regions = new();
+    // leftRegions pair with each other in one semifinal; rightRegions in the other.
+    // Matches FinalFourBracket's stable sort: alphabetically-first E8 feeder region determines left vs right.
+    private List<string> leftRegions = new();
+    private List<string> rightRegions = new();
 
     // Seed cache: team name → seed
     private Dictionary<string, int> seedCache = new(StringComparer.OrdinalIgnoreCase);
@@ -451,17 +462,12 @@ else
             .ThenBy(g => g.SeedMatchup)
             .ToList();
 
-        regions = games
-            .Where(g => g.Round >= TournamentRound.RoundOf64 && g.Round <= TournamentRound.Elite8 && !string.IsNullOrEmpty(g.Region))
-            .Select(g => g.Region!)
-            .Distinct()
-            .OrderBy(r => r)
-            .ToList();
-
         finalFourGames = games
             .Where(g => g.Round == TournamentRound.FinalFour)
-            .OrderBy(g => g.Id)
+            .OrderBy(g => GetFfSortKey(g))
             .ToList();
+
+        (leftRegions, rightRegions) = ComputeRegionSides();
 
         champGames = games
             .Where(g => g.Round == TournamentRound.NationalChampionship)
@@ -482,6 +488,61 @@ else
 
     private List<HoopsGame> OrderByFeeder(List<HoopsGame> current, List<HoopsGame> previous) =>
         BracketLayoutHelper.OrderByFeeder(current, previous);
+
+    // ── Region side assignment (mirrors FinalFourBracket stable sort) ──
+
+    /// <summary>
+    /// Returns the alphabetically-first E8 feeder region for a Final Four game,
+    /// falling back to the game ID so the sort is always stable.
+    /// Mirrors FinalFourBracket.GetStableSortKey.
+    /// </summary>
+    private string GetFfSortKey(HoopsGame ffGame) =>
+        games!.Where(g => g.Round == TournamentRound.Elite8 && g.NextGameId == ffGame.Id)
+              .Select(g => g.Region ?? "")
+              .Where(r => r.Length > 0)
+              .OrderBy(r => r)
+              .FirstOrDefault() ?? ffGame.Id;
+
+    /// <summary>
+    /// Splits the four regional bracket regions into left and right halves based on
+    /// which two regions play each other in each Final Four semifinal game.
+    /// The SF game with the alphabetically-earlier sort key goes on the left.
+    /// Falls back to an alphabetical 2/2 split when FF structure is unavailable.
+    /// </summary>
+    private (List<string> Left, List<string> Right) ComputeRegionSides()
+    {
+        var sf1 = finalFourGames.ElementAtOrDefault(0);
+        var sf2 = finalFourGames.ElementAtOrDefault(1);
+
+        var left = GetRegionsForFfGame(sf1);
+        var right = GetRegionsForFfGame(sf2);
+
+        // Fallback: alphabetical split if FF data is unavailable
+        if (!left.Any() && !right.Any())
+        {
+            var allRegions = games!
+                .Where(g => g.Round >= TournamentRound.RoundOf64 && g.Round <= TournamentRound.Elite8 && !string.IsNullOrEmpty(g.Region))
+                .Select(g => g.Region!)
+                .Distinct()
+                .OrderBy(r => r)
+                .ToList();
+            left  = allRegions.Take(2).ToList();
+            right = allRegions.Skip(2).ToList();
+        }
+
+        return (left, right);
+    }
+
+    private List<string> GetRegionsForFfGame(HoopsGame? ffGame)
+    {
+        if (ffGame == null) return new();
+        return games!
+            .Where(g => g.Round == TournamentRound.Elite8 && g.NextGameId == ffGame.Id)
+            .Select(g => g.Region ?? "")
+            .Where(r => r.Length > 0)
+            .OrderBy(r => r)
+            .ToList();
+    }
 
     // ── Team resolution ──
 
