@@ -249,10 +249,10 @@
 
     @* Toast *@
     <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:1050">
-        <div class="toast @(showToast ? "show" : "hide") align-items-center text-white @(isSuccessToast ? "bg-success" : "bg-danger") border-0" role="alert">
+        <div class="toast @(showToast ? "show" : "hide") align-items-center @(toastType == "warning" ? "bg-warning text-dark" : toastType == "success" ? "bg-success text-white" : "bg-danger text-white") border-0" role="alert">
             <div class="d-flex">
                 <div class="toast-body fs-6">
-                    <i class="@(isSuccessToast ? "bi bi-check-circle-fill" : "bi bi-exclamation-triangle-fill") me-2"></i>@toastMessage
+                    <i class="@(toastType == "success" ? "bi bi-check-circle-fill" : toastType == "warning" ? "bi bi-exclamation-circle-fill" : "bi bi-exclamation-triangle-fill") me-2"></i>@toastMessage
                 </div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" @onclick="() => showToast = false"></button>
             </div>
@@ -272,7 +272,7 @@
     private string errorMessage = "";
 
     private bool showToast;
-    private bool isSuccessToast;
+    private string toastType = "success"; // "success", "warning", "danger"
     private string toastMessage = "";
 
     private List<HoopsPool> hoopsPools = new();
@@ -340,7 +340,7 @@
     {
         if (string.IsNullOrWhiteSpace(joinModel.InviteCode))
         {
-            TriggerToast("Please enter an invite code.", false);
+            TriggerToast("Please enter an invite code.", "danger");
             return;
         }
 
@@ -352,13 +352,13 @@
 
         if (targetPool == null)
         {
-            TriggerToast("Invalid invite code.", false);
+            TriggerToast("Invalid invite code.", "danger");
             return;
         }
 
         if (DateTime.UtcNow > targetPool.LockDate)
         {
-            TriggerToast("This pool is locked for new entries.", false);
+            TriggerToast("This pool is locked for new entries.", "danger");
             return;
         }
 
@@ -421,19 +421,19 @@
             {
                 currentEntries.Remove(entry);
                 pastEntries.Remove(entry);
-                TriggerToast("Bracket deleted.", true);
+                TriggerToast("Bracket deleted.", "success");
                 AppState.NotifyDataChanged();
                 StateHasChanged();
             }
             else
             {
                 var msg = await response.Content.ReadAsStringAsync();
-                TriggerToast($"Delete failed: {msg}", false);
+                TriggerToast($"Delete failed: {msg}", "danger");
             }
         }
         catch (Exception ex)
         {
-            TriggerToast($"Error: {ex.Message}", false);
+            TriggerToast($"Error: {ex.Message}", "danger");
         }
         finally
         {
@@ -447,7 +447,7 @@
 
         if (string.IsNullOrWhiteSpace(activeEntry.PlayerName))
         {
-            TriggerToast("Please enter a bracket name.", false);
+            TriggerToast("Please enter a bracket name.", "danger");
             return;
         }
 
@@ -475,7 +475,12 @@
                     var idx = list.FindIndex(e => e.Id == saved.Id);
                     if (idx >= 0) list[idx] = saved; else list.Add(saved);
 
-                    TriggerToast("Bracket saved!", true);
+                    int picksMade = saved.Picks?.Count ?? 0;
+                    int picksNeeded = activePoolGames.Count;
+                    if (picksMade < picksNeeded)
+                        TriggerToast($"Bracket saved, but you still have {picksNeeded - picksMade} pick{(picksNeeded - picksMade == 1 ? "" : "s")} remaining.", "warning");
+                    else
+                        TriggerToast("Bracket complete and saved!", "success");
                     viewMode = ViewMode.Dashboard;
                     AppState.NotifyDataChanged();
                 }
@@ -483,13 +488,13 @@
             else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
             {
                 errorMessage = await response.Content.ReadAsStringAsync();
-                TriggerToast("Name already taken in this pool.", false);
+                TriggerToast("Name already taken in this pool.", "danger");
             }
             else
             {
                 var err = await response.Content.ReadAsStringAsync();
                 errorMessage = $"Save failed: {err}";
-                TriggerToast($"Save failed: {err}", false);
+                TriggerToast($"Save failed: {err}", "danger");
             }
         }
         catch (Exception ex)
@@ -502,10 +507,10 @@
         }
     }
 
-    private void TriggerToast(string message, bool success)
+    private void TriggerToast(string message, string type)
     {
         toastMessage = message;
-        isSuccessToast = success;
+        toastType = type;
         showToast = true;
         _ = Task.Delay(4000).ContinueWith(_ =>
         {
