@@ -22,6 +22,23 @@ namespace BowlPoolManager.Client.Helpers
         };
 
         /// <summary>
+        /// Returns the visual order key for any game by recursively resolving to its
+        /// earliest R64 ancestor's seed matchup order. Used to sort feeder games so that
+        /// the team visually on top in the previous round appears in the top slot of the
+        /// next round's matchup.
+        /// </summary>
+        public static int GetVisualOrderKey(HoopsGame game, List<HoopsGame> allGames)
+        {
+            if (game.Round == TournamentRound.RoundOf64)
+                return GetSeedMatchupOrder(game.SeedMatchup);
+
+            var feeders = allGames.Where(g => g.NextGameId == game.Id).ToList();
+            return feeders.Count > 0
+                ? feeders.Min(f => GetVisualOrderKey(f, allGames))
+                : 99;
+        }
+
+        /// <summary>
         /// Orders <paramref name="currentRound"/> games so each follows the position of its
         /// first feeder in <paramref name="previousRound"/> (ordered by feeder index, ascending).
         /// Games with no matching feeder sort last (index 99).

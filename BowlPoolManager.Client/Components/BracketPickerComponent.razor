@@ -206,7 +206,9 @@ else
 
     private (string Home, string Away) ResolveMatchupTeams(HoopsGame game)
     {
-        var feeders = Games.Where(g => g.NextGameId == game.Id).OrderBy(g => g.Id).ToList();
+        var feeders = Games.Where(g => g.NextGameId == game.Id)
+                          .OrderBy(g => BracketLayoutHelper.GetVisualOrderKey(g, Games))
+                          .ToList();
         int feederIdx = 0;
 
         string home = game.TeamHome ?? "";

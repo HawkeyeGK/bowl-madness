@@ -551,7 +551,9 @@ else
         string home = game.TeamHome ?? "";
         string away = game.TeamAway ?? "";
 
-        var feeders = games!.Where(g => g.NextGameId == game.Id).OrderBy(g => g.Id).ToList();
+        var feeders = games!.Where(g => g.NextGameId == game.Id)
+                           .OrderBy(g => BracketLayoutHelper.GetVisualOrderKey(g, games!))
+                           .ToList();
         int fi = 0;
 
         if (string.IsNullOrWhiteSpace(home) || home == "TBD")
