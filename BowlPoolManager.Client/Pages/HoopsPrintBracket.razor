@@ -98,10 +98,10 @@ else
                         <div class="region-name">@region.ToUpper()</div>
                         <div class="region-bracket">
                             <div class="round-col"><div class="round-hdr">R64</div><div class="games-col">
-                                @foreach (var game in r64) {
+                                @foreach (var game in r64) { var (h, a) = ResolveTeams(game);
                                     <div class="match-card">
-                                        <div class="team-slot @GetPickClass(game, game.TeamHome)"><span class="seed-badge">@game.TeamHomeSeed</span><span class="tname">@Ellipsis(game.TeamHome)</span></div>
-                                        <div class="team-slot bottom-team @GetPickClass(game, game.TeamAway)"><span class="seed-badge">@game.TeamAwaySeed</span><span class="tname">@Ellipsis(game.TeamAway)</span></div>
+                                        <div class="team-slot @GetPickClass(game, h)"><span class="seed-badge">@GetSeed(h)</span><span class="tname">@Ellipsis(h)</span></div>
+                                        <div class="team-slot bottom-team @GetPickClass(game, a)"><span class="seed-badge">@GetSeed(a)</span><span class="tname">@Ellipsis(a)</span></div>
                                     </div>
                                 }
                             </div></div>
@@ -171,10 +171,10 @@ else
                                 }
                             </div></div>
                             <div class="round-col"><div class="round-hdr">R64</div><div class="games-col">
-                                @foreach (var game in r64) {
+                                @foreach (var game in r64) { var (h, a) = ResolveTeams(game);
                                     <div class="match-card">
-                                        <div class="team-slot @GetPickClass(game, game.TeamHome)"><span class="seed-badge">@game.TeamHomeSeed</span><span class="tname">@Ellipsis(game.TeamHome)</span></div>
-                                        <div class="team-slot bottom-team @GetPickClass(game, game.TeamAway)"><span class="seed-badge">@game.TeamAwaySeed</span><span class="tname">@Ellipsis(game.TeamAway)</span></div>
+                                        <div class="team-slot @GetPickClass(game, h)"><span class="seed-badge">@GetSeed(h)</span><span class="tname">@Ellipsis(h)</span></div>
+                                        <div class="team-slot bottom-team @GetPickClass(game, a)"><span class="seed-badge">@GetSeed(a)</span><span class="tname">@Ellipsis(a)</span></div>
                                     </div>
                                 }
                             </div></div>
