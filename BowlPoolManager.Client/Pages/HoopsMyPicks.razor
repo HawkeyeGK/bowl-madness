@@ -158,6 +158,7 @@
         {
             var entryPool = hoopsPools.FirstOrDefault(p => p.Id == activeEntry.PoolId);
             bool isLocked = entryPool != null && DateTime.UtcNow > entryPool.LockDate;
+            bool canEditName = entryPool?.IsConcluded != true;
 
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div class="d-flex align-items-center">
@@ -199,8 +200,23 @@
             <div class="card mb-4 shadow-sm">
                 <div class="card-body">
                     <label class="form-label fw-bold">Bracket Name</label>
-                    <input type="text" class="form-control" @bind="activeEntry.PlayerName"
-                           disabled="@isLocked" placeholder="Give this bracket a unique name" />
+                    <div class="input-group">
+                        <input type="text" class="form-control" @bind="activeEntry.PlayerName"
+                               disabled="@(!canEditName)" placeholder="Give this bracket a unique name" />
+                        @if (isLocked && canEditName)
+                        {
+                            <button class="btn btn-primary" @onclick="SavePicks" disabled="@isSaving">
+                                @if (isSaving)
+                                {
+                                    <span class="spinner-border spinner-border-sm"></span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-save-fill"></i> <span>Save Name</span>
+                                }
+                            </button>
+                        }
+                    </div>
                 </div>
             </div>
 
