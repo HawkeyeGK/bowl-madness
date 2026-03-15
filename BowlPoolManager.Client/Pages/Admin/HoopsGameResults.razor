@@ -2,7 +2,7 @@
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
+@attribute [Authorize(Roles = $"{Constants.Roles.SuperAdmin},{Constants.Roles.Admin}")]
 
 @inject IHoopsPoolService PoolService
 @inject IHoopsGameService GameService

@@ -129,7 +129,7 @@
     </div>
 
     @* ===== HOOPS ADMIN ===== *@
-    <AuthorizeView Roles="SuperAdmin" Context="ha">
+    <AuthorizeView Roles="SuperAdmin,Admin" Context="ha">
         <div class="mb-2">
             <span class="text-uppercase fw-bold small text-muted">
                 <i class="bi bi-dribbble me-1"></i> Hoops Admin
@@ -138,27 +138,53 @@
         </div>
         <div class="row g-4 mb-5">
 
-            <div class="col-md-6 col-lg-3">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-body text-center">
-                        <i class="bi bi-collection-play display-4 text-secondary mb-3"></i>
-                        <h5 class="card-title">Hoops Pools</h5>
-                        <p class="card-text text-muted small">Basketball pool settings &amp; scoring.</p>
-                        <a href="admin/hoops-pools" class="btn btn-outline-secondary stretched-link">Hoops Pools</a>
-                    </div>
-                </div>
-            </div>
+            <AuthorizeView Roles="SuperAdmin" Context="haSuperAdmin">
 
-            <div class="col-md-6 col-lg-3">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-body text-center">
-                        <i class="bi bi-diagram-3-fill display-4 text-success mb-3"></i>
-                        <h5 class="card-title">Bracket Builder</h5>
-                        <p class="card-text text-muted small">Generate &amp; verify bracket structure.</p>
-                        <a href="admin/tournament-config" class="btn btn-outline-success stretched-link">Bracket Builder</a>
+                <div class="col-md-6 col-lg-3">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-body text-center">
+                            <i class="bi bi-collection-play display-4 text-secondary mb-3"></i>
+                            <h5 class="card-title">Hoops Pools</h5>
+                            <p class="card-text text-muted small">Basketball pool settings &amp; scoring.</p>
+                            <a href="admin/hoops-pools" class="btn btn-outline-secondary stretched-link">Hoops Pools</a>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+                <div class="col-md-6 col-lg-3">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-body text-center">
+                            <i class="bi bi-diagram-3-fill display-4 text-success mb-3"></i>
+                            <h5 class="card-title">Bracket Builder</h5>
+                            <p class="card-text text-muted small">Generate &amp; verify bracket structure.</p>
+                            <a href="admin/tournament-config" class="btn btn-outline-success stretched-link">Bracket Builder</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-3">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-body text-center">
+                            <i class="bi bi-person-fill-check display-4 text-primary mb-3"></i>
+                            <h5 class="card-title">Bracket Teams</h5>
+                            <p class="card-text text-muted small">Assign teams &amp; seeds to bracket slots.</p>
+                            <a href="admin/team-assignment" class="btn btn-outline-primary stretched-link">Bracket Teams</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-3">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-body text-center">
+                            <i class="bi bi-clock-history display-4 text-secondary mb-3"></i>
+                            <h5 class="card-title">Bracket Archives</h5>
+                            <p class="card-text text-muted small">View concluded basketball pool history.</p>
+                            <a href="hoops/archives" class="btn btn-outline-secondary stretched-link">Bracket Archives</a>
+                        </div>
+                    </div>
+                </div>
+
+            </AuthorizeView>
 
             <div class="col-md-6 col-lg-3">
                 <div class="card h-100 shadow-sm border-0">
@@ -167,17 +193,6 @@
                         <h5 class="card-title">Bracket Game Results</h5>
                         <p class="card-text text-muted small">Enter scores &amp; winners.</p>
                         <a href="admin/hoops/gameresults" class="btn btn-outline-danger stretched-link">Bracket Game Results</a>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-body text-center">
-                        <i class="bi bi-person-fill-check display-4 text-primary mb-3"></i>
-                        <h5 class="card-title">Bracket Teams</h5>
-                        <p class="card-text text-muted small">Assign teams &amp; seeds to bracket slots.</p>
-                        <a href="admin/team-assignment" class="btn btn-outline-primary stretched-link">Bracket Teams</a>
                     </div>
                 </div>
             </div>
@@ -200,17 +215,6 @@
                         <h5 class="card-title">Bracket Payments</h5>
                         <p class="card-text text-muted small">Track basketball pool payments.</p>
                         <a href="admin/hoops/payments" class="btn btn-outline-warning stretched-link">Bracket Payments</a>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-body text-center">
-                        <i class="bi bi-clock-history display-4 text-secondary mb-3"></i>
-                        <h5 class="card-title">Bracket Archives</h5>
-                        <p class="card-text text-muted small">View concluded basketball pool history.</p>
-                        <a href="hoops/archives" class="btn btn-outline-secondary stretched-link">Bracket Archives</a>
                     </div>
                 </div>
             </div>
