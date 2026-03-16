@@ -192,7 +192,7 @@ else
             {
                 var (h, a) = ResolveTeams(game);
                 <div class="ff-game-card">
-                    <div class="ff-game-label">National Semifinal</div>
+                    <div class="ff-game-label">@GetFinalFourLabel(game)</div>
                     <div class="team-slot @GetPickClass(game, h)">
                         <span class="seed-badge">@GetSeed(h)</span>
                         <span class="tname">@Ellipsis(h, 22)</span>
@@ -533,6 +533,12 @@ else
         return (left, right);
     }
 
+    private string GetFinalFourLabel(HoopsGame ffGame)
+    {
+        var regions = GetRegionsForFfGame(ffGame);
+        return regions.Count >= 2 ? $"Final Four — {regions[0]} vs {regions[1]}" : "Final Four";
+    }
+
     private List<string> GetRegionsForFfGame(HoopsGame? ffGame)
     {
         if (ffGame == null) return new();
@@ -620,7 +626,7 @@ else
     {
         if (games == null) return "?";
         var sample = games.FirstOrDefault(g => g.Round == round);
-        return sample?.PointValue > 0 ? sample.PointValue.ToString() : "—";
+        return sample != null ? sample.PointValue.ToString() : "—";
     }
 
     // ── Text truncation ──
