@@ -108,7 +108,7 @@ namespace BowlPoolManager.Api.Functions
                 entries);
 
             // 7. Calculate totalFinalGames for UI display
-            int totalFinalGames = games.Count(g => g.Status == GameStatus.Final);
+            int totalFinalGames = games.Count(g => g.Status == GameStatus.Final && g.Round != TournamentRound.FirstFour);
 
             // 8. Map LeaderboardRow -> LeaderboardDto
             var leaderboardDtos = leaderboardRows.Select(row => new LeaderboardDto
