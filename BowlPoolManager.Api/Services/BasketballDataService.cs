@@ -90,6 +90,47 @@ namespace BowlPoolManager.Api.Services
             return await ExecuteRequestAsync("/scoreboard");
         }
 
+        public async Task<List<BasketballGameDto>> GetTournamentGamesAsync(int year)
+        {
+            var json = await GetRawTournamentGamesJsonAsync(year);
+            if (string.IsNullOrEmpty(json) || json.StartsWith("Error"))
+                return new List<BasketballGameDto>();
+
+            try
+            {
+                var token = JToken.Parse(json);
+                if (token is JArray arr)
+                {
+                    return arr.Select(g => new BasketballGameDto
+                    {
+                        Id = (int?)g["id"] ?? 0,
+                        Completed = (bool?)g["completed"] ?? false,
+                        StatusRaw = (string?)g["status"],
+                        // /games endpoint returns team names as strings (homeTeam or home_team)
+                        HomeRaw = (string?)g["homeTeam"] ?? (string?)g["home_team"],
+                        AwayRaw = (string?)g["awayTeam"] ?? (string?)g["away_team"],
+                        HomeIdRaw = (int?)g["homeId"] ?? (int?)g["home_id"],
+                        AwayIdRaw = (int?)g["awayId"] ?? (int?)g["away_id"],
+                        HomePointsRoot = (int?)g["homePoints"] ?? (int?)g["home_points"],
+                        AwayPointsRoot = (int?)g["awayPoints"] ?? (int?)g["away_points"],
+                        Notes = (string?)g["notes"]
+                    }).ToList();
+                }
+
+                return new List<BasketballGameDto>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Basketball tournament games deserialization failed.");
+                return new List<BasketballGameDto>();
+            }
+        }
+
+        public async Task<string> GetRawTournamentGamesJsonAsync(int year)
+        {
+            return await ExecuteRequestAsync($"/games?year={year}&seasonType=postseason");
+        }
+
         private async Task<string> ExecuteRequestAsync(string relativeUrl)
         {
             try
