@@ -100,12 +100,13 @@ namespace BowlPoolManager.Api.Services
                 var oldDetail = localGame.GameDetail;
 
                 if (apiGame.Completed ||
-                    string.Equals(apiGame.StatusRaw, "completed", StringComparison.OrdinalIgnoreCase))
+                    string.Equals(apiGame.StatusRaw, "final", StringComparison.OrdinalIgnoreCase))
                 {
                     localGame.Status = GameStatus.Final;
                     localGame.GameDetail = "Final";
                 }
-                else if (string.Equals(apiGame.StatusRaw, "in_progress", StringComparison.OrdinalIgnoreCase))
+                else if (string.Equals(apiGame.StatusRaw, "in_progress", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(apiGame.StatusRaw, "live", StringComparison.OrdinalIgnoreCase))
                 {
                     localGame.Status = GameStatus.InProgress;
 

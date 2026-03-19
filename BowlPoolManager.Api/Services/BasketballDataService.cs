@@ -107,8 +107,8 @@ namespace BowlPoolManager.Api.Services
             return arr.Select(g => new BasketballGameDto
             {
                 Id = (int?)g["id"] ?? 0,
-                Completed = (bool?)g["completed"] ?? false,
                 StatusRaw = (string?)g["status"],
+                Completed = string.Equals((string?)g["status"], "final", StringComparison.OrdinalIgnoreCase),
                 Period = (int?)g["period"],
                 Clock = (string?)g["clock"],
                 // /games endpoint returns team names as strings under homeTeam or home_team
