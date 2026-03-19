@@ -562,7 +562,7 @@ else
                            .ToList();
         int fi = 0;
 
-        if (string.IsNullOrWhiteSpace(home) || home == "TBD")
+        if (VisualHelper.IsTBD(home))
         {
             if (fi < feeders.Count)
             {
@@ -574,7 +574,7 @@ else
             }
         }
 
-        if (string.IsNullOrWhiteSpace(away) || away == "TBD")
+        if (VisualHelper.IsTBD(away))
         {
             if (fi < feeders.Count)
             {
