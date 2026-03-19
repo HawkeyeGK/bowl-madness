@@ -92,6 +92,24 @@ namespace BowlPoolManager.Api.Functions
             }
         }
 
+        /// <summary>
+        /// Diagnostic endpoint — returns the raw JSON from the CollegeBasketballData scoreboard
+        /// without any parsing, so we can inspect the actual API response structure.
+        /// </summary>
+        [Function("GetRawHoopsScoreboardDiag")]
+        public async Task<HttpResponseData> GetRawHoopsScoreboardDiag(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
+        {
+            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
+            if (!authResult.IsValid) return authResult.ErrorResponse!;
+
+            var json = await _basketballDataService.GetRawScoreboardJsonAsync();
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            await response.WriteStringAsync(json);
+            return response;
+        }
+
         [Function("GenerateBracket")]
         public async Task<HttpResponseData> GenerateBracket(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
