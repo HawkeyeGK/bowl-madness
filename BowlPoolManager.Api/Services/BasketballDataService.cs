@@ -87,7 +87,7 @@ namespace BowlPoolManager.Api.Services
 
         public async Task<string> GetRawScoreboardJsonAsync()
         {
-            return await ExecuteRequestAsync("/scoreboard?classification=di");
+            return await ExecuteRequestAsync("/scoreboard");
         }
 
         public async Task<List<BasketballGameDto>> GetTournamentGamesAsync(int year)
