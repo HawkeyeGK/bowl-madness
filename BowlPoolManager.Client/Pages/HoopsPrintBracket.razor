@@ -573,6 +573,10 @@ else
                     home = "";
             }
         }
+        else
+        {
+            fi++; // home slot is already a real team — advance past its feeder so away uses feeders[1]
+        }
 
         if (VisualHelper.IsTBD(away))
         {
