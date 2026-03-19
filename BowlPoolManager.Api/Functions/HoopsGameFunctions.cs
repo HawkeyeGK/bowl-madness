@@ -80,22 +80,7 @@ namespace BowlPoolManager.Api.Functions
 
             try
             {
-                var source = req.Query["source"];
-
-                List<BasketballGameDto> games;
-                if (source == "scoreboard")
-                {
-                    games = await _basketballDataService.GetScoreboardGamesAsync();
-                }
-                else
-                {
-                    // Default: postseason games list — includes scheduled, in-progress, and completed.
-                    // More useful for game linking than scoreboard (which only shows live games).
-                    games = await _basketballDataService.GetTournamentGamesAsync(2026);
-                    if (!games.Any())
-                        games = await _basketballDataService.GetScoreboardGamesAsync();
-                }
-
+                var games = await _basketballDataService.GetScoreboardGamesAsync();
                 var response = req.CreateResponse(HttpStatusCode.OK);
                 await response.WriteAsJsonAsync(games);
                 return response;
