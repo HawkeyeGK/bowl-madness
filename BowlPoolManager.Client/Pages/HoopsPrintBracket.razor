@@ -611,8 +611,18 @@ else
         if (game.IsFinal)
             return string.Equals(pick, game.WinningTeamName, StringComparison.OrdinalIgnoreCase)
                 ? "user-pick-correct" : "user-pick-incorrect";
+        // Game not yet played — but if the team was already knocked out in a prior round, show red.
+        if (IsEliminated(teamName))
+            return "user-pick-incorrect";
         return "user-pick-pending";
     }
+
+    private bool IsEliminated(string teamName) =>
+        games!.Any(g => g.IsFinal &&
+                        !string.IsNullOrEmpty(g.WinningTeamName) &&
+                        !string.Equals(g.WinningTeamName, teamName, StringComparison.OrdinalIgnoreCase) &&
+                        (string.Equals(g.TeamHome, teamName, StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(g.TeamAway, teamName, StringComparison.OrdinalIgnoreCase)));
 
     // ── Seed lookup ──
 
