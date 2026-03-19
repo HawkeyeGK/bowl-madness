@@ -2,6 +2,7 @@
 @using BowlPoolManager.Core.Domain
 @inject IHoopsPoolService PoolService
 @inject IHoopsGameService GameService
+@inject HttpClient Http
 
 <PageTitle>Hoops Scoreboard</PageTitle>
 
@@ -91,6 +92,11 @@
                                                 <span class="small @(IsEliminated(game, true) ? "text-decoration-line-through text-muted" : "")">
                                                     @GetDisplayTeamName(game, true)
                                                 </span>
+                                                @{ var homePct = GetPickPct(game, true); }
+                                                @if (homePct.HasValue)
+                                                {
+                                                    <span class="text-muted small">(@homePct%)</span>
+                                                }
                                             </div>
                                             @if (game.TeamHomeScore.HasValue)
                                             {
@@ -112,6 +118,11 @@
                                                 <span class="small @(IsEliminated(game, false) ? "text-decoration-line-through text-muted" : "")">
                                                     @GetDisplayTeamName(game, false)
                                                 </span>
+                                                @{ var awayPct = GetPickPct(game, false); }
+                                                @if (awayPct.HasValue)
+                                                {
+                                                    <span class="text-muted small">(@awayPct%)</span>
+                                                }
                                             </div>
                                             @if (game.TeamAwayScore.HasValue)
                                             {
@@ -137,6 +148,7 @@
 @code {
     private List<HoopsGame>? _games;
     private bool _isLoading = true;
+    private Dictionary<string, Dictionary<string, int>> _pickCountsByGame = new();
 
     private static readonly TournamentRound[] _roundOrder =
     [
@@ -158,7 +170,12 @@
             var activePool = pools.FirstOrDefault(p => !p.IsConcluded) ?? pools.FirstOrDefault();
             if (activePool != null)
             {
-                _games = await GameService.GetGamesAsync(activePool.Id);
+                var gamesTask = GameService.GetGamesAsync(activePool.Id);
+                var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetHoopsEntries?poolId={activePool.Id}");
+                await Task.WhenAll(gamesTask, entriesTask);
+                _games = await gamesTask;
+                var entries = await entriesTask ?? new();
+                ComputePickCounts(entries);
             }
         }
         catch (Exception ex)
@@ -169,6 +186,37 @@
         {
             _isLoading = false;
         }
+    }
+
+    private void ComputePickCounts(List<BracketEntry> entries)
+    {
+        _pickCountsByGame = new();
+        foreach (var entry in entries)
+        {
+            if (entry.Picks == null) continue;
+            foreach (var (gameId, pick) in entry.Picks)
+            {
+                if (string.IsNullOrEmpty(pick)) continue;
+                if (!_pickCountsByGame.TryGetValue(gameId, out var gameCounts))
+                {
+                    gameCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                    _pickCountsByGame[gameId] = gameCounts;
+                }
+                gameCounts.TryGetValue(pick, out var existing);
+                gameCounts[pick] = existing + 1;
+            }
+        }
+    }
+
+    private int? GetPickPct(HoopsGame game, bool isHome)
+    {
+        var teamName = isHome ? game.TeamHome : game.TeamAway;
+        if (string.IsNullOrEmpty(teamName) || IsPlaceholder(teamName)) return null;
+        if (!_pickCountsByGame.TryGetValue(game.Id, out var counts)) return null;
+        int total = counts.Values.Sum();
+        if (total == 0) return null;
+        counts.TryGetValue(teamName, out var teamCount);
+        return (int)Math.Round(teamCount * 100.0 / total);
     }
 
     private static string GetRoundLabel(TournamentRound round) => round switch

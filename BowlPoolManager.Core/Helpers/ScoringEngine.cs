@@ -117,7 +117,8 @@ namespace BowlPoolManager.Core.Helpers
             var primaryMetric = poolConfig?.PrimaryTieBreaker ?? TieBreakerMetric.CorrectPickCount;
             var secondaryMetric = poolConfig?.SecondaryTieBreaker ?? TieBreakerMetric.ScoreDelta;
 
-            var sortedQuery = rows.OrderByDescending(r => r.Score);
+            var sortedQuery = rows.OrderByDescending(r => r.Score)
+                                  .ThenByDescending(r => r.MaxPossible);
             IOrderedEnumerable<LeaderboardRow> finalSortedQuery = sortedQuery;
 
             if (primaryMetric == TieBreakerMetric.CorrectPickCount)
@@ -152,10 +153,11 @@ namespace BowlPoolManager.Core.Helpers
                     var prevRow = sortedRows[i - 1];
 
                     bool scoresEqual = currentRow.Score == prevRow.Score;
+                    bool maxPossibleEqual = currentRow.MaxPossible == prevRow.MaxPossible;
                     bool primaryEqual = IsMetricEqual(primaryMetric, currentRow, prevRow, isTieBreakerFinal);
                     bool secondaryEqual = IsMetricEqual(secondaryMetric, currentRow, prevRow, isTieBreakerFinal);
 
-                    if (scoresEqual && primaryEqual && secondaryEqual)
+                    if (scoresEqual && maxPossibleEqual && primaryEqual && secondaryEqual)
                     {
                         currentRow.Rank = prevRow.Rank;
                     }
