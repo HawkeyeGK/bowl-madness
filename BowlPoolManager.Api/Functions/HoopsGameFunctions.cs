@@ -19,6 +19,7 @@ namespace BowlPoolManager.Api.Functions
         private readonly IUserRepository _userRepo;
         private readonly IBracketGeneratorService _bracketGenerator;
         private readonly IHoopsGameScoringService _scoringService;
+        private readonly IEspnDataService _espnDataService;
         private readonly IBasketballDataService _basketballDataService;
 
         public HoopsGameFunctions(
@@ -28,6 +29,7 @@ namespace BowlPoolManager.Api.Functions
             IUserRepository userRepo,
             IBracketGeneratorService bracketGenerator,
             IHoopsGameScoringService scoringService,
+            IEspnDataService espnDataService,
             IBasketballDataService basketballDataService)
         {
             _logger = loggerFactory.CreateLogger<HoopsGameFunctions>();
@@ -36,6 +38,7 @@ namespace BowlPoolManager.Api.Functions
             _userRepo = userRepo;
             _bracketGenerator = bracketGenerator;
             _scoringService = scoringService;
+            _espnDataService = espnDataService;
             _basketballDataService = basketballDataService;
         }
 
@@ -80,7 +83,7 @@ namespace BowlPoolManager.Api.Functions
 
             try
             {
-                var games = await _basketballDataService.GetScoreboardGamesAsync();
+                var games = await _espnDataService.GetBasketballScoreboardAsync();
                 var response = req.CreateResponse(HttpStatusCode.OK);
                 await response.WriteAsJsonAsync(games);
                 return response;
@@ -90,24 +93,6 @@ namespace BowlPoolManager.Api.Functions
                 _logger.LogError(ex, "GetRawHoopsGames failed.");
                 return req.CreateResponse(HttpStatusCode.InternalServerError);
             }
-        }
-
-        /// <summary>
-        /// Diagnostic endpoint — returns the raw JSON from /games?date=today
-        /// without any parsing, so we can inspect the actual API response structure.
-        /// </summary>
-        [Function("GetRawHoopsScoreboardDiag")]
-        public async Task<HttpResponseData> GetRawHoopsScoreboardDiag(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
-        {
-            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
-            if (!authResult.IsValid) return authResult.ErrorResponse!;
-
-            var json = await _basketballDataService.GetRawScoreboardJsonAsync();
-            var response = req.CreateResponse(HttpStatusCode.OK);
-            response.Headers.Add("Content-Type", "application/json; charset=utf-8");
-            await response.WriteStringAsync(json);
-            return response;
         }
 
         [Function("GenerateBracket")]

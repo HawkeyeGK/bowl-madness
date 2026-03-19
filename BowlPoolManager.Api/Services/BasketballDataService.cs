@@ -1,9 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System.Net.Http.Headers;
 using BowlPoolManager.Core.Domain;
-using BowlPoolManager.Core.Dtos;
 
 namespace BowlPoolManager.Api.Services
 {
@@ -48,78 +46,6 @@ namespace BowlPoolManager.Api.Services
                 _logger.LogError(ex, "Failed to fetch/deserialize basketball teams.");
                 return new List<TeamInfo>();
             }
-        }
-
-        public async Task<List<BasketballGameDto>> GetScoreboardGamesAsync()
-        {
-            var json = await GetRawScoreboardJsonAsync();
-            if (string.IsNullOrEmpty(json) || json.StartsWith("Error"))
-                return new List<BasketballGameDto>();
-
-            try
-            {
-                var token = JToken.Parse(json);
-                if (token is JArray arr)
-                    return ParseGamesArray(arr);
-
-                return new List<BasketballGameDto>();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Basketball games deserialization failed.");
-                return new List<BasketballGameDto>();
-            }
-        }
-
-        public async Task<string> GetRawScoreboardJsonAsync()
-        {
-            return await ExecuteRequestAsync("/games?season=2026&tournament=NCAA");
-        }
-
-        public async Task<List<BasketballGameDto>> GetTournamentGamesAsync(int year)
-        {
-            var json = await GetRawTournamentGamesJsonAsync(year);
-            if (string.IsNullOrEmpty(json) || json.StartsWith("Error"))
-                return new List<BasketballGameDto>();
-
-            try
-            {
-                var token = JToken.Parse(json);
-                if (token is JArray arr)
-                    return ParseGamesArray(arr);
-
-                return new List<BasketballGameDto>();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Basketball tournament games deserialization failed.");
-                return new List<BasketballGameDto>();
-            }
-        }
-
-        public async Task<string> GetRawTournamentGamesJsonAsync(int year)
-        {
-            return await ExecuteRequestAsync($"/games?season={year}&tournament=NCAA");
-        }
-
-        private static List<BasketballGameDto> ParseGamesArray(JArray arr)
-        {
-            return arr.Select(g => new BasketballGameDto
-            {
-                Id = (int?)g["id"] ?? 0,
-                StatusRaw = (string?)g["status"],
-                Completed = string.Equals((string?)g["status"], "final", StringComparison.OrdinalIgnoreCase),
-                Period = (int?)g["period"],
-                Clock = (string?)g["clock"],
-                // /games endpoint returns team names as strings under homeTeam or home_team
-                HomeRaw = (string?)g["homeTeam"] ?? (string?)g["home_team"],
-                AwayRaw = (string?)g["awayTeam"] ?? (string?)g["away_team"],
-                HomeIdRaw = (int?)g["homeId"] ?? (int?)g["home_id"],
-                AwayIdRaw = (int?)g["awayId"] ?? (int?)g["away_id"],
-                HomePointsRoot = (int?)g["homePoints"] ?? (int?)g["home_points"],
-                AwayPointsRoot = (int?)g["awayPoints"] ?? (int?)g["away_points"],
-                Notes = (string?)g["notes"]
-            }).ToList();
         }
 
         private async Task<string> ExecuteRequestAsync(string relativeUrl)

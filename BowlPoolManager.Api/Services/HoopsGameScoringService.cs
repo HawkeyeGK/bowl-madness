@@ -8,18 +8,18 @@ namespace BowlPoolManager.Api.Services
     {
         private readonly ILogger<HoopsGameScoringService> _logger;
         private readonly IHoopsGameRepository _gameRepo;
-        private readonly IBasketballDataService _basketballDataService;
+        private readonly IEspnDataService _espnDataService;
 
         // Throttling state — shared across all requests (singleton service)
         private static DateTime _lastRefresh = DateTime.MinValue;
         private static readonly SemaphoreSlim _refreshLock = new SemaphoreSlim(1, 1);
         private const int RefreshIntervalMinutes = 2;
 
-        public HoopsGameScoringService(ILogger<HoopsGameScoringService> logger, IHoopsGameRepository gameRepo, IBasketballDataService basketballDataService)
+        public HoopsGameScoringService(ILogger<HoopsGameScoringService> logger, IHoopsGameRepository gameRepo, IEspnDataService espnDataService)
         {
             _logger = logger;
             _gameRepo = gameRepo;
-            _basketballDataService = basketballDataService;
+            _espnDataService = espnDataService;
         }
 
         public async Task CheckAndRefreshScoresAsync(List<HoopsGame> games)
@@ -54,7 +54,7 @@ namespace BowlPoolManager.Api.Services
 
             if (!linkedGames.Any()) return;
 
-            var apiGames = await _basketballDataService.GetScoreboardGamesAsync();
+            var apiGames = await _espnDataService.GetBasketballScoreboardAsync();
             var batchUpdates = new List<HoopsGame>();
             string? seasonId = linkedGames.FirstOrDefault()?.SeasonId;
 

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using BowlPoolManager.Core.Domain;
+using BowlPoolManager.Core.Dtos;
 
 namespace BowlPoolManager.Api.Services
 {
@@ -10,6 +11,8 @@ namespace BowlPoolManager.Api.Services
         private readonly ILogger<EspnDataService> _logger;
         private const string TeamsUrl = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams?limit=1000";
         private const string SearchUrl = "https://site.api.espn.com/apis/search/v2";
+        private const string ScoreboardUrl = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard";
+
         public EspnDataService(HttpClient httpClient, ILogger<EspnDataService> logger)
         {
             _httpClient = httpClient;
@@ -85,7 +88,6 @@ namespace BowlPoolManager.Api.Services
                         if (item["type"]?.ToString() != "team") continue;
                         if (item["subtitle"]?.ToString() != "NCAAM") continue;
 
-                        // uid format: "s:40~l:41~t:2598" — extract numeric team ID after "~t:"
                         var uid = item["uid"]?.ToString() ?? string.Empty;
                         var tIdx = uid.IndexOf("~t:", StringComparison.Ordinal);
                         if (!int.TryParse(tIdx >= 0 ? uid[(tIdx + 3)..] : string.Empty, out var schoolId) || schoolId == 0)
@@ -110,5 +112,58 @@ namespace BowlPoolManager.Api.Services
             }
         }
 
+        public async Task<List<BasketballGameDto>> GetBasketballScoreboardAsync()
+        {
+            try
+            {
+                var json = await _httpClient.GetStringAsync(ScoreboardUrl);
+                var root = JObject.Parse(json);
+                var events = root["events"] as JArray;
+                if (events == null) return new List<BasketballGameDto>();
+
+                var result = new List<BasketballGameDto>();
+                foreach (var ev in events)
+                {
+                    var competition = ev["competitions"]?[0];
+                    if (competition == null) continue;
+
+                    var competitors = competition["competitors"] as JArray;
+                    if (competitors == null) continue;
+
+                    var home = competitors.FirstOrDefault(c => c["homeAway"]?.ToString() == "home");
+                    var away = competitors.FirstOrDefault(c => c["homeAway"]?.ToString() == "away");
+                    if (home == null || away == null) continue;
+
+                    var statusName = ev["status"]?["type"]?["name"]?.ToString() ?? "";
+                    var statusRaw = statusName switch
+                    {
+                        "STATUS_FINAL" => "final",
+                        "STATUS_IN_PROGRESS" => "in_progress",
+                        _ => "scheduled"
+                    };
+
+                    result.Add(new BasketballGameDto
+                    {
+                        Id = int.TryParse(ev["id"]?.ToString(), out var eid) ? eid : 0,
+                        StatusRaw = statusRaw,
+                        Completed = statusRaw == "final",
+                        Period = (int?)ev["status"]?["period"],
+                        Clock = ev["status"]?["displayClock"]?.ToString(),
+                        HomeRaw = home["team"]?["location"]?.ToString(),
+                        AwayRaw = away["team"]?["location"]?.ToString(),
+                        HomePointsRoot = int.TryParse(home["score"]?.ToString(), out var hs) ? hs : (int?)null,
+                        AwayPointsRoot = int.TryParse(away["score"]?.ToString(), out var aws) ? aws : (int?)null,
+                    });
+                }
+
+                _logger.LogInformation("ESPN basketball scoreboard returned {Count} games.", result.Count);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to fetch ESPN basketball scoreboard.");
+                return new List<BasketballGameDto>();
+            }
+        }
     }
 }
