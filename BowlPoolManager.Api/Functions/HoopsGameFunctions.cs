@@ -93,7 +93,7 @@ namespace BowlPoolManager.Api.Functions
         }
 
         /// <summary>
-        /// Diagnostic endpoint — returns the raw JSON from the CollegeBasketballData scoreboard
+        /// Diagnostic endpoint — returns the raw JSON from /games?date=today
         /// without any parsing, so we can inspect the actual API response structure.
         /// </summary>
         [Function("GetRawHoopsScoreboardDiag")]

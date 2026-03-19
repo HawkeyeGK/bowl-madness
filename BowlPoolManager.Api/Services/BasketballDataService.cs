@@ -60,34 +60,23 @@ namespace BowlPoolManager.Api.Services
             {
                 var token = JToken.Parse(json);
                 if (token is JArray arr)
-                {
-                    return arr.Select(g => new BasketballGameDto
-                    {
-                        Id = (int?)g["id"] ?? 0,
-                        Completed = (bool?)g["completed"] ?? false,
-                        StatusRaw = (string?)g["status"],
-                        Period = (int?)g["period"],
-                        Clock = (string?)g["clock"],
-                        HomeRaw = g["homeTeam"]?.ToObject<Dictionary<string, object>>(),
-                        HomePointsRoot = (int?)g["homePoints"],
-                        AwayRaw = g["awayTeam"]?.ToObject<Dictionary<string, object>>(),
-                        AwayPointsRoot = (int?)g["awayPoints"],
-                        Notes = (string?)g["notes"]
-                    }).ToList();
-                }
+                    return ParseGamesArray(arr);
 
                 return new List<BasketballGameDto>();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Basketball scoreboard deserialization failed.");
+                _logger.LogError(ex, "Basketball games deserialization failed.");
                 return new List<BasketballGameDto>();
             }
         }
 
         public async Task<string> GetRawScoreboardJsonAsync()
         {
-            return await ExecuteRequestAsync("/scoreboard");
+            // /games?date=YYYY-MM-DD returns scheduled, in-progress, and completed games for the day.
+            // Use approximate Eastern time so late-evening games don't fall on the wrong UTC date.
+            var date = DateTime.UtcNow.AddHours(-5).ToString("yyyy-MM-dd");
+            return await ExecuteRequestAsync($"/games?date={date}");
         }
 
         public async Task<List<BasketballGameDto>> GetTournamentGamesAsync(int year)
@@ -100,22 +89,7 @@ namespace BowlPoolManager.Api.Services
             {
                 var token = JToken.Parse(json);
                 if (token is JArray arr)
-                {
-                    return arr.Select(g => new BasketballGameDto
-                    {
-                        Id = (int?)g["id"] ?? 0,
-                        Completed = (bool?)g["completed"] ?? false,
-                        StatusRaw = (string?)g["status"],
-                        // /games endpoint returns team names as strings (homeTeam or home_team)
-                        HomeRaw = (string?)g["homeTeam"] ?? (string?)g["home_team"],
-                        AwayRaw = (string?)g["awayTeam"] ?? (string?)g["away_team"],
-                        HomeIdRaw = (int?)g["homeId"] ?? (int?)g["home_id"],
-                        AwayIdRaw = (int?)g["awayId"] ?? (int?)g["away_id"],
-                        HomePointsRoot = (int?)g["homePoints"] ?? (int?)g["home_points"],
-                        AwayPointsRoot = (int?)g["awayPoints"] ?? (int?)g["away_points"],
-                        Notes = (string?)g["notes"]
-                    }).ToList();
-                }
+                    return ParseGamesArray(arr);
 
                 return new List<BasketballGameDto>();
             }
@@ -129,6 +103,26 @@ namespace BowlPoolManager.Api.Services
         public async Task<string> GetRawTournamentGamesJsonAsync(int year)
         {
             return await ExecuteRequestAsync($"/games?year={year}&seasonType=postseason");
+        }
+
+        private static List<BasketballGameDto> ParseGamesArray(JArray arr)
+        {
+            return arr.Select(g => new BasketballGameDto
+            {
+                Id = (int?)g["id"] ?? 0,
+                Completed = (bool?)g["completed"] ?? false,
+                StatusRaw = (string?)g["status"],
+                Period = (int?)g["period"],
+                Clock = (string?)g["clock"],
+                // /games endpoint returns team names as strings under homeTeam or home_team
+                HomeRaw = (string?)g["homeTeam"] ?? (string?)g["home_team"],
+                AwayRaw = (string?)g["awayTeam"] ?? (string?)g["away_team"],
+                HomeIdRaw = (int?)g["homeId"] ?? (int?)g["home_id"],
+                AwayIdRaw = (int?)g["awayId"] ?? (int?)g["away_id"],
+                HomePointsRoot = (int?)g["homePoints"] ?? (int?)g["home_points"],
+                AwayPointsRoot = (int?)g["awayPoints"] ?? (int?)g["away_points"],
+                Notes = (string?)g["notes"]
+            }).ToList();
         }
 
         private async Task<string> ExecuteRequestAsync(string relativeUrl)
