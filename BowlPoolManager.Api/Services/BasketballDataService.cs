@@ -73,10 +73,7 @@ namespace BowlPoolManager.Api.Services
 
         public async Task<string> GetRawScoreboardJsonAsync()
         {
-            // /games?date=YYYY-MM-DD returns scheduled, in-progress, and completed games for the day.
-            // Use approximate Eastern time so late-evening games don't fall on the wrong UTC date.
-            var date = DateTime.UtcNow.AddHours(-5).ToString("yyyy-MM-dd");
-            return await ExecuteRequestAsync($"/games?date={date}");
+            return await ExecuteRequestAsync("/games?season=2026&tournament=NCAA");
         }
 
         public async Task<List<BasketballGameDto>> GetTournamentGamesAsync(int year)
@@ -102,7 +99,7 @@ namespace BowlPoolManager.Api.Services
 
         public async Task<string> GetRawTournamentGamesJsonAsync(int year)
         {
-            return await ExecuteRequestAsync($"/games?year={year}&seasonType=postseason");
+            return await ExecuteRequestAsync($"/games?season={year}&tournament=NCAA");
         }
 
         private static List<BasketballGameDto> ParseGamesArray(JArray arr)
