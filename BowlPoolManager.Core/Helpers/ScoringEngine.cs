@@ -80,7 +80,8 @@ namespace BowlPoolManager.Core.Helpers
                                 roundScores[game.Round] += game.PointValue;
                             }
 
-                            correct++;
+                            if (game.Round != TournamentRound.FirstFour)
+                                correct++;
                             maxPossible += game.PointValue;
                         }
                     }

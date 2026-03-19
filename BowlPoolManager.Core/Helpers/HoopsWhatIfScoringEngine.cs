@@ -83,7 +83,8 @@ namespace BowlPoolManager.Core.Helpers
                         {
                             score += pts;
                             maxPossible += pts;
-                            correctPicks++;
+                            if (game.Round != TournamentRound.FirstFour)
+                                correctPicks++;
                         }
                         // else: wrong pick for a decided game — no points, not added to maxPossible.
                     }
