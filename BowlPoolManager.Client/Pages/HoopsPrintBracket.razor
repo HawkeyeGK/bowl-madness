@@ -554,40 +554,38 @@ else
 
     private (string Home, string Away) ResolveTeams(HoopsGame game)
     {
-        string home = game.TeamHome ?? "";
-        string away = game.TeamAway ?? "";
-
         var feeders = games!.Where(g => g.NextGameId == game.Id)
                            .OrderBy(g => BracketLayoutHelper.GetVisualOrderKey(g, games!))
                            .ToList();
-        int fi = 0;
 
-        if (VisualHelper.IsTBD(home))
+        // No feeders: use the actual teams (First Four and directly-seeded R64 games).
+        if (feeders.Count == 0)
+            return (game.TeamHome ?? "", game.TeamAway ?? "");
+
+        string home, away;
+
+        if (feeders.Count >= 2)
         {
-            if (fi < feeders.Count)
-            {
-                var f = feeders[fi++];
-                if (userEntry?.Picks != null && userEntry.Picks.TryGetValue(f.Id, out var pick) && !string.IsNullOrEmpty(pick))
-                    home = pick;
-                else
-                    home = "";
-            }
+            // Both slots are feeder-sourced (R32 and later).
+            // Always resolve from user's picks so the bracket shows the entry as filled out,
+            // regardless of what TeamHome/TeamAway say (which may be stale or wrong).
+            var f0 = feeders[0];
+            var f1 = feeders[1];
+            home = userEntry?.Picks != null && userEntry.Picks.TryGetValue(f0.Id, out var p0) && !string.IsNullOrEmpty(p0) ? p0 : "";
+            away = userEntry?.Picks != null && userEntry.Picks.TryGetValue(f1.Id, out var p1) && !string.IsNullOrEmpty(p1) ? p1 : "";
         }
         else
         {
-            fi++; // home slot is already a real team — advance past its feeder so away uses feeders[1]
-        }
-
-        if (VisualHelper.IsTBD(away))
-        {
-            if (fi < feeders.Count)
-            {
-                var f = feeders[fi];
-                if (userEntry?.Picks != null && userEntry.Picks.TryGetValue(f.Id, out var pick) && !string.IsNullOrEmpty(pick))
-                    away = pick;
-                else
-                    away = "";
-            }
+            // 1 feeder: one slot is a direct seed, the other comes from the feeder (e.g. First Four → R64).
+            // Keep actual teams but replace the TBD slot with the user's feeder pick.
+            home = game.TeamHome ?? "";
+            away = game.TeamAway ?? "";
+            var f = feeders[0];
+            var pick = userEntry?.Picks != null && userEntry.Picks.TryGetValue(f.Id, out var p) && !string.IsNullOrEmpty(p) ? p : "";
+            if (VisualHelper.IsTBD(home))
+                home = pick;
+            else if (VisualHelper.IsTBD(away))
+                away = pick;
         }
 
         return (home, away);
