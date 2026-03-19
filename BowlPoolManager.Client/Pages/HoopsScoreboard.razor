@@ -54,7 +54,9 @@
                 @* Group by region within round *@
                 @foreach (var region in roundGames.Select(g => g.Region ?? "").Distinct().OrderBy(r => r))
                 {
-                    var regionGames = roundGames.Where(g => (g.Region ?? "") == region).OrderBy(g => g.Id).ToList();
+                    var regionGames = roundGames.Where(g => (g.Region ?? "") == region)
+                        .OrderBy(g => g.Status == GameStatus.InProgress ? 0 : g.Status == GameStatus.Final ? 1 : 2)
+                        .ThenBy(g => g.Id).ToList();
 
                     @if (!string.IsNullOrEmpty(region) && roundGames.Select(g => g.Region ?? "").Distinct().Count() > 1)
                     {
@@ -190,7 +192,7 @@
 
     private static string GetStatusBadgeClass(HoopsGame game) => game.Status switch
     {
-        GameStatus.Final => "bg-secondary",
+        GameStatus.Final => "bg-success",
         GameStatus.InProgress => "bg-danger",
         _ => "bg-primary opacity-50"
     };
