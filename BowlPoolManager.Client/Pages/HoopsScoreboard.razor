@@ -249,14 +249,14 @@
     {
         GameStatus.Final => "Final",
         GameStatus.InProgress => game.GameDetail ?? "In Progress",
-        _ => "Scheduled"
+        _ => game.StartTime.HasValue ? "Scheduled" : "Pending"
     };
 
     private static string GetStatusBadgeClass(HoopsGame game) => game.Status switch
     {
         GameStatus.Final => "bg-success",
         GameStatus.InProgress => "bg-danger",
-        _ => "bg-primary opacity-50"
+        _ => "bg-secondary opacity-75"
     };
 
     private static string GetCardClass(HoopsGame game) => game.Status switch
