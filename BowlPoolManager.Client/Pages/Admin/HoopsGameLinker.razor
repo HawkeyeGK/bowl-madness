@@ -376,11 +376,42 @@
             if (!string.IsNullOrEmpty(match.HomeTeam)) _availableApiTeams.Add(match.HomeTeam);
             if (!string.IsNullOrEmpty(match.AwayTeam)) _availableApiTeams.Add(match.AwayTeam);
 
-            if (string.IsNullOrEmpty(_proposedApiHome) && !string.IsNullOrEmpty(match.HomeTeam))
-                _proposedApiHome = match.HomeTeam;
-            if (string.IsNullOrEmpty(_proposedApiAway) && !string.IsNullOrEmpty(match.AwayTeam))
-                _proposedApiAway = match.AwayTeam;
+            // Only auto-assign when the user hasn't already confirmed mappings
+            if (string.IsNullOrEmpty(_proposedApiHome) && string.IsNullOrEmpty(_proposedApiAway)
+                && _selectedLocalGame != null
+                && !string.IsNullOrEmpty(match.HomeTeam) && !string.IsNullOrEmpty(match.AwayTeam))
+            {
+                // Score each API team against the local home team name; assign the better match
+                // to home and the other to away.
+                int homeVsHome = NameMatchScore(_selectedLocalGame.TeamHome, match.HomeTeam);
+                int homeVsAway = NameMatchScore(_selectedLocalGame.TeamHome, match.AwayTeam);
+
+                if (homeVsHome >= homeVsAway)
+                {
+                    _proposedApiHome = match.HomeTeam;
+                    _proposedApiAway = match.AwayTeam;
+                }
+                else
+                {
+                    _proposedApiHome = match.AwayTeam;
+                    _proposedApiAway = match.HomeTeam;
+                }
+            }
         }
+    }
+
+    // Returns a similarity score between a local team name and an API team name.
+    // Higher is better. Exact match = 3, one contains the other = 2, one starts with the other = 1, else 0.
+    private static int NameMatchScore(string? local, string? api)
+    {
+        if (string.IsNullOrEmpty(local) || string.IsNullOrEmpty(api)) return 0;
+        var l = local.Trim();
+        var a = api.Trim();
+        if (string.Equals(l, a, StringComparison.OrdinalIgnoreCase)) return 3;
+        if (l.Contains(a, StringComparison.OrdinalIgnoreCase) || a.Contains(l, StringComparison.OrdinalIgnoreCase)) return 2;
+        if (l.StartsWith(a.Split(' ')[0], StringComparison.OrdinalIgnoreCase) ||
+            a.StartsWith(l.Split(' ')[0], StringComparison.OrdinalIgnoreCase)) return 1;
+        return 0;
     }
 
     private async Task SaveLink()
