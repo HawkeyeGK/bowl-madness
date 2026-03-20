@@ -130,9 +130,23 @@
                                             }
                                         </div>
 
-                                        @if (!string.IsNullOrEmpty(game.GameDetail) && game.Status == GameStatus.InProgress)
+                                        @if (game.Status != GameStatus.Final && (game.StartTime.HasValue || !string.IsNullOrEmpty(game.Television)))
                                         {
-                                            <div class="text-muted small text-end mt-1">@game.GameDetail</div>
+                                            <div class="text-muted small text-end mt-1">
+                                                @if (game.StartTime.HasValue)
+                                                {
+                                                    // Tournament games display in CDT (UTC-5)
+                                                    <span>@game.StartTime.Value.AddHours(-5).ToString("h:mm tt") CT</span>
+                                                }
+                                                @if (game.StartTime.HasValue && !string.IsNullOrEmpty(game.Television))
+                                                {
+                                                    <span class="mx-1">·</span>
+                                                }
+                                                @if (!string.IsNullOrEmpty(game.Television))
+                                                {
+                                                    <span>@game.Television</span>
+                                                }
+                                            </div>
                                         }
                                     </div>
                                 </div>

@@ -41,6 +41,24 @@
         </div>
     </div>
 
+    @if (!string.IsNullOrEmpty(_syncResult))
+    {
+        <div class="alert alert-success alert-dismissible py-2 small mb-3">
+            @_syncResult
+            <button type="button" class="btn-close btn-sm" @onclick="() => _syncResult = null"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_selectedPoolId) && _externalGames.Any())
+    {
+        <div class="mb-3">
+            <button class="btn btn-outline-secondary btn-sm" disabled="@_isSyncing" @onclick="SyncGameInfo">
+                @if (_isSyncing) { <span>Syncing...</span> } else { <span><i class="bi bi-arrow-repeat me-1"></i>Sync Game Info from ESPN</span> }
+            </button>
+            <span class="text-muted small ms-2">Updates Start Time &amp; TV network for all linked games in the current feed.</span>
+        </div>
+    }
+
     @if (_isLoading)
     {
         <div class="spinner-border text-primary" role="status">
@@ -242,7 +260,9 @@
 @code {
     private bool _isLoading = false;
     private bool _isSaving = false;
+    private bool _isSyncing = false;
     private bool _showModal = false;
+    private string? _syncResult;
 
     private List<HoopsPool> _pools = new();
     private string _selectedPoolId = string.Empty;
@@ -424,6 +444,11 @@
             _selectedLocalGame.ExternalId = _selectedApiGame != null ? _selectedApiGame.Id.ToString() : _manualGameId;
             _selectedLocalGame.ApiHomeTeam = _proposedApiHome;
             _selectedLocalGame.ApiAwayTeam = _proposedApiAway;
+            if (_selectedApiGame != null)
+            {
+                _selectedLocalGame.StartTime = _selectedApiGame.StartTime;
+                _selectedLocalGame.Television = _selectedApiGame.Television;
+            }
 
             // Denormalize team info from local team config if available
             if (_selectedApiGame != null)
@@ -456,6 +481,37 @@
         finally
         {
             _isSaving = false;
+        }
+    }
+
+    private async Task SyncGameInfo()
+    {
+        _isSyncing = true;
+        _syncResult = null;
+        int updated = 0;
+        try
+        {
+            foreach (var local in _localGames.Where(g => !string.IsNullOrEmpty(g.ExternalId)))
+            {
+                var external = _externalGames.FirstOrDefault(x => x.Id.ToString() == local.ExternalId);
+                if (external == null) continue;
+
+                local.StartTime = external.StartTime;
+                local.Television = external.Television;
+                await GameService.SaveGameAsync(local);
+                updated++;
+            }
+            _syncResult = updated > 0
+                ? $"Synced {updated} game(s) with start time and TV network."
+                : "No linked games matched the current feed. Try a different date.";
+        }
+        catch (Exception ex)
+        {
+            _syncResult = $"Sync failed: {ex.Message}";
+        }
+        finally
+        {
+            _isSyncing = false;
         }
     }
 

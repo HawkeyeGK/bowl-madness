@@ -35,6 +35,14 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("apiAwayTeam")]
         public string? ApiAwayTeam { get; set; }
 
+        [JsonProperty("startTime")]
+        [JsonPropertyName("startTime")]
+        public DateTime? StartTime { get; set; }
+
+        [JsonProperty("television")]
+        [JsonPropertyName("television")]
+        public string? Television { get; set; }
+
         [JsonProperty("gameStatus")]
         [JsonPropertyName("gameStatus")]
         public GameStatus Status { get; set; } = GameStatus.Scheduled;

@@ -151,6 +151,16 @@ namespace BowlPoolManager.Api.Services
                         _ => "scheduled"
                     };
 
+                    var startTimeRaw = ev["date"]?.ToString();
+                    DateTime? startTime = DateTime.TryParse(startTimeRaw, null,
+                        System.Globalization.DateTimeStyles.RoundtripKind, out var parsed)
+                        ? parsed.ToUniversalTime() : null;
+
+                    // Top-level "broadcast" is the simplest TV network string (e.g. "CBS", "truTV")
+                    var television = ev["broadcast"]?.ToString();
+                    if (string.IsNullOrEmpty(television))
+                        television = competition["broadcasts"]?[0]?["names"]?[0]?.ToString();
+
                     result.Add(new BasketballGameDto
                     {
                         Id = int.TryParse(ev["id"]?.ToString(), out var eid) ? eid : 0,
@@ -162,6 +172,8 @@ namespace BowlPoolManager.Api.Services
                         AwayRaw = away["team"]?["location"]?.ToString(),
                         HomePointsRoot = int.TryParse(home["score"]?.ToString(), out var hs) ? hs : (int?)null,
                         AwayPointsRoot = int.TryParse(away["score"]?.ToString(), out var aws) ? aws : (int?)null,
+                        StartTime = startTime,
+                        Television = television,
                     });
                 }
 

@@ -129,6 +129,14 @@ namespace BowlPoolManager.Core.Dtos
             return null;
         }
 
+        [JsonProperty("startTime")]
+        [JsonPropertyName("startTime")]
+        public DateTime? StartTime { get; set; }
+
+        [JsonProperty("television")]
+        [JsonPropertyName("television")]
+        public string? Television { get; set; }
+
         [JsonProperty("notes")]
         [JsonPropertyName("notes")]
         public string? Notes { get; set; }
