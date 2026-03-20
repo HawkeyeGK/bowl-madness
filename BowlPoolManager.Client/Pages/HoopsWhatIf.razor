@@ -50,7 +50,6 @@
     .lb-rank { font-size: 0.75rem; color: #6c757d; min-width: 18px; text-align: right; }
     .lb-name { font-size: 0.82rem; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .lb-score { font-size: 0.82rem; font-weight: 700; color: #0d6efd; white-space: nowrap; }
-    .lb-max  { font-size: 0.72rem; color: #6c757d; white-space: nowrap; }
 
     /* Bracket panel */
     .what-if-bracket {
@@ -212,7 +211,6 @@
                                     <span class="lb-rank">@row.Rank.</span>
                                     <span class="lb-name" title="@row.PlayerName">@row.PlayerName</span>
                                     <span class="lb-score">@row.Score</span>
-                                    <span class="lb-max">/ @row.MaxPossible</span>
                                     @if (row.IsEliminated)
                                     {
                                         <i class="bi bi-x-circle-fill text-danger" style="font-size:0.75rem;" title="Mathematically eliminated"></i>
