@@ -234,7 +234,7 @@
                         <li class="nav-item flex-shrink-0">
                             <button class="nav-link @(activeTab == "First Four" ? "active fw-bold" : "") px-2 px-md-3"
                                     @onclick='@(() => activeTab = "First Four")'>
-                                First Four
+                                First Four @TabDot(GamesForFirstFour())
                             </button>
                         </li>
                     }
@@ -243,14 +243,14 @@
                         <li class="nav-item flex-shrink-0">
                             <button class="nav-link @(activeTab == region ? "active fw-bold" : "") px-2 px-md-3"
                                     @onclick="@(() => activeTab = region)">
-                                @region
+                                @region @TabDot(GamesForRegion(region))
                             </button>
                         </li>
                     }
                     <li class="nav-item flex-shrink-0">
                         <button class="nav-link @(activeTab == "Final Four" ? "active fw-bold" : "") px-2 px-md-3"
                                 @onclick='@(() => activeTab = "Final Four")'>
-                            Final Four
+                            Final Four @TabDot(GamesForFinalFour())
                         </button>
                     </li>
                 </ul>
@@ -913,6 +913,14 @@
             return seed;
 
         return null;
+    }
+
+    private RenderFragment TabDot(List<HoopsGame> tabGames)
+    {
+        bool complete = tabGames.Any() &&
+            tabGames.All(g => _simState.EffectiveWinners.TryGetValue(g.Id, out var w) && w != null);
+        string color = complete ? "#198754" : "#ffc107";
+        return @<span style="font-size:0.55rem; vertical-align:middle; color:@color;">&#9679;</span>;
     }
 
     private string GetGameLabel(HoopsGame game) => game.Round switch
