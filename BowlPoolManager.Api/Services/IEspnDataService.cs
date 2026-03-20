@@ -14,6 +14,7 @@ namespace BowlPoolManager.Api.Services
         /// Team names use the ESPN "location" field (e.g. "Ohio State", "TCU")
         /// which matches what CollegeBasketballData stores in homeTeam/awayTeam.
         /// </summary>
-        Task<List<BasketballGameDto>> GetBasketballScoreboardAsync();
+        /// <param name="date">Optional date in yyyyMMdd format. Defaults to today in Eastern time.</param>
+        Task<List<BasketballGameDto>> GetBasketballScoreboardAsync(string? date = null);
     }
 }

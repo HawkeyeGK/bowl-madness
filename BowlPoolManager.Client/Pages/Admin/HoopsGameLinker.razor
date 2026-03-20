@@ -20,8 +20,8 @@
         <span class="badge bg-danger">Super Admin Zone</span>
     </div>
 
-    @* Pool Selector *@
-    <div class="row mb-4">
+    @* Pool + Date Selectors *@
+    <div class="row mb-4 g-3 align-items-end">
         <div class="col-md-4">
             <label class="form-label fw-bold">Select Pool:</label>
             <select class="form-select" value="@_selectedPoolId" @onchange="OnPoolChanged">
@@ -34,6 +34,10 @@
                     }
                 }
             </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-bold">ESPN Feed Date:</label>
+            <input type="date" class="form-control" @bind="_feedDate" @bind:after="OnFeedDateChanged" />
         </div>
     </div>
 
@@ -243,6 +247,7 @@
     private List<HoopsPool> _pools = new();
     private string _selectedPoolId = string.Empty;
     private HoopsPool? _selectedPool;
+    private DateTime _feedDate = DateTime.Today;
 
     private List<HoopsGame> _localGames = new();
     private List<BasketballGameDto> _externalGames = new();
@@ -276,13 +281,20 @@
             await LoadGames();
     }
 
+    private async Task OnFeedDateChanged()
+    {
+        if (!string.IsNullOrEmpty(_selectedPoolId))
+            await LoadGames();
+    }
+
     private async Task LoadGames()
     {
         _isLoading = true;
         try
         {
             var gamesTask = GameService.GetGamesAsync(_selectedPoolId);
-            var cbdTask = Http.GetFromJsonAsync<List<BasketballGameDto>>("api/GetRawHoopsGames");
+            var dateParam = _feedDate.ToString("yyyyMMdd");
+            var cbdTask = Http.GetFromJsonAsync<List<BasketballGameDto>>($"api/GetRawHoopsGames?date={dateParam}");
             var teamsTask = ConfigurationService.GetBasketballTeamsAsync();
 
             await Task.WhenAll(gamesTask, cbdTask, teamsTask);

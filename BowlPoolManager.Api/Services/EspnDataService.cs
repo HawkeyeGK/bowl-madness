@@ -112,17 +112,19 @@ namespace BowlPoolManager.Api.Services
             }
         }
 
-        public async Task<List<BasketballGameDto>> GetBasketballScoreboardAsync()
+        public async Task<List<BasketballGameDto>> GetBasketballScoreboardAsync(string? date = null)
         {
             try
             {
-                // Always pass today's date explicitly. The default endpoint returns only
-                // completed games from the prior day once a new calendar day begins in ESPN's
-                // system, which causes scheduled games to disappear from the feed.
-                var easternZone = TimeZoneInfo.FindSystemTimeZoneById(
-                    OperatingSystem.IsWindows() ? "Eastern Standard Time" : "America/New_York");
-                var todayEt = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, easternZone).ToString("yyyyMMdd");
-                var url = $"{ScoreboardUrl}?dates={todayEt}";
+                // Always pass a date explicitly. The default endpoint returns only completed
+                // games from the prior day once a new calendar day begins in ESPN's system.
+                if (string.IsNullOrWhiteSpace(date))
+                {
+                    var easternZone = TimeZoneInfo.FindSystemTimeZoneById(
+                        OperatingSystem.IsWindows() ? "Eastern Standard Time" : "America/New_York");
+                    date = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, easternZone).ToString("yyyyMMdd");
+                }
+                var url = $"{ScoreboardUrl}?dates={date}";
                 var json = await _httpClient.GetStringAsync(url);
                 var root = JObject.Parse(json);
                 var events = root["events"] as JArray;

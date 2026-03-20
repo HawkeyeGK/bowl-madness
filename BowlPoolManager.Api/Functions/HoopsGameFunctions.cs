@@ -83,7 +83,8 @@ namespace BowlPoolManager.Api.Functions
 
             try
             {
-                var games = await _espnDataService.GetBasketballScoreboardAsync();
+                var date = req.Query["date"];
+                var games = await _espnDataService.GetBasketballScoreboardAsync(date);
                 var response = req.CreateResponse(HttpStatusCode.OK);
                 await response.WriteAsJsonAsync(games);
                 return response;
