@@ -114,8 +114,12 @@ namespace BowlPoolManager.Core.Helpers
                 .ThenBy(r => r.PlayerName)
                 .ToList();
 
-            int leaderScore = sorted.Count > 0 ? sorted[0].Score : 0;
             int rank = 1;
+
+            // Threshold: an entry is eliminated if it can no longer finish in the top 3.
+            // Use the score of the entry currently sitting in 3rd place (index 2).
+            // If there are 3 or fewer entries nobody can be eliminated from the top 3.
+            int topThreeThreshold = sorted.Count > 3 ? sorted[2].Score : 0;
 
             for (int i = 0; i < sorted.Count; i++)
             {
@@ -124,7 +128,7 @@ namespace BowlPoolManager.Core.Helpers
                 else
                     sorted[i].Rank = rank;
 
-                sorted[i].IsEliminated = sorted[i].MaxPossible < leaderScore;
+                sorted[i].IsEliminated = topThreeThreshold > 0 && sorted[i].MaxPossible < topThreeThreshold;
                 rank++;
             }
 
