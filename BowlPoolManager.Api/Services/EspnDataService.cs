@@ -116,7 +116,14 @@ namespace BowlPoolManager.Api.Services
         {
             try
             {
-                var json = await _httpClient.GetStringAsync(ScoreboardUrl);
+                // Always pass today's date explicitly. The default endpoint returns only
+                // completed games from the prior day once a new calendar day begins in ESPN's
+                // system, which causes scheduled games to disappear from the feed.
+                var easternZone = TimeZoneInfo.FindSystemTimeZoneById(
+                    OperatingSystem.IsWindows() ? "Eastern Standard Time" : "America/New_York");
+                var todayEt = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, easternZone).ToString("yyyyMMdd");
+                var url = $"{ScoreboardUrl}?dates={todayEt}";
+                var json = await _httpClient.GetStringAsync(url);
                 var root = JObject.Parse(json);
                 var events = root["events"] as JArray;
                 if (events == null) return new List<BasketballGameDto>();
