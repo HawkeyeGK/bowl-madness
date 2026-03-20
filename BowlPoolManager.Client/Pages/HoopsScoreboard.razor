@@ -130,13 +130,13 @@
                                             }
                                         </div>
 
-                                        @if (game.Status != GameStatus.Final && (game.StartTime.HasValue || !string.IsNullOrEmpty(game.Television)))
+                                        @if (game.StartTime.HasValue || !string.IsNullOrEmpty(game.Television))
                                         {
                                             <div class="text-muted small text-end mt-1">
                                                 @if (game.StartTime.HasValue)
                                                 {
                                                     // Tournament games display in CDT (UTC-5)
-                                                    <span>@game.StartTime.Value.AddHours(-5).ToString("h:mm tt") CT</span>
+                                                    <span>@game.StartTime.Value.AddHours(-5).ToString("MMM d, h:mm tt") CT</span>
                                                 }
                                                 @if (game.StartTime.HasValue && !string.IsNullOrEmpty(game.Television))
                                                 {
