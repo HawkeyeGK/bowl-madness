@@ -161,6 +161,8 @@
                 {
                     var regionGames = roundGames.Where(g => (g.Region ?? "") == region)
                         .OrderBy(g => g.Status == GameStatus.InProgress ? 0 : g.Status == GameStatus.Final ? 1 : 2)
+                        .ThenBy(g => g.StartTime ?? DateTime.MaxValue)
+                        .ThenBy(g => Math.Min(g.TeamHomeSeed ?? 99, g.TeamAwaySeed ?? 99))
                         .ThenBy(g => g.Id).ToList();
 
                     @if (!string.IsNullOrEmpty(region) && roundGames.Select(g => g.Region ?? "").Distinct().Count() > 1)
