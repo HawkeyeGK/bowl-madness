@@ -33,6 +33,109 @@
     }
     else
     {
+        @* Today's Games section *@
+        @if (_todaysGames.Any())
+        {
+            var hasLiveToday = _todaysGames.Any(g => g.Status == GameStatus.InProgress);
+
+            <div class="mb-5">
+                <div class="d-flex align-items-center gap-2 mb-3 border-bottom pb-2">
+                    <h5 class="fw-bold mb-0 text-warning"><i class="bi bi-calendar-day me-1"></i>Today's Games</h5>
+                    @if (hasLiveToday)
+                    {
+                        <span class="badge bg-danger" style="font-size: 0.7em;">
+                            <span class="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style="width: 5px; height: 5px;"></span>
+                            LIVE
+                        </span>
+                    }
+                </div>
+                <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mb-3">
+                    @foreach (var game in _todaysGames)
+                    {
+                        <div class="col" @key="@($"today-{game.Id}")">
+                            <div class="card h-100 shadow-sm @GetCardClass(game)">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-end align-items-start mb-2">
+                                        <span class="badge @GetStatusBadgeClass(game)">@GetStatusLabel(game)</span>
+                                    </div>
+
+                                    @* Home Team *@
+                                    <div class="d-flex justify-content-between align-items-center mb-1 @(IsWinner(game, true) ? "fw-bold" : "")">
+                                        <div class="d-flex align-items-center gap-2">
+                                            @if (!string.IsNullOrEmpty(game.HomeTeamInfo?.PrimaryLogoUrl))
+                                            {
+                                                <img src="@game.HomeTeamInfo.PrimaryLogoUrl" height="24" width="24" style="object-fit: contain;" alt="" />
+                                            }
+                                            @if (game.TeamHomeSeed.HasValue)
+                                            {
+                                                <span class="badge bg-secondary" style="font-size: 0.7em; min-width: 22px;">@game.TeamHomeSeed</span>
+                                            }
+                                            <span class="small @(IsEliminated(game, true) ? "text-decoration-line-through text-muted" : "")">
+                                                @GetDisplayTeamName(game, true)
+                                            </span>
+                                            @{ var homePctT = GetPickPct(game, true); }
+                                            @if (homePctT.HasValue)
+                                            {
+                                                <span class="text-muted small">(@homePctT%)</span>
+                                            }
+                                        </div>
+                                        @if (game.TeamHomeScore.HasValue)
+                                        {
+                                            <span class="fw-bold @(IsWinner(game, true) ? "text-success" : "")">@game.TeamHomeScore</span>
+                                        }
+                                    </div>
+
+                                    @* Away Team *@
+                                    <div class="d-flex justify-content-between align-items-center @(IsWinner(game, false) ? "fw-bold" : "")">
+                                        <div class="d-flex align-items-center gap-2">
+                                            @if (!string.IsNullOrEmpty(game.AwayTeamInfo?.PrimaryLogoUrl))
+                                            {
+                                                <img src="@game.AwayTeamInfo.PrimaryLogoUrl" height="24" width="24" style="object-fit: contain;" alt="" />
+                                            }
+                                            @if (game.TeamAwaySeed.HasValue)
+                                            {
+                                                <span class="badge bg-secondary" style="font-size: 0.7em; min-width: 22px;">@game.TeamAwaySeed</span>
+                                            }
+                                            <span class="small @(IsEliminated(game, false) ? "text-decoration-line-through text-muted" : "")">
+                                                @GetDisplayTeamName(game, false)
+                                            </span>
+                                            @{ var awayPctT = GetPickPct(game, false); }
+                                            @if (awayPctT.HasValue)
+                                            {
+                                                <span class="text-muted small">(@awayPctT%)</span>
+                                            }
+                                        </div>
+                                        @if (game.TeamAwayScore.HasValue)
+                                        {
+                                            <span class="fw-bold @(IsWinner(game, false) ? "text-success" : "")">@game.TeamAwayScore</span>
+                                        }
+                                    </div>
+
+                                    @if (game.StartTime.HasValue || !string.IsNullOrEmpty(game.Television))
+                                    {
+                                        <div class="text-muted small text-end mt-1">
+                                            @if (game.StartTime.HasValue)
+                                            {
+                                                <span>@game.StartTime.Value.AddHours(-5).ToString("MMM d, h:mm tt") CT</span>
+                                            }
+                                            @if (game.StartTime.HasValue && !string.IsNullOrEmpty(game.Television))
+                                            {
+                                                <span class="mx-1">·</span>
+                                            }
+                                            @if (!string.IsNullOrEmpty(game.Television))
+                                            {
+                                                <span>@game.Television</span>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
         @foreach (var round in _roundOrder)
         {
             var roundGames = _games.Where(g => g.Round == round).ToList();
@@ -159,6 +262,13 @@
     private List<HoopsGame>? _games;
     private bool _isLoading = true;
     private Dictionary<string, Dictionary<string, int>> _pickCountsByGame = new();
+
+    private List<HoopsGame> _todaysGames =>
+        _games == null ? new() :
+        _games
+            .Where(g => g.StartTime.HasValue && g.StartTime.Value.AddHours(-5).Date == DateTime.UtcNow.AddHours(-5).Date)
+            .OrderBy(g => g.StartTime)
+            .ToList();
 
     private static readonly TournamentRound[] _roundOrder =
     [
