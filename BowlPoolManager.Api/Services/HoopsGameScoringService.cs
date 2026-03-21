@@ -56,19 +56,15 @@ namespace BowlPoolManager.Api.Services
 
             var apiGames = await _espnDataService.GetBasketballScoreboardAsync();
 
-            // If no linked games match today's scoreboard, try yesterday — games played near
-            // midnight ET fall off today's feed once the calendar rolls over.
-            var linkedIds = linkedGames.Select(g => g.ExternalId).ToHashSet();
-            if (!apiGames.Any(a => linkedIds.Contains(a.Id.ToString())))
-            {
-                var easternZone = TimeZoneInfo.FindSystemTimeZoneById(
-                    OperatingSystem.IsWindows() ? "Eastern Standard Time" : "America/New_York");
-                var yesterday = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, easternZone)
-                    .AddDays(-1).ToString("yyyyMMdd");
-                var yesterdayGames = await _espnDataService.GetBasketballScoreboardAsync(yesterday);
-                apiGames = apiGames.Concat(yesterdayGames).ToList();
-                _logger.LogInformation("No scoreboard matches for today; merged yesterday ({Date}) as fallback ({Count} games).", yesterday, yesterdayGames.Count);
-            }
+            // Always also fetch yesterday's scoreboard — games played near midnight ET fall off
+            // the current-day feed once the calendar rolls over in Eastern time, and today's
+            // games may be linked alongside yesterday's in the same bracket pool.
+            var easternZone = TimeZoneInfo.FindSystemTimeZoneById(
+                OperatingSystem.IsWindows() ? "Eastern Standard Time" : "America/New_York");
+            var yesterday = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, easternZone)
+                .AddDays(-1).ToString("yyyyMMdd");
+            var yesterdayGames = await _espnDataService.GetBasketballScoreboardAsync(yesterday);
+            apiGames = apiGames.Concat(yesterdayGames).ToList();
 
             var batchUpdates = new List<HoopsGame>();
             string? seasonId = linkedGames.FirstOrDefault()?.SeasonId;
