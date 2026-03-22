@@ -1,8 +1,10 @@
 @page "/hoops/scoreboard"
 @using BowlPoolManager.Core.Domain
+@using Microsoft.AspNetCore.Components.Authorization
 @inject IHoopsPoolService PoolService
 @inject IHoopsGameService GameService
 @inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Hoops Scoreboard</PageTitle>
 
@@ -74,6 +76,10 @@
                                             <span class="small @(IsEliminated(game, true) ? "text-decoration-line-through text-muted" : "")">
                                                 @GetDisplayTeamName(game, true)
                                             </span>
+                                            @if (IsMyPick(game, true))
+                                            {
+                                                <i class="bi bi-star-fill text-warning" style="font-size: 0.75rem;" title="Your pick"></i>
+                                            }
                                             @{ var homePctT = GetPickPct(game, true); }
                                             @if (homePctT.HasValue)
                                             {
@@ -100,6 +106,10 @@
                                             <span class="small @(IsEliminated(game, false) ? "text-decoration-line-through text-muted" : "")">
                                                 @GetDisplayTeamName(game, false)
                                             </span>
+                                            @if (IsMyPick(game, false))
+                                            {
+                                                <i class="bi bi-star-fill text-warning" style="font-size: 0.75rem;" title="Your pick"></i>
+                                            }
                                             @{ var awayPctT = GetPickPct(game, false); }
                                             @if (awayPctT.HasValue)
                                             {
@@ -194,6 +204,10 @@
                                                 <span class="small @(IsEliminated(game, true) ? "text-decoration-line-through text-muted" : "")">
                                                     @GetDisplayTeamName(game, true)
                                                 </span>
+                                                @if (IsMyPick(game, true))
+                                                {
+                                                    <i class="bi bi-star-fill text-warning" style="font-size: 0.75rem;" title="Your pick"></i>
+                                                }
                                                 @{ var homePct = GetPickPct(game, true); }
                                                 @if (homePct.HasValue)
                                                 {
@@ -220,6 +234,10 @@
                                                 <span class="small @(IsEliminated(game, false) ? "text-decoration-line-through text-muted" : "")">
                                                     @GetDisplayTeamName(game, false)
                                                 </span>
+                                                @if (IsMyPick(game, false))
+                                                {
+                                                    <i class="bi bi-star-fill text-warning" style="font-size: 0.75rem;" title="Your pick"></i>
+                                                }
                                                 @{ var awayPct = GetPickPct(game, false); }
                                                 @if (awayPct.HasValue)
                                                 {
@@ -265,6 +283,8 @@
     private List<HoopsGame>? _games;
     private bool _isLoading = true;
     private Dictionary<string, Dictionary<string, int>> _pickCountsByGame = new();
+    // gameId → picked team name for the logged-in user's entry in this pool
+    private Dictionary<string, string> _myPicks = new(StringComparer.OrdinalIgnoreCase);
 
     private List<HoopsGame> _todaysGames =>
         _games == null ? new() :
@@ -295,10 +315,15 @@
             {
                 var gamesTask = GameService.GetGamesAsync(activePool.Id);
                 var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetHoopsEntries?poolId={activePool.Id}");
-                await Task.WhenAll(gamesTask, entriesTask);
+                var myEntriesTask = FetchMyEntriesSafe(activePool.SeasonId);
+                await Task.WhenAll(gamesTask, entriesTask, myEntriesTask);
                 _games = await gamesTask;
                 var entries = await entriesTask ?? new();
                 ComputePickCounts(entries);
+                var myEntries = await myEntriesTask;
+                var myEntry = myEntries.FirstOrDefault(e => e.PoolId == activePool.Id);
+                if (myEntry?.Picks != null)
+                    _myPicks = new Dictionary<string, string>(myEntry.Picks, StringComparer.OrdinalIgnoreCase);
             }
         }
         catch (Exception ex)
@@ -445,5 +470,25 @@
         if (name.Equals("TBD", StringComparison.OrdinalIgnoreCase)) return true;
         if (name.StartsWith("Winner of", StringComparison.OrdinalIgnoreCase)) return true;
         return false;
+    }
+
+    private async Task<List<BracketEntry>> FetchMyEntriesSafe(string seasonId)
+    {
+        try
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            if (auth.User.Identity?.IsAuthenticated == true)
+                return await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyHoopsEntries?seasonId={seasonId}") ?? new();
+        }
+        catch { }
+        return new();
+    }
+
+    private bool IsMyPick(HoopsGame game, bool isHome)
+    {
+        if (!_myPicks.TryGetValue(game.Id, out var pick)) return false;
+        var team = isHome ? game.TeamHome : game.TeamAway;
+        return !string.IsNullOrEmpty(team) && !IsPlaceholder(team) &&
+               string.Equals(pick, team, StringComparison.OrdinalIgnoreCase);
     }
 }
