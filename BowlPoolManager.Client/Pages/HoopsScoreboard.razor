@@ -167,7 +167,9 @@
                 </div>
 
                 @* Group by region within round *@
-                @foreach (var region in roundGames.Select(g => g.Region ?? "").Distinct().OrderBy(r => r))
+                @foreach (var region in roundGames.Select(g => g.Region ?? "").Distinct()
+                    .OrderBy(r => roundGames.Where(g => (g.Region ?? "") == r && g.StartTime.HasValue).Min(g => (DateTime?)g.StartTime) ?? DateTime.MaxValue)
+                    .ThenBy(r => r))
                 {
                     var regionGames = roundGames.Where(g => (g.Region ?? "") == region)
                         .OrderBy(g => g.Status == GameStatus.InProgress ? 0 : g.Status == GameStatus.Final ? 1 : 2)
