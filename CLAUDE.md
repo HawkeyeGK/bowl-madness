@@ -30,7 +30,10 @@ Hosting is Azure Static Web Apps. A push to main deploys to production.
   and explain the choice in your summary.
 
 ## Git
-- Code changes go on a branch with a pull request. Never merge. Never push code to main.
+- Code changes go on a branch with a pull request. Merge only when I say so, using
+  gh pr merge --squash --delete-branch, and ask before running it. Before asking to merge,
+  run gh pr checks and tell me the result and the preview address. If any check failed,
+  don't merge. A merge to main deploys to production. Never push code to main.
 - Changes that only add or edit documents may be committed straight to main. Ask before pushing.
 - Don't commit until I say the change is what I want, or I ask for a checkpoint.
   Group related changes into one commit unless I say otherwise.
@@ -42,6 +45,14 @@ Hosting is Azure Static Web Apps. A push to main deploys to production.
      rounds and report what is unresolved in plain language.
   3. Give me a summary: what changed, why, what could go wrong, what was tested.
 - Ask before git push and again before gh pr create.
+- After a PR is merged (I say so, or you merged it):
+  1. Run gh pr view <number> --json state,headRefOid,mergeCommit.
+  2. Confirm state is MERGED and the local branch tip equals headRefOid. If either
+     fails, stop and tell me.
+  3. Switch to main and pull with --ff-only.
+  4. gh pr merge --delete-branch may already have deleted the local branch. If it still
+     exists, delete it with git branch -D. Stage and commit nothing.
+  5. Show git status.
 
 ## Bugs
 - Write a failing test first. Run the tests on unchanged code to get a baseline.
