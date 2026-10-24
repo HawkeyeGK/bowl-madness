@@ -1,8 +1,7 @@
 # Business Rules
 
 The intended behavior of Bowl Madness and Hoops Madness. Where this document and the code
-disagree, this document is the intent and the code is the bug. Known differences are listed
-under "Known gaps" at the end.
+disagree, this document is the intent and the code is the bug.
 
 ## 1. Roles and permissions
 
@@ -40,7 +39,7 @@ under "Known gaps" at the end.
 - **Visibility.** Before lock, no one except Admins sees another player's picks, by any route (page, API, backup). The leaderboard shows names and scores only. Once the pool is locked, everyone can see everyone's picks. A player always sees their own. *(Owner decision)*
 - A bracket name is unique within a pool, ignoring case. A player's save is always recorded as theirs.
 - A player can delete their own entry until lock.
-- **Payment status** is changed only by an Admin. A player's save must not be able to set it.
+- **Payment status** is changed only by an Admin or SuperAdmin. A player's save must never set it. *(Owner decision)*
 - Picks may be saved incomplete before lock.
 
 ## 4. Scoring and ranking
@@ -56,6 +55,7 @@ The same rules apply to football and hoops.
 - Entries that tie on all of those share a rank (1, 2, 2, 4), listed by name. Prizes for a shared rank are split evenly by hand. *(Owner decision)*
 - **Football tiebreakers** are chosen per pool: correct-pick count, or closeness of the entry's guess to the tiebreaker game's total points.
 - **Hoops has a tiebreaker**, such as total points in the championship game, and the entry form, leaderboard and lock rule all use it. *(Owner decision)*
+- **Path to Victory elimination.** The top three places pay out in both sports. An entry is eliminated when it can no longer finish in the top 3. *(Owner decision)*
 - A game counts toward "correct picks" and the "final games" total only if it awards points. The First Four round's point value is configurable; when it is 0, a First Four win does not count. *(Owner decision)*
 - **Trophies** (gold, silver, bronze for ranks 1 to 3) appear as soon as the math is finished, meaning every entry's max possible equals its score. The pool does not need to be concluded. *(Owner decision)*
 
@@ -79,30 +79,7 @@ The same rules apply to football and hoops.
 
 - Times are stored in UTC and shown to everyone in Central time, labelled "CT". Dates typed by admins are read as Central. *(Owner decision)* Showing local time is a later enhancement.
 
-## Open questions
+## Undecided
 
-- **Admin game editing.** The game save endpoints serve both result entry and game definition, so it is not decided whether Admins may also create and edit game definitions.
-- **Hoops "Path to Victory" elimination.** Today an entry is eliminated when it can no longer reach the top 3; whether that is the intended rule is not decided.
-
-## Known gaps (temporary)
-
-Delete each line as its issue closes.
-
-| Gap | Issue |
-|---|---|
-| Initialize database, team sync and save season have no login or role check; migration uses a private duplicate check | #93 |
-| Hoops "Path to Victory" tests disagree with the elimination rule | #94 |
-| Season-ID mix-up ("2026") can return empty results | #95 |
-| Backup download has no login or role check and returns every entry's picks | no issue yet |
-| Disabled users are only ejected by the browser; the API ignores the flag | no issue yet |
-| Other users' picks are hidden only in the browser; the API returns them to anyone | no issue yet |
-| The server never checks the invite code, and the pool list returns codes to everyone | no issue yet |
-| A player's save can set their own payment flag | no issue yet |
-| Hoops has no tiebreaker (no pool field, no entry UI, ignored by leaderboard and lock rule) | no issue yet |
-| Score entry and game linking require SuperAdmin in the API for both sports (the hoops pages already allow Admin; the football pages require SuperAdmin) | no issue yet |
-| First Four games are always excluded from correct-pick counts; they should count only when they award points | no issue yet |
-| Football pool deletion does not delete the pool's entries; what happens to shared football games on delete or archive needs a design | no issue yet |
-| Football archive may look up entries with the wrong ID. Last year's archive looks correct, so this is unconfirmed. Investigate before the next archive | no issue yet |
-| Lock deadline on the picks pages shows browser-local time, not Central | no issue yet |
-
-*Not verified: request validation in the sync, logo, migration and bracket-building functions; the football pool-settings tiebreaker screen; live database contents.*
+- What happens to football games when a pool is deleted or archived. Games are shared between pools.
+- Whether Admins may create and edit game definitions, or only enter results and link games.
