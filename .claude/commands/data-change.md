@@ -22,7 +22,7 @@ Write down, in plain language:
 - which containers and which partition keys it touches (Players /id, Seasons /seasonId, Picks /seasonId, PoolArchives /seasonId, Configuration /id)
 - which documents it reads, updates or deletes, and how they are selected
 - the rules that apply: docs/BUSINESS-RULES.md (archiving drops entry ids, owners, payment status and audit history and cannot be undone; the "2026" season id quirk in section 6; pick visibility; payment status)
-- open issues about the same area (`gh issue list --state open --limit 100`)
+- open issues about the same area (`gh issue list --state open --limit 100`). Also read each issue's comments (`gh issue view <n> --comments`), because some deviations are recorded only in comments.
 - what could go wrong, and how it would be undone (the export is the only way back)
 
 Ask me about intended behavior if BUSINESS-RULES does not answer it. Decide technical questions yourself.

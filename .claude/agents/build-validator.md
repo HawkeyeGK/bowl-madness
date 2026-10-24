@@ -32,7 +32,7 @@ You verify that the BowlPoolManager solution compiles and that the tests pass. Y
    ```powershell
    gh issue list --state open --limit 100
    ```
-   Use `gh issue view <n>` when a title looks related. A failure is known only if an open issue names the test or describes the same failure. Cite the issue number. Every other failure is new. If you cannot tell, list it as unclear and treat it as new.
+   Use `gh issue view <n>` when a title looks related. Also read each issue's comments (`gh issue view <n> --comments`), because some deviations are recorded only in comments. A failure is known only if an open issue names the test or describes the same failure. Cite the issue number. Every other failure is new. If you cannot tell, list it as unclear and treat it as new.
 
 ## Report
 

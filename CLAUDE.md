@@ -46,6 +46,11 @@ Hosting is Azure Static Web Apps. A push to main deploys to production.
      findings. Stop after about three rounds and report what is unresolved in plain language.
   3. Give me a summary: what changed, why, what could go wrong, what was tested.
 - Ask before git push and again before gh pr create.
+- After opening or updating a PR, wait for its checks before reporting anything. GitHub takes
+  a few seconds to start them, so "no checks reported" means not started, not passed. Poll
+  gh pr checks until checks appear (give up after about three minutes), then watch them until
+  they finish. Report only the final result. Never ask to merge before every check has
+  finished and passed.
 - After a PR is merged (I say so, or you merged it):
   1. Run gh pr view <number> --json state,headRefOid,mergeCommit.
   2. Confirm state is MERGED and the local branch tip equals headRefOid. If either
@@ -62,7 +67,7 @@ Hosting is Azure Static Web Apps. A push to main deploys to production.
 ## Business rules
 - docs/BUSINESS-RULES.md is the intended behavior. Where code disagrees, the code is the bug.
 - Read the relevant section before changing pool, entry, scoring or permission code.
-- Before changing code in an area it covers, check open GitHub issues for that area.
+- Before changing code in an area it covers, check open GitHub issues and their comments for that area.
 - If code deviates from the rules and no issue exists, report it. Do not fix it silently.
 - Don't edit docs/BUSINESS-RULES.md unless I ask. Propose changes and I decide.
 
@@ -92,6 +97,7 @@ CLAUDE.md and BUSINESS-RULES, architecture in ARCHITECTURAL_CONTEXT, status in G
 - Every function that writes data checks the caller first, on the server, before any other
   logic. Hiding a button is not a protection.
 - No secrets in code, logs or docs. The Cosmos connection string stays in app settings.
+- Error responses may include exception messages, stack traces and internal ids. They must never include secrets, keys, connection strings, tokens, or other players' picks before lock.
 
 ## Tests
 - xUnit, FluentAssertions, Moq. Name tests MethodName_ShouldExpectedBehavior_WhenCondition.
