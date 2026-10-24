@@ -57,7 +57,11 @@
                                       "PowerShell(az cosmosdb show *)",
                                       "Bash(az cosmosdb list *)",
                                       "PowerShell(az cosmosdb list *)",
-                                      "WebFetch(domain:site.api.espn.com)"
+                                      "Bash(az staticwebapp environment list *)",
+                                      "PowerShell(az staticwebapp environment list *)",
+                                      "WebFetch(domain:site.api.espn.com)",
+                                      "WebFetch(domain:bowl-madness.com)",
+                                      "WebFetch(domain:hoops-madness.com)"
                                   ],
                         "ask":  [
                                     "Bash(git push*)",

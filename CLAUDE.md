@@ -41,8 +41,9 @@ Hosting is Azure Static Web Apps. A push to main deploys to production.
 - Stage files by name. Do not use git add . or git add -A.
 - Before opening a PR or pushing:
   1. Build and test. No new failures beyond the failures already tracked in open issues.
-  2. Run the code-review agent. Fix critical and high findings. Stop after about three
-     rounds and report what is unresolved in plain language.
+  2. Run the code-review agent. Also run security-data-review when the change touches
+     authorization, live-data writes, scoring or permissions. Fix critical and high
+     findings. Stop after about three rounds and report what is unresolved in plain language.
   3. Give me a summary: what changed, why, what could go wrong, what was tested.
 - Ask before git push and again before gh pr create.
 - After a PR is merged (I say so, or you merged it):
@@ -83,6 +84,7 @@ CLAUDE.md and BUSINESS-RULES, architecture in ARCHITECTURAL_CONTEXT, status in G
 - Some hoops pools and entries use the text "2026" as seasonId, not the season GUID.
   See BUSINESS-RULES section 6 before touching season ids.
 - Dry-run any bulk or destructive change, report the counts, and wait for my approval.
+  Use /data-change for any bulk or destructive data operation.
 - Never write to live data, or send non-GET requests to the live site, without my explicit approval.
   I take a fresh export before data work.
 
