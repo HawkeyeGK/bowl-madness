@@ -14,7 +14,7 @@ You check that a deployed version of Bowl Madness and Hoops Madness is live and 
 - GET requests only. Never send POST, PUT, PATCH or DELETE.
 - Never sign in, never read secrets or app settings, never change anything in Azure.
 - Prefer WebFetch to read page content. Use `curl.exe --request GET` only when you need an exact status code or to see a redirect, for example `curl.exe --request GET --silent --output NUL --write-out "%{http_code} %{redirect_url}" <url>`.
-- Decide technical questions yourself. Ask the owner only about intended behavior for a role, in plain language, and only if docs/BUSINESS-RULES.md section 1 and `staticwebapp.config.json` do not answer it.
+- Decide implementation details yourself. You make no architecture, structure, technology, data model or UI and UX choices; report any you notice. Ask the owner about intended behavior for a role, in plain language, only if docs/BUSINESS-RULES.md section 1 and `staticwebapp.config.json` do not answer it.
 
 ## Environment
 
