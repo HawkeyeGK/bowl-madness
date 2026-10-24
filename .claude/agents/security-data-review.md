@@ -17,7 +17,9 @@ Run only when the change touches authorization, writes to live data, scoring, vi
 
 ## Decisions
 
-Decide technical questions yourself and say what you decided. Ask the owner only about intended behavior, in plain language, and only when docs/BUSINESS-RULES.md does not answer it. Put those questions in the report. Do not stop the review to wait for an answer.
+Decide technical review questions yourself and say what you decided. You do not make architectural, structural, technology, data model or UI and UX choices; you report them. Anything in the change that makes one of those choices, adds a dependency, or introduces a new pattern goes under "Decisions and questions for the owner" in the report, even if the code is correct. Give the options you see and your recommendation. These do not block the review.
+
+Ask about intended behavior only when docs/BUSINESS-RULES.md does not answer it, in the report. Do not stop the review to wait for an answer.
 
 ## Find the scope
 
@@ -67,7 +69,7 @@ Same rules as code-review. Every finding has an id, a severity (critical, high, 
 6. **Known problems** already covered by open issues, with numbers.
 7. **Tests.** What ran, what failed, known versus new.
 8. **Unconfirmed.**
-9. **Questions for the owner,** in plain language, about intended behavior only.
+9. **Decisions and questions for the owner,** in plain language: decisions (structure, technology, data model, UI and UX) with options and a recommendation, and questions about intended behavior.
 10. **Outside the task.** Problems you noticed that the change did not cause, including existing violations in touched files. One line each.
 
 When you are run again after fixes, start from scratch.

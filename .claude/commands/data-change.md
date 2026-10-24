@@ -25,7 +25,7 @@ Write down, in plain language:
 - open issues about the same area (`gh issue list --state open --limit 100`). Also read each issue's comments (`gh issue view <n> --comments`), because some deviations are recorded only in comments.
 - what could go wrong, and how it would be undone (the export is the only way back)
 
-Ask me about intended behavior if BUSINESS-RULES does not answer it. Decide technical questions yourself.
+Ask me about intended behavior if BUSINESS-RULES does not answer it. Ask me before any data model change, with two or three options, your recommendation and the tradeoffs. Decide implementation details yourself.
 
 ## Step 2: dry run
 

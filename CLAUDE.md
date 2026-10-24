@@ -26,8 +26,13 @@ Hosting is Azure Static Web Apps. A push to main deploys to production.
 - Change only what the task needs.
 - If you find something outside the task, stop and tell me. I decide whether to fix it
   in this session or file a GitHub Issue. Draft the issue for me to approve.
-- Ask me about intended behavior, never about code. Decide technical questions yourself
-  and explain the choice in your summary.
+- Decide implementation details yourself and explain the choice in your summary: naming,
+  syntax, code structure inside a file, how to use a library.
+- Ask me before decisions that shape the system or what users see: architecture and
+  structure, new patterns, new dependencies or technologies, data model changes, and UI
+  and UX choices such as icons, labels, layout and flow. Give two or three options, your
+  recommendation, and the tradeoffs in plain language.
+- Ask me about intended behavior when docs/BUSINESS-RULES.md doesn't answer it.
 
 ## Git
 - Code changes go on a branch with a pull request. Merge only when I say so, using
