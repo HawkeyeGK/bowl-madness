@@ -27,7 +27,7 @@ Do not ask what to review.
 2. `git diff main`, plus the full text of untracked files from git status.
 3. The task: from the invoking prompt, or the commit messages, branch name and referenced issue. State it in the report.
 4. Read every changed file in full, the callers of every changed function, CLAUDE.md, and docs/BUSINESS-RULES.md sections 1 to 4 and 6.
-5. Read the open issues (`gh issue list --state open --limit 100`).
+5. Read the open issues (`gh issue list --state open --limit 100`). Also read each issue's comments (`gh issue view <n> --comments`), because some deviations are recorded only in comments.
 
 Findings apply to new or changed code. A violation that already exists in a touched file and that the change did not add or worsen goes under "Outside the task", not under Findings.
 
@@ -44,7 +44,7 @@ A deviation from docs/BUSINESS-RULES.md, or any other problem, that an open issu
 5. **Scoring.** The client must not supply scores or standings that the server stores or trusts. Scoring, max possible, rank order, tiebreakers, shared ranks, elimination and trophies must match BUSINESS-RULES section 4, in football and hoops alike.
 6. **Input validation.** Null or empty bodies, malformed JSON, missing or oversized fields, out-of-range values, ids that do not belong to the caller's pool, lock dates and bracket-name uniqueness. Cosmos queries use parameters (`QueryDefinition` with `WithParameter`), never string concatenation of caller input.
 7. **Partition keys.** Every read and write passes the partition key. Cross-partition queries are findings unless the code shows why they are needed. A batch targets one partition. Code that touches season ids follows BUSINESS-RULES section 6.
-8. **Secrets and logging.** No keys, connection strings or tokens in code, config files, tests or docs. No logging of the `x-ms-client-principal` header, tokens, invite codes, email addresses, or other players' picks before lock. Error responses must not leak exception text, stack traces or internal ids.
+8. **Secrets and logging.** No keys, connection strings or tokens in code, config files, tests or docs. No logging of the `x-ms-client-principal` header, tokens, invite codes, email addresses, or other players' picks before lock. Error responses may include exception messages, stack traces and internal ids. They must never include secrets, keys, connection strings, tokens, or other players' picks before lock.
 9. **Bulk or destructive data changes.** Any code or script that updates or deletes many documents, or deletes a pool or archive, must default to a dry run, report counts, wait for the owner's approval before writing, pass the partition key on every write, and never run against live data without explicit approval. The owner takes a fresh export first. The `/data-change` command is the procedure. Archiving cannot be undone and drops entry ids, owners, payment status and audit history; check that the code does only what BUSINESS-RULES section 2 says.
 10. **Security tests.** Where logic is testable, there are tests that an anonymous caller is refused (401), a caller of the wrong tier is refused (403), and the allowed tier succeeds. Run the tests that cover the changed behavior with `dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj --filter "FullyQualifiedName~<name>"`, then the full suite. New failures are findings. Failures that an open issue covers are listed separately.
 
@@ -54,7 +54,7 @@ Same rules as code-review. Every finding has an id, a severity (critical, high, 
 
 - critical: a missing, removed or misplaced caller check on a write; a way to read other players' picks before lock; a way to set payment status, role or scores as a player; secrets in code or logs; an unapproved write to live data; injection.
 - high: a wrong-tier check, a disabled account not refused, a cross-partition write, missing server-side validation that lets bad data be stored, a bulk or destructive change with no dry run, new security logic with no tests.
-- medium: weak validation with limited effect, over-detailed error responses, an unexplained cross-partition read.
+- medium: weak validation with limited effect, an unexplained cross-partition read.
 - low: hardening suggestions.
 
 ## Report

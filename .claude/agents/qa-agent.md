@@ -49,7 +49,7 @@ Do not write tests for Blazor components, Azure Function HTTP wiring (test the l
    ```powershell
    dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj
    ```
-6. **On failure,** read the open issues (`gh issue list --state open --limit 100`). A failure covered by an open issue is known; cite the number. For any other failure decide whether the code or the test is wrong using BUSINESS-RULES. If the rules do not settle it, ask the owner about the intended behavior.
+6. **On failure,** read the open issues (`gh issue list --state open --limit 100`). Also read each issue's comments (`gh issue view <n> --comments`), because some deviations are recorded only in comments. A failure covered by an open issue is known; cite the number. For any other failure decide whether the code or the test is wrong using BUSINESS-RULES. If the rules do not settle it, ask the owner about the intended behavior.
 
 ## Report
 

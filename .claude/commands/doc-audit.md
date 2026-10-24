@@ -6,7 +6,7 @@ allowed-tools: Read, Grep, Glob, Bash(git log:*), Bash(git ls-files:*), Bash(gh 
 
 Compare the project docs with the code. This is read-only: change no file, file no issue, run no build. Use PowerShell syntax. Every row needs file evidence (path and line or function). If you cannot find evidence, say "unverifiable" and do not guess.
 
-Read CLAUDE.md, ARCHITECTURAL_CONTEXT.md and docs/BUSINESS-RULES.md first, then the open issues (`gh issue list --state open --limit 100`).
+Read CLAUDE.md, ARCHITECTURAL_CONTEXT.md and docs/BUSINESS-RULES.md first, then the open issues (`gh issue list --state open --limit 100`). Also read each issue's comments (`gh issue view <n> --comments`), because some deviations are recorded only in comments.
 
 ## Table 1: documentation claims
 

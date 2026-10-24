@@ -62,7 +62,7 @@ Hosting is Azure Static Web Apps. A push to main deploys to production.
 ## Business rules
 - docs/BUSINESS-RULES.md is the intended behavior. Where code disagrees, the code is the bug.
 - Read the relevant section before changing pool, entry, scoring or permission code.
-- Before changing code in an area it covers, check open GitHub issues for that area.
+- Before changing code in an area it covers, check open GitHub issues and their comments for that area.
 - If code deviates from the rules and no issue exists, report it. Do not fix it silently.
 - Don't edit docs/BUSINESS-RULES.md unless I ask. Propose changes and I decide.
 
@@ -92,6 +92,7 @@ CLAUDE.md and BUSINESS-RULES, architecture in ARCHITECTURAL_CONTEXT, status in G
 - Every function that writes data checks the caller first, on the server, before any other
   logic. Hiding a button is not a protection.
 - No secrets in code, logs or docs. The Cosmos connection string stays in app settings.
+- Error responses may include exception messages, stack traces and internal ids. They must never include secrets, keys, connection strings, tokens, or other players' picks before lock.
 
 ## Tests
 - xUnit, FluentAssertions, Moq. Name tests MethodName_ShouldExpectedBehavior_WhenCondition.

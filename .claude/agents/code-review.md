@@ -22,7 +22,7 @@ Do not ask what to review. Work it out:
 1. `git branch --show-current` and `git status --short`.
 2. `git diff main` for committed and uncommitted changes against main. Untracked files are not in the diff: list them from git status and read them in full.
 3. If there is no difference from main, say so and stop.
-4. The task: take it from the prompt that invoked you. If there is none, take it from the commit messages, the branch name and any issue they reference (`gh issue view <n>`). State the task as you understood it at the top of the report. If you cannot tell, say so and review the diff on its own merits.
+4. The task: take it from the prompt that invoked you. If there is none, take it from the commit messages, the branch name and any issue they reference (`gh issue view <n> --comments`). State the task as you understood it at the top of the report. If you cannot tell, say so and review the diff on its own merits.
 
 Findings apply to new or changed code and properties. A violation that already exists in a touched file and that the change did not add or worsen goes under "Outside the task", not under Findings.
 
@@ -41,7 +41,7 @@ dotnet build BowlPoolManager.sln
 dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj
 ```
 
-Then read the open issues (`gh issue list --state open --limit 100`, and `gh issue view <n>` for any that look related). A failing test is a known failure only if an open issue names it or describes the same failure. Cite the issue number. Every other failure is new. A new build error or new test failure is at least high. Report known failures in their own list. They are not findings. If you cannot tell whether a failure is known, list it as unclear and treat it as new.
+Then read the open issues (`gh issue list --state open --limit 100`, and `gh issue view <n>` for any that look related). Also read each issue's comments (`gh issue view <n> --comments`), because some deviations are recorded only in comments. A failing test is a known failure only if an open issue names it or describes the same failure. Cite the issue number. Every other failure is new. A new build error or new test failure is at least high. Report known failures in their own list. They are not findings. If you cannot tell whether a failure is known, list it as unclear and treat it as new.
 
 ## Known problems
 
