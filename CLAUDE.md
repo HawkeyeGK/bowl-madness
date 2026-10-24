@@ -1,152 +1,104 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code in this repository. Architecture detail is in
+ARCHITECTURAL_CONTEXT.md. Intended behavior is in docs/BUSINESS-RULES.md.
 
-See [ARCHITECTURAL_CONTEXT.md](ARCHITECTURAL_CONTEXT.md) for full architectural deep-dive.
+## Environment
+Windows with PowerShell. Use PowerShell syntax, not Bash.
 
-## Infrastructure & Deployment
+    dotnet build BowlPoolManager.sln
+    dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj
+    dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj --filter "FullyQualifiedName~ScoringEngineTests"
+    cd BowlPoolManager.Api; func start        # needs Azure Functions Core Tools
+    cd BowlPoolManager.Client; dotnet run
 
-Hosted on Azure Static Web Apps (Central US). Deployments trigger automatically via GitHub Actions on push to `main`.
-
-**Deployment is explicitly controlled — never push to `main` unless the user asks.** Work is committed locally or pushed to a feature branch. Only merge/push to `main` when the user says they are ready to deploy.
-
-## Git Workflow
-
-### Branches
-- **Direct to `main` is the default.** Commit directly on `main` for small, self-contained changes.
-- Use a feature branch for changes that are large, multi-step, or otherwise significant (e.g., new features, refactors touching multiple files, anything that would be risky to partially deploy). Suggest a feature branch proactively when a task meets this bar.
-- Branch naming: `feature/<short-description>` (e.g., `feature/add-payment-export`).
-
-### Commit Messages — GitHub Issue Linking
-Every commit must reference the GitHub issue it belongs to. Use the issue number in the commit message body:
-- To **reference** an issue (without closing it): include `#123` in the message.
-- To **close** an issue on merge to `main`: use a closing keyword — `Closes #123`, `Fixes #123`, or `Resolves #123` — in the commit message body.
-
-Example commit message:
-```
-Add CSV export for payment manager
-
-Adds a download button to the Payment Manager page that exports
-the current filtered view as a CSV file.
-
-Closes #42
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
-```
-
-### Pushing and Deploying
-- **Never push to `main` (or merge a feature branch into `main`) without explicit instruction.** Commits accumulate locally or on a feature branch until the user says they are ready to deploy.
-- When the user confirms they are ready to deploy: push `main` directly, or merge the feature branch first (`git checkout main && git merge feature/<name>`) then push.
-- Pushing a feature branch does not trigger a deployment.
-
-## Development Workflow
-
-### Guiding Principle: Accuracy Over Speed
-
-**Both the main workflow and all sub-agents are expected to pause and ask for clarification whenever intent, scope, or approach is ambiguous.** Making a wrong assumption — especially in a multi-step plan — can be far more costly to unwind than the time it takes to ask a targeted question. No agent or workflow step should proceed on a guess when a question would resolve it. This applies equally to implementation decisions, test expectations, review findings with multiple valid fixes, and deployment scope.
-
-Two tracks, chosen based on the scope of the change.
-
-### Track A — Tactical (small, self-contained changes)
-
-Use for bug fixes, minor UI changes, config updates, or anything confined to one or two files with no architectural impact.
-
-```
-Implement → Build Validator → Commit
-```
-
-Code Review is optional on this track. Invoke it when the change touches any of: Core domain models, CosmosDB queries, `SecurityHelper` / auth logic, `DateTime` handling, partition key usage, or JSON serialization attributes.
-
-### Track B — Phased Implementation (large features, multi-step plans)
-
-Use for new features, significant refactors, or anything multi-step such as the March Madness extension. Each phase follows this cycle:
-
-```
-[In-conversation] Phase planning & scoping
-        ↓
-Implement phase deliverables
-        ↓
-Build Validator        ← must pass before continuing
-        ↓
-QA Agent               ← writes/updates tests, runs full suite
-        ↓
-Code Review Agent      ← architecture compliance and quality check
-        ↓
-[Checkpoint] Review with user → approve or revise
-        ↓
-Commit (references GitHub issue in message body)
-        ↓
-[Repeat for next phase]
-        ↓
-[All phases done] Deploy on user's explicit instruction
-        ↓
-Deployment Validator   ← post-deploy smoke test across roles
-```
-
-**Checkpoint criteria** — a phase must satisfy all of these before advancing:
-- `dotnet build` succeeds with no errors
-- All tests pass
-- New business logic has test coverage (QA Agent approved)
-- No blocking findings from Code Review Agent
-- User has reviewed and approved
-
-### Sub-Agents
-
-Agent prompts live in [.claude/agents/](.claude/agents/). Invoke them via the Agent tool, passing the agent's `.md` file as its system prompt.
-
-| Agent | File | When to invoke |
+| Project | Target | Role |
 |---|---|---|
-| Build Validator | `.claude/agents/build-validator.md` | After every implementation step on both tracks |
-| QA Agent | `.claude/agents/qa-agent.md` | At each Track B phase checkpoint |
-| Code Review Agent | `.claude/agents/code-review.md` | At each Track B phase checkpoint; optionally on Track A for high-risk changes |
-| Deployment Validator | `.claude/agents/deployment-validator.md` | After every production deployment |
+| BowlPoolManager.Core | net8.0 | Shared models, DTOs, scoring engines, constants |
+| BowlPoolManager.Api | net8.0 | Azure Functions v4 isolated, REST API |
+| BowlPoolManager.Client | net10.0 | Blazor WebAssembly |
+| BowlPoolManager.Tests | net10.0 | xUnit tests for Core and Api |
 
-## Available CLI Tools
+Hosting is Azure Static Web Apps. A push to main deploys to production.
 
-- **Azure CLI** (`az`) — authenticated for the project subscription
-- **Git** (`git`) — use for all source control operations
+## Workflow
+- Read the code you will change and its callers first. Say what you found.
+- Change only what the task needs.
+- If you find something outside the task, stop and tell me. I decide whether to fix it
+  in this session or file a GitHub Issue. Draft the issue for me to approve.
+- Ask me about intended behavior, never about code. Decide technical questions yourself
+  and explain the choice in your summary.
 
-## Commands
+## Git
+- Code changes go on a branch with a pull request. Never merge. Never push code to main.
+- Changes that only add or edit documents may be committed straight to main. Ask before pushing.
+- Don't commit until I say the change is what I want, or I ask for a checkpoint.
+  Group related changes into one commit unless I say otherwise.
+- Reference the issue in the commit message when one exists (Closes #N or Refs #N).
+- Stage files by name. Do not use git add . or git add -A.
+- Before opening a PR or pushing:
+  1. Build and test. No new failures beyond the failures already tracked in open issues.
+  2. Run the code-review agent. Fix critical and high findings. Stop after about three
+     rounds and report what is unresolved in plain language.
+  3. Give me a summary: what changed, why, what could go wrong, what was tested.
+- Ask before git push and again before gh pr create.
 
-```bash
-# Build the entire solution
-dotnet build BowlPoolManager.sln
+## Bugs
+- Write a failing test first. Run the tests on unchanged code to get a baseline.
+- Use a git worktree for the baseline, not git stash.
 
-# Run all tests
-dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj
+## Business rules
+- docs/BUSINESS-RULES.md is the intended behavior. Where code disagrees, the code is the bug.
+- Read the relevant section before changing pool, entry, scoring or permission code.
+- Before changing code in an area it covers, check open GitHub issues for that area.
+- If code deviates from the rules and no issue exists, report it. Do not fix it silently.
+- Don't edit docs/BUSINESS-RULES.md unless I ask. Propose changes and I decide.
 
-# Run a single test class
-dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj --filter "FullyQualifiedName~ScoringEngineTests"
+## Docs
+When a change alters architecture, the data model, infrastructure or business rules, propose
+the matching doc edit in the same change. I approve doc edits. One home per fact: rules in
+CLAUDE.md and BUSINESS-RULES, architecture in ARCHITECTURAL_CONTEXT, status in GitHub Issues.
 
-# Run a single test method
-dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj --filter "FullyQualifiedName~ScoringEngineTests.Calculate_ShouldReturnCorrectScore_ForFinalGames"
+## Data (Cosmos DB, database BowlMadnessDb)
+| Container | Partition key | Holds |
+|---|---|---|
+| Players | /id | User profiles |
+| Seasons | /seasonId | Seasons, bowl and hoops pools, bowl and hoops games |
+| Picks | /seasonId | Bowl entries, hoops entries (HoopsBracketEntry) |
+| PoolArchives | /seasonId | Archives (ids Archive_{poolId}, HoopsArchive_{poolId}) |
+| Configuration | /id | Team lists, API integration settings |
 
-# Run the API locally (requires Azure Functions Core Tools)
-cd BowlPoolManager.Api && func start
+- Pass the partition key on every query and write.
+- Some hoops pools and entries use the text "2026" as seasonId, not the season GUID.
+  See BUSINESS-RULES section 6 before touching season ids.
+- Dry-run any bulk or destructive change, report the counts, and wait for my approval.
+- Never write to live data, or send non-GET requests to the live site, without my explicit approval.
+  I take a fresh export before data work.
 
-# Run the Client locally
-cd BowlPoolManager.Client && dotnet run
-```
+## Security
+- Every function that writes data checks the caller first, on the server, before any other
+  logic. Hiding a button is not a protection.
+- No secrets in code, logs or docs. The Cosmos connection string stays in app settings.
 
-## Project Structure
+## Tests
+- xUnit, FluentAssertions, Moq. Name tests MethodName_ShouldExpectedBehavior_WhenCondition.
+- Use It.IsAny<T>() in Moq setups.
+- New logic gets tests. Bug fixes get a regression test. Tests never touch production data.
 
-Four projects in one solution (`BowlPoolManager.sln`):
+## Dates and models
+- Store UTC, display Central. Use DateTime.UtcNow, never DateTime.Now.
+- Models stored in Cosmos carry both [JsonProperty] and [JsonPropertyName] on every property.
+- Models shared by Api and Client live in Core.
 
-| Project | Target | Type | Purpose |
-|---|---|---|---|
-| `BowlPoolManager.Core` | net8.0 | Class library | Shared domain models, DTOs, scoring engines, constants |
-| `BowlPoolManager.Api` | net8.0 | Azure Functions v4 isolated | REST API / serverless back-end |
-| `BowlPoolManager.Client` | net10.0 | Blazor WebAssembly | Front-end SPA |
-| `BowlPoolManager.Tests` | net10.0 | xUnit test project | Tests for Core and Api logic |
+## Common AI mistakes here
+- Changing error handling nobody asked about.
+- A Cosmos call without a partition key.
+- Removing a security check during a refactor.
+- Editing files outside the task.
+- Calling methods that do not exist. Check they exist before using them.
 
-## Testing
-
-- Framework: xUnit with FluentAssertions and Moq.
-- Test files mirror the source: `BowlPoolManager.Tests/Core/` tests Core helpers; `BowlPoolManager.Tests/Api/` tests API helpers.
-- The test project references both `BowlPoolManager.Api` and `BowlPoolManager.Core`.
-- Method naming: `MethodName_ShouldExpectedBehavior_WhenCondition` (e.g. `Calculate_ShouldReturnCorrectScore_ForFinalGames`).
-- Always use FluentAssertions (`result.Should().Be(...)`). Use Moq for all dependencies.
-
-## Terminal Environment
-Running on Windows with PowerShell. Use PowerShell-compatible 
-commands, not Bash syntax.
+## Never
+- Force-push, git reset --hard, or skip commit checks (--no-verify).
+- Push code to main.
+- Delete Azure resources.
+- Read .env files.

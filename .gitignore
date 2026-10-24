@@ -55,3 +55,8 @@ nunit-*.xml
 
 # Planning scratch files — raw chat transcripts, not curated docs
 docs/Gemini Chat*.md
+
+# Local Claude Code settings, debug dump, and sample data containing real-looking emails
+.claude/settings.local.json
+response.txt
+Test Data/Sample User.txt
