@@ -46,6 +46,11 @@ Hosting is Azure Static Web Apps. A push to main deploys to production.
      findings. Stop after about three rounds and report what is unresolved in plain language.
   3. Give me a summary: what changed, why, what could go wrong, what was tested.
 - Ask before git push and again before gh pr create.
+- After opening or updating a PR, wait for its checks before reporting anything. GitHub takes
+  a few seconds to start them, so "no checks reported" means not started, not passed. Poll
+  gh pr checks until checks appear (give up after about three minutes), then watch them until
+  they finish. Report only the final result. Never ask to merge before every check has
+  finished and passed.
 - After a PR is merged (I say so, or you merged it):
   1. Run gh pr view <number> --json state,headRefOid,mergeCommit.
   2. Confirm state is MERGED and the local branch tip equals headRefOid. If either
