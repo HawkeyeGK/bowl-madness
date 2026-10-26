@@ -126,3 +126,14 @@ CLAUDE.md and BUSINESS-RULES, architecture in ARCHITECTURAL_CONTEXT, status in G
 - Push code to main.
 - Delete Azure resources.
 - Read .env files.
+
+## Hooks
+
+A PreToolUse hook (`.claude/hooks/guard.ps1`, one table of rules read against the command text) stops these before they run:
+
+- Refused: az delete or purge, role and credential changes, reading or rotating keys, secrets and tokens; the database host, account key or connection string name in a command (plain searches excepted); any shell command naming the local settings file; non-GET requests to the live site; force pushes, `reset --hard`, `clean -f` and other history-destroying git; destructive gh commands and `gh pr merge --admin`; recursive deletes (use `dotnet clean`); secrets in file writes; `git commit -n` or `--no-verify`; any edit to `.claude/hooks`, `.git/hooks`, `.git/config` or a settings file, any shell command that names those paths unless it is one read-only statement (`git diff`, `git add`, `rg`, `Get-Content` and similar), and any attempt to turn the hooks off.
+- Ask: non-GET `az rest` or `gh api`, `az ... remove`, `git checkout .`, `git stash drop`, `func start`, non-GET requests to localhost, `func azure functionapp publish`, `swa deploy`, a `git push` that names main or master, and any `gh pr merge`. The `gh pr merge` ask rule in the settings stays too; run `gh pr checks` first, as the Git section says.
+
+- When a command is refused, the message names the rule. Report the rule to the owner. If the task can be done another way that does not need the blocked action, do that. Never rewrite the same blocked action in another spelling or form to get past a hook, and never try to disable, edit or work around a hook.
+- Hooks and settings files are changed only by the owner, by hand. To propose a rule change, put a draft in `.claude/hooks-draft/` and say which files to copy; the owner copies them in and runs `Register-Hook.ps1`.
+- The hook is a guardrail against careless commands, not a sandbox. It does not parse commands, so disguised forms get through. The known limits are in `guard.ps1`.

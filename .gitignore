@@ -58,5 +58,7 @@ docs/Gemini Chat*.md
 
 # Local Claude Code settings, debug dump, and sample data containing real-looking emails
 .claude/settings.local.json
+.claude/hooks-draft/
+.claude/*.bak
 response.txt
 Test Data/Sample User.txt
