@@ -16,6 +16,15 @@ The Blazor Client interacts over HTTP with the Azure Functions, which in turn co
 
 The application utilizes CosmosDB with an approach abstracted by `CosmosRepositoryBase`. The `CosmosClient` is registered as a singleton in `BowlPoolManager.Api/Program.cs` with `CosmosSerializationOptions { PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase }`. No custom serializer is configured, so the Cosmos SDK uses its default Newtonsoft.Json-based serializer; `[JsonProperty]` names take precedence over the naming policy.
 
+### Containers (database `BowlMadnessDb`)
+| Container | Partition key | What it holds |
+|---|---|---|
+| Players | /id | User profiles |
+| Seasons | /seasonId | Seasons, bowl and hoops pools, bowl and hoops games |
+| Picks | /seasonId | Bowl entries, hoops entries (HoopsBracketEntry) |
+| PoolArchives | /seasonId | Archives (ids Archive_{poolId}, HoopsArchive_{poolId}) |
+| Configuration | /id | Team lists, API integration settings |
+
 ### Container/Partition Key Strategy
 - **Partition Keys**: The codebase dynamically passes the Partition Key (as a string) to the repository methods (e.g., `UpsertDocumentAsync<T>(item, partitionKey)`). 
 - **Entity Specifics**: 
@@ -157,9 +166,7 @@ Two pure calculation engines live in `BowlPoolManager.Core/Helpers/`:
 | `BowlPoolManager.Client` | `net10.0` |
 | `BowlPoolManager.Tests` | `net10.0` |
 
-A net10.0 project can reference net8.0 assemblies, so this compiles and runs cleanly.
-
-**API ceiling**: The API is capped at `net9.0` maximum — not because Azure Functions lacks support for net10, but because the **Azure Static Web Apps Oryx build system** (which builds and deploys the API) does not yet support net10.0. Do not upgrade the Api or Core target frameworks beyond net9.0 without verifying Oryx support first.
+The Api project is Azure Functions v4 on the isolated worker (`AzureFunctionsVersion` V4, `OutputType` Exe, `Microsoft.Azure.Functions.Worker` packages). A net10.0 project can reference net8.0 assemblies, so this compiles and runs cleanly.
 
 ## 10. Cross-Sport Archive Conventions
 

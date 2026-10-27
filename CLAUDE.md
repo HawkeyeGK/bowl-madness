@@ -9,17 +9,11 @@ Windows with PowerShell. Use PowerShell syntax, not Bash.
     dotnet build BowlPoolManager.sln
     dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj
     dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj --filter "FullyQualifiedName~ScoringEngineTests"
-    cd BowlPoolManager.Api; func start        # needs Azure Functions Core Tools
-    cd BowlPoolManager.Client; dotnet run
 
-| Project | Target | Role |
-|---|---|---|
-| BowlPoolManager.Core | net8.0 | Shared models, DTOs, scoring engines, constants |
-| BowlPoolManager.Api | net8.0 | Azure Functions v4 isolated, REST API |
-| BowlPoolManager.Client | net10.0 | Blazor WebAssembly |
-| BowlPoolManager.Tests | net10.0 | xUnit tests for Core and Api |
+Local runs have no database: the local settings hold a placeholder and no test database exists. func start asks for approval.
+Projects, roles and target frameworks are in ARCHITECTURAL_CONTEXT.md sections 1 and 9.
 
-Hosting is Azure Static Web Apps. A push to main deploys to production.
+Hosting is Azure Static Web Apps. A merge or push to main deploys to production.
 
 ## Workflow
 - Read the code you will change and its callers first. Say what you found.
@@ -39,7 +33,7 @@ Hosting is Azure Static Web Apps. A push to main deploys to production.
 - Code changes go on a branch with a pull request. Merge only when I say so, using
   gh pr merge --squash --delete-branch, and ask before running it. Before asking to merge,
   run gh pr checks and tell me the result and the preview address. If any check failed,
-  don't merge. A merge to main deploys to production. Never push code to main.
+  don't merge. Never push code to main.
 - Changes that only add or edit documents may be committed straight to main. Ask before pushing.
 - Don't commit until I say the change is what I want, or I ask for a checkpoint.
   Group related changes into one commit unless I say otherwise.
@@ -52,23 +46,17 @@ Hosting is Azure Static Web Apps. A push to main deploys to production.
      findings. Stop after about three rounds and report what is unresolved in plain language.
   3. Give me a summary: what changed, why, what could go wrong, what was tested.
 - Ask before git push and again before gh pr create.
-- After opening or updating a PR, wait for its checks before reporting anything. GitHub takes
-  a few seconds to start them, so "no checks reported" means not started, not passed. Poll
-  gh pr checks until checks appear (give up after about three minutes), then watch them until
-  they finish. Report only the final result. Never ask to merge before every check has
-  finished and passed.
-- After a PR is merged (I say so, or you merged it):
-  1. Run gh pr view <number> --json state,headRefOid,mergeCommit.
-  2. Confirm state is MERGED and the local branch tip equals headRefOid. If either
-     fails, stop and tell me.
-  3. Switch to main and pull with --ff-only.
-  4. gh pr merge --delete-branch may already have deleted the local branch. If it still
-     exists, delete it with git branch -D. Stage and commit nothing.
-  5. Show git status.
+- After opening or updating a PR, wait for its checks to finish before reporting. "No checks
+  reported" means not started, not passed. Never ask to merge before every check has finished
+  and passed.
+- After a PR is merged (I say so, or you merged it): verify the PR is MERGED and the local tip
+  matches its head (gh pr view <number> --json state,headRefOid); if either fails, stop and
+  tell me. Switch to main (if not already on it) and pull with --ff-only. Delete the local
+  branch only if it still exists. Show git status. Stage and commit nothing.
 
 ## Bugs
-- Write a failing test first. Run the tests on unchanged code to get a baseline.
-- Use a git worktree for the baseline, not git stash.
+- Write a failing test first.
+- Run the tests on the unchanged code before editing, without stashing my work.
 
 ## Business rules
 - docs/BUSINESS-RULES.md is the intended behavior. Where code disagrees, the code is the bug.
@@ -83,23 +71,16 @@ the matching doc edit in the same change. I approve doc edits. One home per fact
 CLAUDE.md and BUSINESS-RULES, architecture in ARCHITECTURAL_CONTEXT, status in GitHub Issues.
 
 ## Data (Cosmos DB, database BowlMadnessDb)
-| Container | Partition key | Holds |
-|---|---|---|
-| Players | /id | User profiles |
-| Seasons | /seasonId | Seasons, bowl and hoops pools, bowl and hoops games |
-| Picks | /seasonId | Bowl entries, hoops entries (HoopsBracketEntry) |
-| PoolArchives | /seasonId | Archives (ids Archive_{poolId}, HoopsArchive_{poolId}) |
-| Configuration | /id | Team lists, API integration settings |
-
-- Pass the partition key on every query and write.
+- Pass the partition key on every query and write. Container partition keys are in
+  ARCHITECTURAL_CONTEXT.md section 2.
 - Some hoops pools and entries use the text "2026" as seasonId, not the season GUID.
   See BUSINESS-RULES section 6 before touching season ids.
-- Dry-run any bulk or destructive change, report the counts, and wait for my approval.
-  Use /data-change for any bulk or destructive data operation.
+- Dry-run first, report the counts, and wait for my approval.
+- Use /data-change for any bulk or destructive data operation (it checks that continuous
+  backup is on and records the restore point first).
 - Never write to live data, or send non-GET requests to the live site, without my explicit approval.
-  Before a bulk or destructive data change, confirm the production Cosmos account is on
-  continuous backup (az cosmosdb show with --query backupPolicy) and tell me the UTC time the
-  change starts, which is the restore point. Do not start the change if the policy is not Continuous.
+- Assume a PR preview uses production data and services (not yet confirmed), so do not use it
+  to test anything that writes.
 
 ## Security
 - Every function that writes data checks the caller first, on the server, before any other
@@ -119,10 +100,7 @@ CLAUDE.md and BUSINESS-RULES, architecture in ARCHITECTURAL_CONTEXT, status in G
 
 ## Common AI mistakes here
 - Changing error handling nobody asked about.
-- A Cosmos call without a partition key.
-- Removing a security check during a refactor.
-- Editing files outside the task.
-- Calling methods that do not exist. Check they exist before using them.
+- Calling methods that do not exist; check they exist first.
 
 ## Never
 - Force-push, git reset --hard, or skip commit checks (--no-verify).
@@ -130,19 +108,12 @@ CLAUDE.md and BUSINESS-RULES, architecture in ARCHITECTURAL_CONTEXT, status in G
 - Delete Azure resources.
 - Read .env files.
 
-## Hooks
+## Blocks, hooks and permissions
+A PreToolUse hook refuses destructive Azure, credential, key and secret access, live-site writes, history-destroying git, edits to hooks and settings, and attempts to turn the hooks off. It asks first for non-GET `az rest` and `gh api`, `func start`, deploys, a push that names main or master, and any `gh pr merge`. Details and rule ids are in `.claude/hooks/guard.ps1`.
 
-A PreToolUse hook (`.claude/hooks/guard.ps1`, one table of rules read against the command text) stops these before they run:
-
-- Refused: az delete or purge, role and credential changes, reading or rotating keys, secrets and tokens; the database host, account key or connection string name in a command (plain searches excepted); any shell command naming the local settings file; non-GET requests to the live site; force pushes, `reset --hard`, `clean -f` and other history-destroying git; destructive gh commands and `gh pr merge --admin`; recursive deletes (use `dotnet clean`); secrets in file writes; `git commit -n` or `--no-verify`; any edit to `.claude/hooks`, `.git/hooks`, `.git/config` or a settings file, any shell command that names those paths unless it is one read-only statement (`git diff`, `git add`, `rg`, `Get-Content` and similar), and any attempt to turn the hooks off.
-- Ask: non-GET `az rest` or `gh api`, `az ... remove`, `git checkout .`, `git stash drop`, `func start`, non-GET requests to localhost, `func azure functionapp publish`, `swa deploy`, a `git push` that names main or master, and any `gh pr merge`. The `gh pr merge` ask rule in the settings stays too; run `gh pr checks` first, as the Git section says.
-
-- When a command is refused, the message names the rule. Report the rule to the owner. If the task can be done another way that does not need the blocked action, do that. Never rewrite the same blocked action in another spelling or form to get past a hook, and never try to disable, edit or work around a hook.
-- Hooks and settings files are changed only by the owner, by hand. To propose a rule change, put a draft in `.claude/hooks-draft/` and say which files to copy; the owner copies them in and runs `Register-Hook.ps1`.
-- The hook is a guardrail against careless commands, not a sandbox. It does not parse commands, so disguised forms get through. The known limits are in `guard.ps1`.
-
-## Permissions and modes
+- When a command is refused, report the rule to me. A refusal from a hook, a deny rule or the permission classifier is final for that action: tell me which one it was and what you were trying to do. If the task can be done another way that does not need the blocked action, do that. Never retry the blocked action in another spelling or form, and never try to disable, edit or work around a hook.
+- Hooks and settings files are changed only by me, by hand. To propose a rule change, put a draft in `.claude/hooks-draft/` and say which files to copy; I copy them in and run `Register-Hook.ps1`.
+- The hook is a guardrail against careless commands, not a sandbox. It does not parse commands, so disguised forms get through.
 - I choose the permission mode; you cannot change it. Never suggest Bypass permissions mode, and never ask me to switch modes to get past a block.
-- A refusal from a hook, a deny rule or the permission classifier is final for that action. Tell me which one it was and what you were trying to do, then continue with other work or stop. Do not retry it in another form.
 - If I deny a prompt, stop and report. Do not look for another way to get the same effect.
 - Edits to instruction files, hooks and settings can be blocked in Auto mode. If one is, tell me which file and what change you wanted; I will switch modes or make it myself.
