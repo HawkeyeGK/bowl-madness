@@ -14,9 +14,9 @@ disagree, this document is the intent and the code is the bug.
 
 | Tier | May do |
 |---|---|
-| Public | View the leaderboard, scoreboard, games, pools (without invite codes), seasons, archives and team lists |
+| Public | View the leaderboard, scoreboard, games, pools, seasons, archives and team lists |
 | Owner (signed in) | Create, edit and delete their own entries (editing and deleting only before lock); view their own picks, and everyone's picks once the pool is locked |
-| Admin | Everything an Owner can do for any entry at any time; set payment status; view the user list; see invite codes; enter results and link games. *(Owner decision: Admins can enter results and link games, and what an Admin can do is the same in football and hoops.)* |
+| Admin | Everything an Owner can do for any entry at any time; set payment status; view the user list; enter results and link games. *(Owner decision: Admins can enter results and link games, and what an Admin can do is the same in football and hoops.)* |
 | SuperAdmin | Everything an Admin can do, plus create, edit, delete, conclude and archive pools; create and edit games and brackets; manage users, seasons, integrations, team syncs, backups and migration |
 
 ## 2. Pools
@@ -25,7 +25,7 @@ disagree, this document is the intent and the code is the bug.
 
 - A pool is Active until its lock date, then Locked, then optionally Concluded, then optionally Archived. Locked is derived from the date, not stored.
 - A pool needs a name and an invite code. A new pool's lock date must be in the future.
-- **Invite codes are secret and handed out offline.** *(Owner decision)* The server verifies the code whenever an entry is created in a pool. The pool list returns codes only to Admins.
+- **An invite code identifies a pool.** *(Owner decision)* A player joins a pool by entering its code. The code is not a security measure: it is not secret, it is reused from year to year, and the server does not check it.
 - Concluding is a SuperAdmin toggle and the prerequisite for archiving. Once the pool is past its lock date, a concluded pool refuses all entry changes, including renames. It is reversible. It does not hide the pool and does not affect trophies. *(Owner decision: concluding exists only to enable archiving and to prevent unintended changes to a pool after it has ended.)*
 - Archiving requires a concluded pool. It saves a snapshot of games, final standings and picks, and removes the pool from the main views. It cannot be undone: the snapshot drops entry IDs, owners, payment status and audit history. Football archives do not store playoff rounds; hoops archives store rounds and seeds.
 - Deleting a pool deletes its entries. *(Owner decision)* Football games are shared between pools, so what happens to games when a pool is deleted or archived is undecided and needs a design.
