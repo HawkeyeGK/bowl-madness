@@ -48,8 +48,8 @@ Which of these are set in Azure is unverified. Locally they come from BowlPoolMa
 The browser Application Insights snippet in wwwroot/index.html carries its own connection string; it is public by design and is not repeated here.
 
 ## Application Insights
-- API: wired (Program.cs and host.json). Client: JavaScript SDK loader in index.html (commit a7b1f3f).
-- Known gap: Blazor route changes do not send page views, so traffic appears to land on "/". No trackPageView call exists in the client (verified by search). A fix would hook NavigationManager location changes to the SDK.
+- API: wired (Program.cs and host.json). Information logs from app code reach Application Insights through AllowAppInformationLogs (categories under BowlPoolManager.Api); framework categories stay at Warning. Before this, the SDK default sent only Warning and above, so function log messages were missing. Client: JavaScript SDK loader in index.html (commit a7b1f3f). enableAutoRouteTracking: true is set in the loader, so each Blazor route change sends a page view.
+- Limits (read 2026-10-26): the component has a daily cap of 0.2 GB. The workspace has no daily cap and keeps data 30 days. Volume before the filter change was about 70 MB per 30 days.
 
 ## Protection
 Delete locks (CanNotDelete), created 2026-10-26, one each on the resource group, the database account, the Static Web App and the Log Analytics workspace. They stop deletion of those four resources. They do not protect documents or containers inside Cosmos.

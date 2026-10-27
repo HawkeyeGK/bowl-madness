@@ -58,7 +58,7 @@ namespace BowlPoolManager.Api.Functions
 
                     // Use Repo
                     await _userRepo.UpsertUserAsync(user);
-                    _logger.LogInformation($"Created new user: {user.Email}");
+                    _logger.LogInformation("Created new user {UserId}.", user.Id);
                 }
 
                 var response = req.CreateResponse(HttpStatusCode.OK);
