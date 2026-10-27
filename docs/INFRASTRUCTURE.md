@@ -1,7 +1,7 @@
 # Infrastructure
 
 Facts about where Bowl Madness and Hoops Madness run. No secrets, keys or setting values belong here, only names.
-Last checked 2026-10-24. "Unverified" means it was recorded earlier and could not be re-checked.
+Last checked 2026-10-26. "Unverified" means it was recorded earlier and could not be re-checked.
 
 ## Azure resources
 | Resource | Name | Notes |
@@ -50,6 +50,21 @@ The browser Application Insights snippet in wwwroot/index.html carries its own c
 ## Application Insights
 - API: wired (Program.cs and host.json). Client: JavaScript SDK loader in index.html (commit a7b1f3f).
 - Known gap: Blazor route changes do not send page views, so traffic appears to land on "/". No trackPageView call exists in the client (verified by search). A fix would hook NavigationManager location changes to the SDK.
+
+## Protection
+Delete locks (CanNotDelete), created 2026-10-26, one each on the resource group, the database account, the Static Web App and the Log Analytics workspace. They stop deletion of those four resources. They do not protect documents or containers inside Cosmos.
+
+Backup policy: Continuous, 7-day tier, since 2026-10-26. Before that it was Periodic, a backup every 4 hours kept for 8 hours. The switch cannot be reversed. Check it with `az cosmosdb show` and `--query backupPolicy`.
+
+### How a restore works
+1. In the Azure portal, open the Cosmos account, then Point In Time Restore. The section is empty without the `Microsoft.DocumentDB/locations/restorableDatabaseAccounts/*/read` permission.
+2. Pick the restore point (UTC, any second in the last 7 days), the location, the whole account or selected databases and containers, a resource group, and a new account name.
+3. A restore creates a new account and never overwrites the live one. The status shows Creating, then Online.
+4. To use the restored data, change the `CosmosDbConnectionString` app setting to the restored account and add the delete locks again.
+5. Firewall, network and role settings and stored procedures, triggers and functions are not carried over. Set them again on the restored account.
+6. A restore is charged about $0.15 per GB restored, once (Microsoft's West US example price).
+
+Unconfirmed: whether a restored account can be serverless, and the Central US price.
 
 ## Verification commands (read-only)
 - `az staticwebapp show`, `hostname list`, `environment list` with `-n swa-bowlmadness-prod -g rg-bowlmadness-prod`

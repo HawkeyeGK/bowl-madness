@@ -96,7 +96,9 @@ CLAUDE.md and BUSINESS-RULES, architecture in ARCHITECTURAL_CONTEXT, status in G
 - Dry-run any bulk or destructive change, report the counts, and wait for my approval.
   Use /data-change for any bulk or destructive data operation.
 - Never write to live data, or send non-GET requests to the live site, without my explicit approval.
-  I take a fresh export before data work.
+  Before a bulk or destructive data change, confirm the production Cosmos account is on
+  continuous backup (az cosmosdb show with --query backupPolicy) and tell me the UTC time the
+  change starts, which is the restore point. Do not start the change if the policy is not Continuous.
 
 ## Security
 - Every function that writes data checks the caller first, on the server, before any other
