@@ -48,7 +48,7 @@ Which of these are set in Azure is unverified. Locally they come from BowlPoolMa
 The browser Application Insights snippet in wwwroot/index.html carries its own connection string; it is public by design and is not repeated here.
 
 ## Application Insights
-- API: wired (Program.cs and host.json). Information logs from app code reach Application Insights through AllowAppInformationLogs (categories under BowlPoolManager.Api); framework categories stay at Warning. Before this, the SDK default sent only Warning and above, so function log messages were missing. Client: JavaScript SDK loader in index.html (commit a7b1f3f). enableAutoRouteTracking: true is set in the loader; page views on route change are to be confirmed on the PR preview.
+- API: wired (Program.cs and host.json). Information logs from app code reach Application Insights through AllowAppInformationLogs (categories under BowlPoolManager.Api); framework categories stay at Warning. Before this, the SDK default sent only Warning and above, so function log messages were missing. Client: JavaScript SDK loader in index.html (commit a7b1f3f). enableAutoRouteTracking: true is set in the loader, so each Blazor route change sends a page view.
 - Limits (read 2026-10-26): the component has a daily cap of 0.2 GB. The workspace has no daily cap and keeps data 30 days. Volume before the filter change was about 70 MB per 30 days.
 
 ## Protection
