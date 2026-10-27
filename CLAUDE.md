@@ -79,8 +79,8 @@ CLAUDE.md and BUSINESS-RULES, architecture in ARCHITECTURAL_CONTEXT, status in G
 - Use /data-change for any bulk or destructive data operation (it checks that continuous
   backup is on and records the restore point first).
 - Never write to live data, or send non-GET requests to the live site, without my explicit approval.
-- Assume a PR preview uses production data and services (not yet confirmed), so do not use it
-  to test anything that writes.
+- A PR preview appears to use the production database (the season and pool ids match), so do
+  not use it to test anything that writes.
 
 ## Security
 - Every function that writes data checks the caller first, on the server, before any other
