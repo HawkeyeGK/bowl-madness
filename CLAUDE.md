@@ -33,6 +33,7 @@ Hosting is Azure Static Web Apps. A push to main deploys to production.
   and UX choices such as icons, labels, layout and flow. Give two or three options, your
   recommendation, and the tradeoffs in plain language.
 - Ask me about intended behavior when docs/BUSINESS-RULES.md doesn't answer it.
+- When troubleshooting a failure, read 'Reading the logs' in docs/INFRASTRUCTURE.md first.
 
 ## Git
 - Code changes go on a branch with a pull request. Merge only when I say so, using
