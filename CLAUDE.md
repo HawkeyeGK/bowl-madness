@@ -140,3 +140,9 @@ A PreToolUse hook (`.claude/hooks/guard.ps1`, one table of rules read against th
 - When a command is refused, the message names the rule. Report the rule to the owner. If the task can be done another way that does not need the blocked action, do that. Never rewrite the same blocked action in another spelling or form to get past a hook, and never try to disable, edit or work around a hook.
 - Hooks and settings files are changed only by the owner, by hand. To propose a rule change, put a draft in `.claude/hooks-draft/` and say which files to copy; the owner copies them in and runs `Register-Hook.ps1`.
 - The hook is a guardrail against careless commands, not a sandbox. It does not parse commands, so disguised forms get through. The known limits are in `guard.ps1`.
+
+## Permissions and modes
+- I choose the permission mode; you cannot change it. Never suggest Bypass permissions mode, and never ask me to switch modes to get past a block.
+- A refusal from a hook, a deny rule or the permission classifier is final for that action. Tell me which one it was and what you were trying to do, then continue with other work or stop. Do not retry it in another form.
+- If I deny a prompt, stop and report. Do not look for another way to get the same effect.
+- Edits to instruction files, hooks and settings can be blocked in Auto mode. If one is, tell me which file and what change you wanted; I will switch modes or make it myself.
