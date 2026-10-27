@@ -43,8 +43,6 @@ namespace BowlPoolManager.Api.Functions.Admin
 
             status.DebugDetails = $"Target Var: 'CfbdApiKey'. Status: {keyStatus}. \nRelevant Env Vars Found: [{allKeys}]";
 
-            _logger.LogInformation($"[Diagnose] {status.DebugDetails}");
-
             try
             {
                 var cosResponse = await _container.ReadItemAsync<TeamConfig>(Constants.ConfigDocumentIds.FbsTeamConfig, new PartitionKey(Constants.ConfigDocumentIds.FbsTeamConfig));

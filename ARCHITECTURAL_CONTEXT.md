@@ -210,8 +210,8 @@ All three are called through typed `HttpClient` registrations in `Program.cs`.
 
 ## 14. Application Insights and Health Check
 
-- **API**: `Program.cs` calls `AddApplicationInsightsTelemetryWorkerService()` and `ConfigureFunctionsApplicationInsights()`; `host.json` enables sampling (Request excluded). The connection string is an app setting.
-- **Client**: the Application Insights JavaScript SDK loader is in `wwwroot/index.html`. No code calls `trackPageView`, so Blazor route changes are not recorded as separate page views (known gap).
+- **API**: `Program.cs` calls `AddApplicationInsightsTelemetryWorkerService()` and `ConfigureFunctionsApplicationInsights()`, then `builder.Logging.AllowAppInformationLogs()` (`Helpers/ApplicationInsightsLogging.cs`). The SDK's default filter sends only Warning and above to Application Insights. The helper adds Information for categories under `BowlPoolManager.Api`; every logger in the API is `ILogger<T>` or `ILoggerFactory.CreateLogger<T>()`, so those are the categories in use. Framework categories (`Microsoft.*`, `System.*`) stay at Warning. `host.json` sets sampling for the Functions host (Request excluded) and its log levels apply to the host, not the worker's `ILogger` output. The connection string is an app setting.
+- **Client**: the Application Insights JavaScript SDK loader is in `wwwroot/index.html`. `enableAutoRouteTracking: true` is set in the loader; page views on route change are to be confirmed on the PR preview.
 - **Health check**: `GET /api/healthcheck` (`HealthCheckFunction`) returns a `HealthCheckResponseDto` (status, source, message, UTC timestamp). It touches nothing in Cosmos, so it shows only that the API host is up.
 
 ## 15. Legacy Container and Migration Endpoints

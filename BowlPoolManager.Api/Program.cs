@@ -7,7 +7,8 @@ using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Configuration;
 using BowlPoolManager.Api.Services;
 using BowlPoolManager.Api.Repositories;
-using BowlPoolManager.Core; 
+using BowlPoolManager.Api.Helpers;
+using BowlPoolManager.Core;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
@@ -16,6 +17,8 @@ builder.ConfigureFunctionsWebApplication();
 builder.Services
     .AddApplicationInsightsTelemetryWorkerService()
     .ConfigureFunctionsApplicationInsights();
+
+builder.Logging.AllowAppInformationLogs();
 
 builder.Services.AddHttpClient<ICfbdService, CfbdService>();
 builder.Services.AddHttpClient<IBasketballDataService, BasketballDataService>();
