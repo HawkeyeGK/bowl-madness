@@ -1,7 +1,7 @@
 # Infrastructure
 
 Facts about where Bowl Madness and Hoops Madness run. No secrets, keys or setting values belong here, only names.
-Last checked 2026-10-26. "Unverified" means it was recorded earlier and could not be re-checked.
+Last checked 2026-10-26; the test resources were created 2026-11-22 and checked by name only. "Unverified" means it was recorded earlier and could not be re-checked.
 
 ## Azure resources
 | Resource | Name | Notes |
@@ -10,6 +10,9 @@ Last checked 2026-10-26. "Unverified" means it was recorded earlier and could no
 | Static Web App | swa-bowlmadness-prod | Central US, Free tier; hosts the Blazor client and the Functions API |
 | Cosmos DB account | in the resource group above | Central US, NoSQL API, serverless; database BowlMadnessDb. Find the account with `az cosmosdb list -g rg-bowlmadness-prod` |
 | Application Insights | swa-bowlmadness-prod | Central US, workspace-based (Log Analytics, DefaultWorkspace in DefaultResourceGroup-CUS) |
+| Resource group (test) | rg-bowlmadness-test | Central US; the test site's resources |
+| Static Web App (test) | swa-bowlmadness-test | Central US, Free tier; the test site. Default host: zealous-wave-0d1fa5110.4.azurestaticapps.net |
+| Cosmos DB account (test) | cosmos-bowlmadness-test | Central US, NoSQL API, serverless, Session consistency; database BowlMadnessDb with Players (/id), Seasons (/seasonId), Picks (/seasonId), PoolArchives (/seasonId), Configuration (/id). No MainContainer. Seed data comes from fixtures in the repo, never from production. |
 
 Cosmos containers (partition key): Players (/id), Seasons (/seasonId), Picks (/seasonId), PoolArchives (/seasonId), Configuration (/id), and the legacy MainContainer (/id), confirmed by a read-only container listing on 2026-10-24. Details: ARCHITECTURAL_CONTEXT.md.
 
@@ -25,14 +28,14 @@ Cosmos containers (partition key): Players (/id), Seasons (/seasonId), Picks (/s
 - IP addresses are not recorded because they can change.
 
 ## Deploys and PR previews
-- Source: GitHub HawkeyeGK/bowl-madness (public), branch main.
-- One workflow, "Azure Static Web Apps CI/CD" (.github/workflows/azure-static-web-apps-polite-glacier-059273d10.yml).
-- A push to main builds and deploys to production. A pull request opened, updated or reopened against main builds and deploys a preview environment for that PR; closing the PR runs a job that removes it.
+- Source: GitHub HawkeyeGK/bowl-madness (public). Branches: `main` (production) and `staging` (the test site's main environment).
+- Production: workflow "Azure Static Web Apps CI/CD" (.github/workflows/azure-static-web-apps-polite-glacier-059273d10.yml). It runs only on a push to main. A build-and-test job (.NET 10, `dotnet build`, `dotnet test --filter "Category!=KnownFailure"`) must pass before the deploy job runs. Secret: AZURE_STATIC_WEB_APPS_API_TOKEN_POLITE_GLACIER_059273D10 (exists; name only).
+- Test site: workflow "Test site CI/CD" (.github/workflows/test-site.yml). It runs on pull requests to staging or main (opened, updated, reopened, closed) and on pushes to staging, with the same build-and-test job in front of the deploy. A closed PR runs a close job that removes its preview. Secret: AZURE_STATIC_WEB_APPS_API_TOKEN_TEST (exists; name only).
+- Production no longer gets PR previews. A PR's preview lives on the test site, uses the test database and is safe for writes. The preview address format is `https://zealous-wave-0d1fa5110-<PR number>.centralus.4.azurestaticapps.net`. It also appears in the Build and Deploy job log ("Visit your site at ...") and in `az staticwebapp environment list`, where rows other than `default` are previews. The action may fail to post a comment on the PR, so do not rely on one.
 - Build inputs: app_location BowlPoolManager.Client, api_location BowlPoolManager.Api, output_location wwwroot.
-- The deploy uses the GitHub secret AZURE_STATIC_WEB_APPS_API_TOKEN_POLITE_GLACIER_059273D10 (exists; name only).
-- The preview address appears in the Build and Deploy job log ("Visit your site at ...") and in `az staticwebapp environment list`, where rows other than `default` are previews. The format is `https://polite-glacier-059273d10-<PR number>.centralus.3.azurestaticapps.net`. The action currently fails to post a comment on the PR, so do not rely on one.
-- The preview limit on the Free tier is unverified.
-- No PR was open when checked, so only the default environment existed.
+- The Free tier allows 3 preview environments per app (Microsoft Learn, "hosting plans"). Close PRs promptly.
+- Tests labelled `[Trait("Category", "KnownFailure")]` fail today and are tracked in open issues. CI skips that category; a fix removes the trait.
+- Release flow: feature PRs target `staging` and merge with a squash. A release PR from `staging` to `main` ships production, with a merge commit and the branch kept.
 
 ## App settings (names only)
 Read by the code:
@@ -42,9 +45,10 @@ Read by the code:
 | CfbdApiKey | College Football Data API |
 | CfbdApiKeyHoops | College Basketball Data API |
 | BootstrapAdminEmail | Email that becomes the first SuperAdmin |
+| SiteEnvironment | `Test` on the test site only. Turns on test-only features (ResetTestData). Production never sets it. The features also require the Cosmos account to be the test account. |
 | APPLICATIONINSIGHTS_CONNECTION_STRING | Read by the Application Insights SDK (not by app code directly) |
 
-Which of these are set in Azure is unverified. Locally they come from BowlPoolManager.Api/local.settings.json, which is git-ignored.
+On the test site CfbdApiKey is not set (a mock feed comes in Phase 1.1) and BootstrapAdminEmail makes the owner SuperAdmin there. Which of these are set in Azure is unverified. Locally they come from BowlPoolManager.Api/local.settings.json, which is git-ignored.
 The browser Application Insights snippet in wwwroot/index.html carries its own connection string; it is public by design and is not repeated here.
 
 ## Application Insights
@@ -159,6 +163,7 @@ Unconfirmed: whether a restored account can be serverless, and the Central US pr
 
 ## Verification commands (read-only)
 - `az staticwebapp show`, `hostname list`, `environment list` with `-n swa-bowlmadness-prod -g rg-bowlmadness-prod`
+- `az staticwebapp show`, `environment list` with `-n swa-bowlmadness-test -g rg-bowlmadness-test`; `az cosmosdb show` and `az cosmosdb sql container list` for cosmos-bowlmadness-test
 - `az cosmosdb list -g rg-bowlmadness-prod`, then `az cosmosdb sql container list` for that account with `-d BowlMadnessDb`
 - `gh secret list`, `gh workflow list`
 

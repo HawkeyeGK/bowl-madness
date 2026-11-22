@@ -110,4 +110,4 @@ Verify without reading values: `az group show`, `az cosmosdb show --query "{name
 - [x] Step 2 workflows (PR 142, merged to staging 2026-11-22)
 - [ ] Step 3 guard, seed, reset
 - [x] Step 4 baseline tests (2026-11-22; PR pending)
-- [ ] Step 5 docs
+- [x] Step 5 docs (INFRASTRUCTURE.md and ARCHITECTURAL_CONTEXT.md applied 2026-11-22; CLAUDE.md edits are the owner's)
