@@ -44,6 +44,8 @@ Tests to add before 1.0 (about two days):
 
 Test environment and score feed mock: decided, see section 13. Execution plan: docs/plans/phase-0-test-environment.md.
 
+**Phase 0 done 2026-11-22:** the test site (swa-bowlmadness-test, its own database), the test guard with `ResetTestData` and three scenarios, tests gating every deploy, and the baseline serialization and endpoint tests are on production's `main` (PR 147). 30 tests are labelled `KnownFailure` and skipped by CI until their issues are fixed. The score feed mock is still Phase 1.1 group A.
+
 ### Release 1: platform and fixes, current UI
 Purpose: a supported, correct site that can carry the bowl season by itself if Release 2 slips. Two releases, approved 2026-10-28; 1.1 is not split further.
 
