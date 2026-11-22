@@ -105,9 +105,9 @@ Verify without reading values: `az group show`, `az cosmosdb show --query "{name
 
 ## Progress
 - [x] Decisions 1-3 (2026-11-22)
-- [ ] Step 1 resources
-- [ ] Step 1 secrets (owner)
-- [ ] Step 2 workflows
-- [ ] Step 3 guard, seed, reset
-- [ ] Step 4 baseline tests
-- [ ] Step 5 docs
+- [x] Step 1 resources (2026-11-22; test host zealous-wave-0d1fa5110.4.azurestaticapps.net)
+- [x] Step 1 secrets (owner; 2026-11-22)
+- [x] Step 2 workflows (PR 142, merged to staging 2026-11-22)
+- [x] Step 3 guard, seed, reset (PR 143 merged; verified on the test site 2026-11-22: guard true, all three scenarios loaded with expected counts, leaderboard, scoreboard and Path to Victory checked; owner signed in with a Microsoft account because the Free test site has no Google provider)
+- [x] Step 4 baseline tests (2026-11-22; PR pending)
+- [x] Step 5 docs (INFRASTRUCTURE.md and ARCHITECTURAL_CONTEXT.md applied 2026-11-22; CLAUDE.md edits are the owner's)

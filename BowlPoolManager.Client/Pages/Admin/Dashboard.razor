@@ -4,6 +4,8 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "SuperAdmin,Admin")]
 @inject HttpClient Http
+@inject AuthenticationStateProvider AuthProvider
+@using Microsoft.AspNetCore.Components.Authorization
 
 <PageTitle>Admin Dashboard</PageTitle>
 
@@ -287,11 +289,46 @@
                 </div>
             </div>
 
+            @if (showTestData)
+            {
+                <div class="col-md-6 col-lg-3">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-body text-center">
+                            <i class="bi bi-database-gear display-4 text-warning mb-3"></i>
+                            <h5 class="card-title">Test Data</h5>
+                            <p class="card-text text-muted small">Reset and load a test scenario.</p>
+                            <a href="admin/test-data" class="btn btn-outline-warning stretched-link">Test Data</a>
+                        </div>
+                    </div>
+                </div>
+            }
+
         </div>
     </AuthorizeView>
 
 </div>
 
 @code {
-    // Dashboard Logic
+    private bool showTestData;
+
+    // The Test Data tile shows only when the API says this is the test site (SuperAdmin only).
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthProvider.GetAuthenticationStateAsync();
+        if (!state.User.IsInRole("SuperAdmin")) return;
+
+        try
+        {
+            var response = await Http.GetAsync("api/TestEnvironment");
+            if (response.IsSuccessStatusCode)
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                showTestData = doc.RootElement.GetProperty("isTestEnvironment").GetBoolean();
+            }
+        }
+        catch (Exception)
+        {
+            showTestData = false;
+        }
+    }
 }
