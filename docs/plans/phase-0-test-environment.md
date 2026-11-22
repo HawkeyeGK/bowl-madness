@@ -106,8 +106,8 @@ Verify without reading values: `az group show`, `az cosmosdb show --query "{name
 ## Progress
 - [x] Decisions 1-3 (2026-11-22)
 - [x] Step 1 resources (2026-11-22; test host zealous-wave-0d1fa5110.4.azurestaticapps.net)
-- [ ] Step 1 secrets (owner)
-- [ ] Step 2 workflows
+- [x] Step 1 secrets (owner; 2026-11-22)
+- [x] Step 2 workflows (PR 142, merged to staging 2026-11-22)
 - [ ] Step 3 guard, seed, reset
 - [ ] Step 4 baseline tests
 - [ ] Step 5 docs
