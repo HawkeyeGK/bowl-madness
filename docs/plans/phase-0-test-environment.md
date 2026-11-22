@@ -1,6 +1,6 @@
 # Phase 0: test environment and test baseline
 
-Status: ready to start. Written 2026-10-29. Part of docs/UPGRADE-PLAN-2026.md (section 3 "Before Release 1" and section 13).
+Status: done 2026-11-22 (released to production in PR 147). Written 2026-10-29. Part of docs/UPGRADE-PLAN-2026.md (section 3 "Before Release 1" and section 13).
 
 ## Start here (for a new session)
 1. Read CLAUDE.md, then docs/UPGRADE-PLAN-2026.md sections 3 and 13, then this file.

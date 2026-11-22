@@ -78,6 +78,13 @@ Group A, group B, #129, #128 and #130. If the date is at risk, the rest of group
 
 **Progress:** [ ] characterization tests [ ] slot rule + #130 [ ] simulator + #136 #109 #127 [ ] replay [ ] #94 [ ] pages and server switched [ ] reviews [ ] test site check [ ] merged
 
+**Decision needed from the owner (before step 5, #94):** Phase 0 added 28 new `KnownFailure` tests beside the two #94 tests (30 in all; CI skips them). Decide whether to fix any of the new ones together with #94 in this group, or leave them for the phase that touches that code anyway. Where they stand today:
+- 20 are already owned by group B, which flips them with its fixes: #93 (4), #98 (2), and #97, #99, #131 (14, football and hoops).
+- 7 are the malformed `x-ms-client-principal` header tests (`SecurityHelperMalformedHeaderTests`; no issue yet). They fit group B, since #98 changes the same helper (`SecurityHelper`).
+- 1 is the `UserProfile` attribute test (`ModelSerializationTests`; no issue yet): `Email`, `DisplayName` and `CreatedOn` lack `[JsonProperty]`. A natural time is whenever `UserProfile` or the Users page is next changed.
+- 2 are the #94 tests (this group).
+Either way, file issues for the two "no issue yet" items first so each label names a real issue, and remove each `KnownFailure` trait in the PR that fixes it.
+
 ---
 
 ## Group D: entry window
