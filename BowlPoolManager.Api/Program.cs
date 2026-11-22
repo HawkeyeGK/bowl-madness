@@ -64,6 +64,13 @@ builder.Services.AddSingleton<IArchiveRepository, ArchiveRepository>();
 builder.Services.AddSingleton<ISeasonRepository, SeasonRepository>();
 builder.Services.AddSingleton<IConfigurationRepository, ConfigurationRepository>();
 builder.Services.AddSingleton<IMigrationRepository, MigrationRepository>();
+
+// --- TEST-SITE ONLY FEATURES (ResetTestData). The guard is true only when SiteEnvironment=Test and
+// the Cosmos account is the test account; production never sets SiteEnvironment. ---
+builder.Services.AddSingleton<ITestEnvironment>(sp =>
+    new TestEnvironment(sp.GetRequiredService<IConfiguration>(), sp.GetRequiredService<CosmosClient>().Endpoint));
+builder.Services.AddSingleton<ITestDataRepository, TestDataRepository>();
+builder.Services.AddSingleton<ITestScenarioProvider, EmbeddedTestScenarioProvider>();
 // --------------------------------
 
 var host = builder.Build();
