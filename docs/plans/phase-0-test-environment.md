@@ -109,5 +109,5 @@ Verify without reading values: `az group show`, `az cosmosdb show --query "{name
 - [x] Step 1 secrets (owner; 2026-11-22)
 - [x] Step 2 workflows (PR 142, merged to staging 2026-11-22)
 - [ ] Step 3 guard, seed, reset
-- [ ] Step 4 baseline tests
+- [x] Step 4 baseline tests (2026-11-22; PR pending)
 - [ ] Step 5 docs
