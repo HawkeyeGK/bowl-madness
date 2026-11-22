@@ -50,8 +50,8 @@ Core and Api on net10.0; `apiRuntime` set; tests pass (known failures labelled);
 - [x] 4 Runtime setting (2026-11-22)
 - [x] 5 Warnings (2026-11-22: 0 before, 0 after)
 - [x] 6 Tests (2026-11-22: same counts as baseline)
-- [ ] 7 Review
-- [ ] 8 Test site
+- [x] 7 Review (2026-11-22: code-review agent, 0 critical or high)
+- [x] 8 Test site (2026-11-22: PR 149 preview; deploy log shows dotnetisolated 10.0; hand checks passed, see PR)
 - [ ] 9 Release
 - [ ] 10 Production check
 - [ ] 11 Docs
