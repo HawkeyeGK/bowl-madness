@@ -44,12 +44,12 @@ Revert the merge with a new PR (never force-push or reset). Before 2026-11-10 th
 Core and Api on net10.0; `apiRuntime` set; tests pass (known failures labelled); the test site checklist passed; production deployed and healthy for an hour with no new errors in the logs; docs updated.
 
 ## Progress
-- [ ] 1 Baseline
-- [ ] 2 Retarget
-- [ ] 3 Packages
-- [ ] 4 Runtime setting
-- [ ] 5 Warnings
-- [ ] 6 Tests
+- [x] 1 Baseline (2026-11-22: 745 pass with KnownFailure excluded; 745 pass + 30 KnownFailure fail with filter off; 0 warnings)
+- [x] 2 Retarget (2026-11-22)
+- [x] 3 Packages (2026-11-22: no package changes; open question on Azure.Functions.Sdk, see PR)
+- [x] 4 Runtime setting (2026-11-22)
+- [x] 5 Warnings (2026-11-22: 0 before, 0 after)
+- [x] 6 Tests (2026-11-22: same counts as baseline)
 - [ ] 7 Review
 - [ ] 8 Test site
 - [ ] 9 Release
