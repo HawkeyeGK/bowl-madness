@@ -21,7 +21,12 @@ A sister test site with its own database, so every later phase is tested end to 
 - Test-only features run only when `SiteEnvironment=Test` is set and the database is not the production account.
 - Seed data comes from fixtures in the repo, never copied from production.
 
-## Decisions needed from the owner before the steps that use them
+## Owner decisions (2026-11-22)
+1. Branch flow: A, a `staging` branch.
+2. Known failing tests in CI: A, the `KnownFailure` trait.
+3. Browser telemetry on the test site: B, accept the noise (no change to `index.html`).
+
+## Decisions needed from the owner before the steps that use them (decided above)
 1. **Branch flow for releases (before step 2).** Merging to main deploys production, and Release 1.1 is one release made of several PRs. Options:
    - **A (recommended): a `staging` branch.** Feature PRs target `staging`; each PR gets a test-site preview; merging into `staging` updates the test site's main environment; a release PR from `staging` to `main` ships to production. Release PRs merge with a merge commit, not squash, and never with `--delete-branch` (so `staging` survives and history stays in step). This changes the merge rule in CLAUDE.md, which the owner edits.
    - B: feature PRs target `main` as today and each merge ships to production. Simpler, but 1.1 would reach production in pieces.
@@ -59,7 +64,6 @@ Verify without reading values: `az group show`, `az cosmosdb show --query "{name
   - Job 1: set up .NET 10, `dotnet build BowlPoolManager.sln`, `dotnet test` with the filter from decision 2.
   - Job 2 (needs job 1): `Azure/static-web-apps-deploy@v1` with `AZURE_STATIC_WEB_APPS_API_TOKEN_TEST`, same app/api/output locations as production. Close job for closed PRs.
 - Production workflow: deploy only on push to `main` (remove the pull_request trigger and the close job), and add the same build-and-test job in front of the deploy.
-- Telemetry change from decision 3.
 - If decision 1 is A: create the `staging` branch from `main` (ask before pushing it).
 - Verify: the PR's own run deploys a test-site preview; production gets no preview. Record the preview address format in docs/INFRASTRUCTURE.md.
 
@@ -100,7 +104,7 @@ Verify without reading values: `az group show`, `az cosmosdb show --query "{name
 - Signing in on the test site uses the same Google and Microsoft providers; the owner becomes SuperAdmin there only through `BootstrapAdminEmail`.
 
 ## Progress
-- [ ] Decisions 1-3
+- [x] Decisions 1-3 (2026-11-22)
 - [ ] Step 1 resources
 - [ ] Step 1 secrets (owner)
 - [ ] Step 2 workflows

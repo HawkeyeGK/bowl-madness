@@ -191,7 +191,7 @@ Static HTML pages with sample data, published as private links. Proposed set:
 13. ~~Invite code across seasons.~~ Use the current season's pool (#135), decided 2026-10-28.
 14. ~~Test environment.~~ Sister static web app plus its own serverless Cosmos account (section 13), decided 2026-10-28 and 2026-10-29.
 15. ~~Score feed.~~ Keep College Football Data for football this season, behind a shared feed interface with a mock (section 13), decided 2026-10-28.
-16. Phase 0 decisions: release branch flow, known failing tests in CI, browser telemetry on the test site (docs/plans/phase-0-test-environment.md).
+16. ~~Phase 0 decisions.~~ A `staging` branch for releases; known failing tests labelled `KnownFailure` and skipped in CI; test-site page views accepted in production telemetry. Decided 2026-11-22 (docs/plans/phase-0-test-environment.md).
 
 ## 11. Prototypes
 Canvas: https://claude.ai/artifact/F2wyGerBb6cgyCayDV82Z3 (private). Sample data only.
