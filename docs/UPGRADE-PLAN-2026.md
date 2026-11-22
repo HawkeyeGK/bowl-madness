@@ -20,7 +20,8 @@ Smaller releases inside each milestone are fine when they help.
 | Date | Event |
 |---|---|
 | 2026-11-10 | .NET 8 and .NET 9 support ends on Static Web Apps managed functions. .NET 10 isolated is supported. |
-| before 2026-11-10 | Release 1.0 (.NET 10) in production |
+| ~2026-11-03 | Phase 0 done: test site and test baseline |
+| before 2026-11-10 | Release 1.0 (.NET 10) in production (merge target 2026-11-06) |
 | ~2026-11-20 | Release 1.1 (fixes) in production (target) |
 | ~2026-11-29 | Release 2 in production (target). Bowl side frozen after this. |
 | 2026-12-06 | Selection Day. Admin loads games, opens pools, prints blank brackets. |
@@ -41,22 +42,24 @@ Tests to add before 1.0 (about two days):
 - Sign-in and role tests for every write endpoint: anonymous refused, player refused, admin allowed. Today's known gaps are written as tests marked with their issue so the 1.1 fixes flip them.
 - Run the test suite in the deploy workflow.
 
-Test environment and score feed mock: proposed, see section 13.
+Test environment and score feed mock: decided, see section 13. Execution plan: docs/plans/phase-0-test-environment.md.
 
 ### Release 1: platform and fixes, current UI
 Purpose: a supported, correct site that can carry the bowl season by itself if Release 2 slips. Two releases, approved 2026-10-28; 1.1 is not split further.
 
 **1.0: .NET 10 upgrade only (before 2026-11-10).**
 - Move Api and Core from net8.0 to net10.0 (Client and Tests are already net10.0). Set `platform.apiRuntime` to `dotnet-isolated:10.0` in `staticwebapp.config.json`; the file names no runtime today. Update the Functions worker packages.
-- Run the test suite in the deploy workflow, so a failing test blocks a deploy (to confirm with the owner).
-- Checks: build, full test suite (no new failures beyond #94), read-only click-through on the preview.
+- Checks: build, full test suite (no new failures beyond #94), and a full click-through on the test site (Phase 0). Details: docs/plans/phase-1.0-dotnet10.md.
 
-**1.1: fixes before the new UI (~2026-11-20).** One pull request per group, in this order.
-- Security and data: #93 open write endpoints, #97 pick visibility on the server (scope widened: emails and audit log, leaderboard tiebreakers, backup), #98 disabled accounts, #99 payment status, #131 players moving entries between pools, #134 unchecked entry fields, #133 Final games with no scores.
-- Entry window: #102 hard-coded 2025 season in the game import (needed to load bowls on Dec 6), #129 New Pool crash (needed on Dec 6), #128 junk and stale picks, #137 incomplete entries, #132 rebuild Move Entry, #135 invite code matching last year's pool, #107 Central time (scope widened).
-- Path to Victory on the shared simulator (section 12), page unchanged: #136 rank mismatch, #109 elimination, #127 simulated Max, #130 corrected result overwrites a seed (shared slot rule), #94 investigated, archive replay test.
+**1.1: fixes before the new UI (~2026-11-20).** One release, four groups, each its own pull request and session, in this order. Details: docs/plans/phase-1.1-fixes.md.
+- A, feed and season setup: shared score-feed interface and mock (section 13), #102 hard-coded 2025 season, #129 New Pool crash. First, because every later group needs pools and scores on the test site.
+- B, security and data: #93, #97 (scope widened: emails and audit log, leaderboard tiebreakers, backup), #98, #99, #131 players moving entries between pools, #133 Final games with no scores, #134 unchecked entry fields.
+- C, bracket core and Path to Victory on the shared simulator (section 12), page unchanged: #130 corrected result overwrites a seed (shared slot rule), #136 rank mismatch, #109 elimination, #127 simulated Max, #94, archive replay test.
+- D, entry window: #128 junk and stale picks (uses C's slot rule), #137 incomplete entries, #132 rebuild Move Entry, #135 invite code matching last year's pool, #107 Central time (scope widened).
 - Each group starts with tests that fail on today's code.
-- If time runs short, the security group, #102, #129, #128 and #130 must ship; the rest of the Path to Victory group can move to Release 2.
+- If time runs short, groups A and B, #128 and #130 must ship; the rest of group C can move to Release 2.
+
+Execution plans for each phase: docs/plans/README.md.
 
 Out of Release 1: #120, #117, #106, #101, #105, #103, #104, #108, #55, #54, #34, #96. Section 6 says when each fits.
 
@@ -170,45 +173,28 @@ Static HTML pages with sample data, published as private links. Proposed set:
 - Schedule: Release 2 has about four weeks. Fallback is Release 1.
 - Google sign-in is undocumented on our plan.
 - A new component library changes every page; regressions in print layouts are likely. Print must be tested by hand.
-- The PR preview uses the production database, so write paths can only be tested locally with the test suite, not on the preview.
+- Today the PR preview uses the production database, so write paths can't be tested there. Phase 0's test site (section 13) removes this risk; until it exists, test writes only with the test suite.
 
 ## 10. Decisions needed from the owner
 1. ~~Approve the three-release plan and dates.~~ Approved 2026-10-28.
 2. ~~Component library.~~ MudBlazor, decided 2026-10-28. Bottom navigation on phones approved.
 3. ~~Sign-in option.~~ Google and Microsoft, player's choice, decided 2026-10-28. A new login is a new user.
-4. UX direction in section 5 (after prototypes). Labels: keep "Leaderboard" (decided 2026-10-28).
-5. File the issues in 7.1 and 7.2.
+4. UX direction in section 5 (after prototypes). Labels: keep "Leaderboard" (decided 2026-10-28). Prototypes looked good to the owner on 2026-10-28; the detailed Release 2 plan settles the rest.
+5. ~~File the issues in 7.1 and 7.2.~~ Filed as #136 and #137.
 6. ~~Path to Victory approach.~~ Shared simulator in Core, running in the browser (section 12), decided 2026-10-28.
 7. ~~Add a field for which line a winner fills.~~ Not needed; one shared start time rule (section 12), decided 2026-10-28.
 8. ~~Replay last season's archive as a test.~~ Approved 2026-10-28: read-only export, names replaced.
 9. ~~Ordering.~~ Start time orders everything, decided 2026-10-28.
+10. ~~Release 1 split.~~ 1.0 is the .NET 10 upgrade only; 1.1 is one release of four groups, decided 2026-10-28.
+11. ~~Review placements.~~ Findings #128-#140 placed as in section 6, approved 2026-10-28.
+12. ~~Move Entry.~~ Rebuild it (#132); admins must be able to move an entry to the right pool. Decided 2026-10-28.
+13. ~~Invite code across seasons.~~ Use the current season's pool (#135), decided 2026-10-28.
+14. ~~Test environment.~~ Sister static web app plus its own serverless Cosmos account (section 13), decided 2026-10-28 and 2026-10-29.
+15. ~~Score feed.~~ Keep College Football Data for football this season, behind a shared feed interface with a mock (section 13), decided 2026-10-28.
+16. Phase 0 decisions: release branch flow, known failing tests in CI, browser telemetry on the test site (docs/plans/phase-0-test-environment.md).
 
 ## 11. Prototypes
 Canvas: https://claude.ai/artifact/F2wyGerBb6cgyCayDV82Z3 (private). Sample data only.
-
-## 13. Test environment and score feed mock
-**Decided 2026-10-28:** a sister test site (a second Free static web app) with its own Cosmos DB account, because preview environments inherit production settings. Mock the score feeds. Score feed provider decided the same day (see below).
-
-Owner request, 2026-10-28: test each release fully before production without touching live data, and test scoring before this season's bowl games exist in the score feed.
-
-### Facts checked
-- Static Web Apps copies application settings into every preview (staging) environment, and settings can then be changed per environment (Microsoft Learn, "Configure application settings", updated 2026-01-23). So each new PR preview starts with the production connection string. That is why previews use the production database today, and changing a preview's settings after it is created leaves a window where it doesn't.
-- Free plan: 3 staging environments per app; managed functions only (Microsoft Learn, "hosting plans").
-- The database name is a constant (`Core/Constants.cs:7`, `BowlMadnessDb`); the account comes from the `CosmosDbConnectionString` setting (`Api/Program.cs:34`).
-- Football scores come from College Football Data (`CfbdService.GetScoreboardGamesAsync`, behind `ICfbdService`, registered at `Api/Program.cs:23`), not ESPN. ESPN supplies hoops scores and logos.
-- Not yet checked: how many Free static web apps the subscription allows, and whether the subscription's one Cosmos DB free-tier account is unused.
-
-### Proposal
-- **A second Free static web app for testing**, with its own settings, deployed from pull requests and a `staging` branch. Production's PR previews stop being used for testing.
-- **A separate Cosmos DB account for testing.** Use the free-tier offer if it's available on the subscription (no charge within its limits); otherwise serverless, which costs cents a month at this size. A separate account means a test setting can never reach production data, even by mistake.
-- **Guards in code.** A `SiteEnvironment=Test` setting turns on test-only features (reset, seed, mock feed). Those features also refuse to run if the database account is the production one. Production never sets it.
-- **Seed and reset** from an admin page button (server-checked as above), with a few named starting points: before Selection Day, entry window open, mid-season, and last season replayed (from the approved archive export, names replaced). Seed data lives in the repository as test fixtures; nothing is copied from production.
-- **Score feed mock.** A second `ICfbdService` used when `ScoreFeed=Mock` (test only). It reads games and scores from the test database. An admin "score feed" page lists games and lets an admin set each one to scheduled, in progress (quarter and clock) or final with scores, and change the team names the feed reports, to test mismatches (#133). It also serves the postseason game list, so loading bowls (#102) and linking can be tested before Dec 6. It starts from a one-time recording of last season's real postseason data. A hoops (ESPN) mock waits for Release 3.
-- **Timing.** Test environment before 1.0, with the test baseline, so 1.0 is tested there. Score mock at the start of 1.1.
-
-### Score feed provider (decided 2026-10-28)
-- Today: football uses College Football Data for three things: the postseason game list (import and linking; `ExternalId` holds its game id and `ApiHomeTeam`/`ApiAwayTeam` its team names), live scores (`GameScoringService`), and FBS team data (`SyncTeams`). Hoops uses ESPN for scores and logos and College Basketball Data for teams. The owner chose College Football Data because a documented, keyed service is less likely to change without notice than ESPN's unofficial endpoints; no equal option existed for hoops.
-- Decided: keep College Football Data for football this season. Put both sports' score feeds behind one internal score-feed interface (one shape for "games and scores"), with the College Football Data and ESPN code as two implementations and one mock for testing. Football adopts it in 1.1, hoops in Release 3. Switching football to ESPN, or using ESPN as a fallback when College Football Data is down, then becomes a contained change to revisit after the season. Owner approved the new pattern.
 
 ## 12. Path to Victory: shared bracket simulator
 Decided 2026-10-28: one simulator in Core, running in the browser. The server gains no what-if endpoint. Its only Path to Victory change is #97, sending picks only after lock.
@@ -244,4 +230,29 @@ The logic moves out of the page, so it can be tested with the existing xUnit, Fl
    - Football archives keep games, scores, point values and each entry's picks. They don't keep the bracket links, playoff rounds, Max or the pool's tiebreaker settings. Those come from last season's game records, if they still exist, and the pool record, also read-only. If not, the replay checks scoring and ranking only.
    - The archived standings came from the old code, so they are a baseline to match, not proof of correctness. Any difference gets checked by hand against what was actually paid out.
 4. **Same answer as the server.** Tests check that the server's winner propagation and the simulator put each winner in the same slot.
-5. **By hand.** Before Release 1 and Release 2, click through a checklist on the PR preview (read-only): reset, change an earlier result, pick an upset, and compare ranks with the leaderboard.
+5. **By hand.** Before Release 1.1 and Release 2, click through a checklist on the test site (section 13): reset, change an earlier result, pick an upset, and compare ranks with the leaderboard.
+
+## 13. Test environment and score feed mock
+**Decided 2026-10-28:** a sister test site (a second Free static web app) with its own Cosmos DB account, because preview environments inherit production settings. Mock the score feeds. Score feed provider decided the same day (see below).
+
+Owner request, 2026-10-28: test each release fully before production without touching live data, and test scoring before this season's bowl games exist in the score feed.
+
+### Facts checked
+- Static Web Apps copies application settings into every preview (staging) environment, and settings can then be changed per environment (Microsoft Learn, "Configure application settings", updated 2026-01-23). So each new PR preview starts with the production connection string. That is why previews use the production database today, and changing a preview's settings after it is created leaves a window where it doesn't.
+- Free plan: 3 staging environments per app; managed functions only (Microsoft Learn, "hosting plans").
+- The database name is a constant (`Core/Constants.cs:7`, `BowlMadnessDb`); the account comes from the `CosmosDbConnectionString` setting (`Api/Program.cs:34`).
+- Football scores come from College Football Data (`CfbdService.GetScoreboardGamesAsync`, behind `ICfbdService`, registered at `Api/Program.cs:23`), not ESPN. ESPN supplies hoops scores and logos.
+- Checked 2026-10-29: the subscription has 2 of its 10 Free static web apps, and no Cosmos DB account uses the free tier (one allowed per subscription). The free tier works only with provisioned throughput, not serverless: 1000 RU/s and 25 GB free, chosen at account creation. 
+- **Decided 2026-10-29: the test account is serverless (pay per use), like production.** Production's Cosmos account cost under $1 over the last 12 months, including the whole bowl season (owner, from Cost analysis). Serverless leaves the subscription's one free-tier slot unused and has no charge for reserved capacity if settings change.
+
+### Design (decided)
+- **A second Free static web app for testing**, with its own settings, deployed from pull requests and a `staging` branch. Production's PR previews stop being used for testing.
+- **A separate Cosmos DB account for testing**, serverless, in its own resource group (`rg-bowlmadness-test`). A separate account means a test setting can never reach production data, even by mistake.
+- **Guards in code.** A `SiteEnvironment=Test` setting turns on test-only features (reset, seed, mock feed). Those features also refuse to run if the database account is the production one. Production never sets it.
+- **Seed and reset** from an admin page button (server-checked as above), with a few named starting points: before Selection Day, entry window open, mid-season, and last season replayed (from the approved archive export, names replaced). Seed data lives in the repository as test fixtures; nothing is copied from production.
+- **Score feed mock.** An implementation of the shared score-feed interface (below), used when `ScoreFeed=Mock` (test only). It reads games and scores from the test database. An admin "score feed" page lists games and lets an admin set each one to scheduled, in progress (quarter and clock) or final with scores, and change the team names the feed reports, to test mismatches (#133). It also serves the postseason game list, so loading bowls (#102) and linking can be tested before Dec 6. It starts from a one-time recording of last season's real postseason data. A hoops (ESPN) mock waits for Release 3.
+- **Timing.** Test environment before 1.0, with the test baseline, so 1.0 is tested there. Score mock at the start of 1.1.
+
+### Score feed provider (decided 2026-10-28)
+- Today: football uses College Football Data for three things: the postseason game list (import and linking; `ExternalId` holds its game id and `ApiHomeTeam`/`ApiAwayTeam` its team names), live scores (`GameScoringService`), and FBS team data (`SyncTeams`). Hoops uses ESPN for scores and logos and College Basketball Data for teams. The owner chose College Football Data because a documented, keyed service is less likely to change without notice than ESPN's unofficial endpoints; no equal option existed for hoops.
+- Decided: keep College Football Data for football this season. Put both sports' score feeds behind one internal score-feed interface (one shape for "games and scores"), with the College Football Data and ESPN code as two implementations and one mock for testing. Football adopts it in 1.1, hoops in Release 3. Switching football to ESPN, or using ESPN as a fallback when College Football Data is down, then becomes a contained change to revisit after the season. Owner approved the new pattern.
