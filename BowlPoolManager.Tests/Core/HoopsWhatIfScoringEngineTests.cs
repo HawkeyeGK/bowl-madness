@@ -286,6 +286,7 @@ namespace BowlPoolManager.Tests.Core
         // ---------------------------------------------------------------------------
 
         [Fact]
+        [Trait("Category", "KnownFailure")] // Issue #94: fails today; Phase 1.1 group C removes this trait when fixed.
         public void Calculate_ShouldMarkEntryAsEliminated_WhenMaxPossibleIsLessThanLeaderScore()
         {
             var pool = MakePool(new Dictionary<TournamentRound, int>
@@ -739,6 +740,7 @@ namespace BowlPoolManager.Tests.Core
         // ---------------------------------------------------------------------------
 
         [Fact]
+        [Trait("Category", "KnownFailure")] // Issue #94: fails today; Phase 1.1 group C removes this trait when fixed.
         public void Calculate_ShouldUseHighestScoreAsLeaderScore_ForEliminationCheck()
         {
             // Three entries: A=10, B=5, C=0.

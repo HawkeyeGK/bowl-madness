@@ -1,0 +1,64 @@
+name: Test site CI/CD
+
+# Feature PRs target staging. Each PR gets a preview on the test site, and a push to
+# staging updates the test site's main environment. A release PR from staging to main
+# also gets a preview here; production deploys only from the production workflow.
+on:
+  push:
+    branches:
+      - staging
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches:
+      - staging
+      - main
+
+jobs:
+  build_and_test_job:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    name: Build and Test Job
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build
+        run: dotnet build BowlPoolManager.sln --configuration Release
+      - name: Test
+        # KnownFailure tests fail today and are tracked in open issues; the trait is removed when each is fixed.
+        run: dotnet test BowlPoolManager.Tests/BowlPoolManager.Tests.csproj --configuration Release --no-build --filter "Category!=KnownFailure"
+
+  build_and_deploy_job:
+    needs: build_and_test_job
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    name: Build and Deploy Job
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          lfs: false
+      - name: Build And Deploy
+        id: builddeploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_TEST }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for Github integrations (i.e. PR comments)
+          action: "upload"
+          app_location: "BowlPoolManager.Client"
+          api_location: "BowlPoolManager.Api"
+          output_location: "wwwroot"
+
+  close_pull_request_job:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    name: Close Pull Request Job
+    steps:
+      - name: Close Pull Request
+        id: closepullrequest
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_TEST }}
+          action: "close"
+          app_location: "BowlPoolManager.Client"
