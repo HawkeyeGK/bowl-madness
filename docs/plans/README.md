@@ -7,7 +7,7 @@ The 2026 upgrade (docs/UPGRADE-PLAN-2026.md) runs in phases. Each phase has a pl
 | 0: test environment and test baseline | [phase-0-test-environment.md](phase-0-test-environment.md) | Done 2026-11-22 | Done by 2026-11-03 |
 | 1.0: .NET 10 upgrade | [phase-1.0-dotnet10.md](phase-1.0-dotnet10.md) | Done 2026-11-22 | Production before 2026-11-10 (merge target 2026-11-06) |
 | 1.1: fixes, groups A-D | [phase-1.1-fixes.md](phase-1.1-fixes.md) | Done 2026-11-23 | Production about 2026-11-20 |
-| 2: new UI (football player pages, season admin) | Not written yet | Write after Phase 1.0, from the prototypes and plan section 5 | Production about 2026-11-29 |
+| 2: new UI (football player pages, season admin) | [phase-2-new-ui.md](phase-2-new-ui.md) | Approved 2026-11-23 | Production by 2026-12-05 (freeze); go/no-go 2026-12-03 |
 | 3: hoops | Not written yet | Write after the bowl season | Jan-Feb 2027 |
 
 ## Starting a session
