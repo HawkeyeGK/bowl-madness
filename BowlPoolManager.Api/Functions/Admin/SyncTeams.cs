@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Azure.Cosmos;
 using BowlPoolManager.Core;
 using BowlPoolManager.Core.Domain;
+using BowlPoolManager.Api.Helpers;
+using BowlPoolManager.Api.Repositories;
 using BowlPoolManager.Api.Services;
 
 namespace BowlPoolManager.Api.Functions.Admin
@@ -14,11 +16,13 @@ namespace BowlPoolManager.Api.Functions.Admin
         private readonly ICfbdService _cfbdService;
         private readonly Container _container;
         private readonly ILogger<SyncTeams> _logger;
+        private readonly IUserRepository _userRepo;
 
-        public SyncTeams(ICfbdService cfbdService, CosmosClient cosmosClient, ILogger<SyncTeams> logger)
+        public SyncTeams(ICfbdService cfbdService, CosmosClient cosmosClient, ILogger<SyncTeams> logger, IUserRepository userRepo)
         {
             _cfbdService = cfbdService;
             _logger = logger;
+            _userRepo = userRepo;
             // Get reference to Configuration container
             _container = cosmosClient.GetContainer(Constants.Database.DbName, Constants.Database.ConfigurationContainer);
         }
@@ -26,6 +30,9 @@ namespace BowlPoolManager.Api.Functions.Admin
         [Function("SyncTeams")]
         public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req)
         {
+            var refused = await SecurityHelper.RefuseUnlessSuperAdminAsync(req, _userRepo);
+            if (refused != null) return refused;
+
             _logger.LogInformation("Starting Team Sync...");
 
             // 1. Fetch Teams

@@ -39,6 +39,13 @@ namespace BowlPoolManager.Api.Functions
                 // Use Repo
                 var user = await _userRepo.GetUserAsync(principal.UserId);
 
+                // A disabled account gets no profile and no role. The 403 (not 401) is how the browser learns the
+                // account is disabled, so it can say so before signing the user out (issue 98).
+                if (user != null && user.IsDisabled)
+                {
+                    return req.CreateResponse(HttpStatusCode.Forbidden);
+                }
+
                 if (user == null)
                 {
                     user = new UserProfile
@@ -77,18 +84,16 @@ namespace BowlPoolManager.Api.Functions
         {
             _logger.LogInformation("Getting all users.");
 
-            var principal = SecurityHelper.ParseSwaHeader(req);
-            if (principal == null || string.IsNullOrEmpty(principal.UserId))
+            var caller = await SecurityHelper.GetCallerAsync(req, _userRepo);
+            if (caller == null)
             {
                 return req.CreateResponse(HttpStatusCode.Unauthorized);
             }
 
-            // Use Repo for Authorization check
-            var currentUser = await _userRepo.GetUserAsync(principal.UserId);
             // Allow Admin access for Entry Management (needed to see user emails)
-            if (!SecurityHelper.IsAdmin(currentUser))
+            if (!caller.IsAdmin)
             {
-                _logger.LogWarning($"User {principal.UserId} attempted to access user list without Admin rights.");
+                _logger.LogWarning($"User {caller.UserId} attempted to access user list without Admin rights.");
                 return req.CreateResponse(HttpStatusCode.Forbidden);
             }
 
@@ -106,12 +111,10 @@ namespace BowlPoolManager.Api.Functions
 
             try
             {
-                var principal = SecurityHelper.ParseSwaHeader(req);
-                if (principal == null) return req.CreateResponse(HttpStatusCode.Unauthorized);
+                var caller = await SecurityHelper.GetCallerAsync(req, _userRepo);
+                if (caller == null) return req.CreateResponse(HttpStatusCode.Unauthorized);
 
-                // Use Repo
-                var currentUser = await _userRepo.GetUserAsync(principal.UserId);
-                if (currentUser == null || currentUser.AppRole != Constants.Roles.SuperAdmin)
+                if (!caller.IsSuperAdmin)
                 {
                     return req.CreateResponse(HttpStatusCode.Forbidden);
                 }
@@ -153,12 +156,10 @@ namespace BowlPoolManager.Api.Functions
 
             try
             {
-                var principal = SecurityHelper.ParseSwaHeader(req);
-                if (principal == null) return req.CreateResponse(HttpStatusCode.Unauthorized);
+                var caller = await SecurityHelper.GetCallerAsync(req, _userRepo);
+                if (caller == null) return req.CreateResponse(HttpStatusCode.Unauthorized);
 
-                // Use Repo
-                var currentUser = await _userRepo.GetUserAsync(principal.UserId);
-                if (currentUser == null || currentUser.AppRole != Constants.Roles.SuperAdmin)
+                if (!caller.IsSuperAdmin)
                 {
                     return req.CreateResponse(HttpStatusCode.Forbidden);
                 }

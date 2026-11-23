@@ -3,6 +3,8 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using BowlPoolManager.Core;
+using BowlPoolManager.Api.Helpers;
+using BowlPoolManager.Api.Repositories;
 
 namespace BowlPoolManager.Api.Functions.Admin
 {
@@ -10,17 +12,22 @@ namespace BowlPoolManager.Api.Functions.Admin
     {
         private readonly CosmosClient _cosmosClient;
         private readonly ILogger<InfrastructureFunctions> _logger;
+        private readonly IUserRepository _userRepo;
 
-        public InfrastructureFunctions(CosmosClient cosmosClient, ILogger<InfrastructureFunctions> logger)
+        public InfrastructureFunctions(CosmosClient cosmosClient, ILogger<InfrastructureFunctions> logger, IUserRepository userRepo)
         {
             _cosmosClient = cosmosClient;
             _logger = logger;
+            _userRepo = userRepo;
         }
 
         [Function("InitializeDatabase")]
         public async Task<HttpResponseData> InitializeDatabase(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "Admin/Initialize")] HttpRequestData req)
         {
+            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
+            if (!authResult.IsValid) return authResult.ErrorResponse!;
+
             _logger.LogInformation("Initializing Database Infrastructure...");
 
             try
