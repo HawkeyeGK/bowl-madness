@@ -37,6 +37,24 @@ namespace BowlPoolManager.Core.ScoreFeed
         public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
     }
 
+    /// <summary>What switching to Mock could change right now: linked games of the current season that the mock would update.</summary>
+    public class MockFeedEnableSummary
+    {
+        // Linked, not-yet-Final games whose external id also exists in the mock: the score refresh would update them.
+        [JsonProperty("matchingGames")]
+        [JsonPropertyName("matchingGames")]
+        public int MatchingGames { get; set; }
+
+        [JsonProperty("gameNames")]
+        [JsonPropertyName("gameNames")]
+        public List<string> GameNames { get; set; } = new();
+
+        // All linked games of the current season, for context.
+        [JsonProperty("linkedGames")]
+        [JsonPropertyName("linkedGames")]
+        public int LinkedGames { get; set; }
+    }
+
     /// <summary>What a mock reset would do (preview) or did (apply).</summary>
     public class MockFeedResetSummary
     {

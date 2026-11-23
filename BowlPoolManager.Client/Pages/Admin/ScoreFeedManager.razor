@@ -52,6 +52,33 @@
                     Live uses College Football Data. Mock uses the games below.
                 </span>
 
+                @if (enableSummary != null)
+                {
+                    <div class="mt-3 p-3 border rounded bg-light">
+                        <p class="mb-2">
+                            Switch to the mock feed? While it is on, score updates for linked games come from the mock games on this page,
+                            not College Football Data, and every visitor sees the result.
+                        </p>
+                        @if (enableSummary.MatchingGames == 0)
+                        {
+                            <p class="mb-2">No linked game of the current season matches a mock game, so no real game would change right now.
+                               (@enableSummary.LinkedGames linked game(s) in the current season.)</p>
+                        }
+                        else
+                        {
+                            <p class="mb-1 fw-bold text-danger">
+                                @enableSummary.MatchingGames linked game(s) of the current season match a mock game and would take its status and scores:
+                            </p>
+                            <ul class="small">@foreach (var n in enableSummary.GameNames) { <li>@n</li> }</ul>
+                        }
+                        <label class="form-label" for="mock-confirm">Type MOCK to confirm</label>
+                        <input id="mock-confirm" class="form-control mb-2" style="max-width:12rem" autocomplete="off"
+                               @bind="confirmText" @bind:event="oninput" />
+                        <button class="btn btn-warning me-2" @onclick="ConfirmMock" disabled="@(busy || confirmText != "MOCK")">Switch to Mock</button>
+                        <button class="btn btn-link" @onclick="CancelEnable" disabled="@busy">Cancel</button>
+                    </div>
+                }
+
                 @if (preview != null)
                 {
                     <div class="mt-3 p-3 border rounded bg-light">
@@ -168,6 +195,8 @@
     private string? message;
     private List<FeedGame> games = new();
     private MockFeedResetSummary? preview;
+    private MockFeedEnableSummary? enableSummary;
+    private string confirmText = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -189,13 +218,32 @@
         games = await Http.GetFromJsonAsync<List<FeedGame>>("api/MockFeed/Games", JsonOptions) ?? new();
     }
 
+    // Switching to Mock first shows which real games it could change, and needs MOCK typed to confirm.
     private Task SelectMock() => Run(async () =>
     {
-        var response = await Http.PostAsJsonAsync("api/MockFeed/Mode", new { mode = "Mock" });
+        var response = await Http.GetAsync("api/MockFeed/EnablePreview");
+        if (!response.IsSuccessStatusCode) return await Failure(response);
+        enableSummary = await response.Content.ReadFromJsonAsync<MockFeedEnableSummary>(JsonOptions);
+        if (enableSummary == null) return "Error: the preview came back empty. Nothing was changed.";
+        confirmText = string.Empty;
+        return string.Empty;
+    });
+
+    private Task ConfirmMock() => Run(async () =>
+    {
+        var response = await Http.PostAsJsonAsync("api/MockFeed/Mode", new { mode = "Mock", confirm = confirmText });
         if (!response.IsSuccessStatusCode) return await Failure(response);
         mockOn = true;
+        enableSummary = null;
+        confirmText = string.Empty;
         return "Mock feed is on.";
     });
+
+    private void CancelEnable()
+    {
+        enableSummary = null;
+        confirmText = string.Empty;
+    }
 
     // Switching to Live first shows what a reset would do, so the admin can choose.
     private Task SelectLive() => Run(async () =>

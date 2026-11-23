@@ -19,6 +19,7 @@ namespace BowlPoolManager.Tests.Api
             public Mock<IMockFeedStartingSet> StartingSet = new();
             public Mock<IScoreFeedSettingsStore> Settings = new();
             public Mock<IMockFeedResetService> Reset = new();
+            public Mock<IMockFeedImpactService> Impact = new();
 
             public Fixture()
             {
@@ -32,6 +33,7 @@ namespace BowlPoolManager.Tests.Api
                 Store.Setup(s => s.ReplaceAllAsync(It.IsAny<IEnumerable<FeedGame>>())).ReturnsAsync(3);
                 StartingSet.Setup(s => s.Load()).Returns(new List<FeedGame> { new() { ExternalId = "9" } });
                 Settings.Setup(s => s.GetModeAsync()).ReturnsAsync(ScoreFeedMode.Mock);
+                Impact.Setup(i => i.PreviewAsync()).ReturnsAsync(new MockFeedEnableSummary { MatchingGames = 2, LinkedGames = 5, GameNames = new List<string> { "A Bowl", "B Bowl" } });
                 Settings.Setup(s => s.SetModeAsync(It.IsAny<ScoreFeedMode>())).Returns(Task.CompletedTask);
                 var summary = new MockFeedResetSummary { GamesToReset = 4, SlotsToClear = 2 };
                 Reset.Setup(r => r.PreviewAsync()).ReturnsAsync(new MockFeedResetResult(MockFeedResetStatus.Ok, summary));
@@ -40,7 +42,7 @@ namespace BowlPoolManager.Tests.Api
             }
 
             public MockFeedFunctions Build() => new(new NullLoggerFactory(), EndpointKit.Users().Object,
-                Store.Object, StartingSet.Object, Settings.Object, Reset.Object);
+                Store.Object, StartingSet.Object, Settings.Object, Reset.Object, Impact.Object);
 
             public void NothingTouched()
             {
@@ -52,6 +54,7 @@ namespace BowlPoolManager.Tests.Api
                 Settings.Verify(s => s.GetModeAsync(), Times.Never);
                 Settings.Verify(s => s.SetModeAsync(It.IsAny<ScoreFeedMode>()), Times.Never);
                 Reset.Verify(r => r.PreviewAsync(), Times.Never);
+                Impact.Verify(i => i.PreviewAsync(), Times.Never);
                 Reset.Verify(r => r.ApplyAsync(It.IsAny<int>()), Times.Never);
             }
         }
@@ -76,13 +79,14 @@ namespace BowlPoolManager.Tests.Api
                 "getMode" => await f.GetMockFeedMode(req),
                 "setMode" => await f.SetMockFeedMode(req),
                 "preview" => await f.PreviewMockFeedReset(req),
+                "enablePreview" => await f.PreviewMockFeedEnable(req),
                 _ => throw new ArgumentException(endpoint)
             };
             return new Result(EndpointKit.Status(response), EndpointKit.BodyText(response));
         }
 
         public static IEnumerable<object[]> AllEndpoints() =>
-            new[] { "get", "save", "delete", "startingSet", "getMode", "setMode", "preview" }.Select(e => new object[] { e });
+            new[] { "get", "save", "delete", "startingSet", "getMode", "setMode", "preview", "enablePreview" }.Select(e => new object[] { e });
 
         [Theory]
         [MemberData(nameof(AllEndpoints))]
@@ -236,7 +240,7 @@ namespace BowlPoolManager.Tests.Api
         {
             var f = new Fixture();
 
-            var result = await Call(f.Build(), "setMode", Tier.SuperAdmin, new { mode });
+            var result = await Call(f.Build(), "setMode", Tier.SuperAdmin, new { mode, confirm = "MOCK" });
 
             result.Status.Should().Be(200);
             f.Settings.Verify(s => s.SetModeAsync(expected), Times.Once);
@@ -254,6 +258,80 @@ namespace BowlPoolManager.Tests.Api
             var result = await Call(f.Build(), "setMode", Tier.SuperAdmin, new { mode });
 
             result.Status.Should().Be(400);
+            f.Settings.Verify(s => s.SetModeAsync(It.IsAny<ScoreFeedMode>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task SetMockFeedMode_ShouldSwitchToLiveWithoutAConfirmation_WhenNoConfirmIsGiven()
+        {
+            var f = new Fixture();
+
+            var result = await Call(f.Build(), "setMode", Tier.SuperAdmin, new { mode = "Live" });
+
+            result.Status.Should().Be(200);
+            f.Settings.Verify(s => s.SetModeAsync(ScoreFeedMode.Live), Times.Once);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("mock")]
+        [InlineData("MOCK ")]
+        [InlineData(" MOCK")]
+        [InlineData("YES")]
+        public async Task SetMockFeedMode_ShouldReturn400AndStoreNothing_WhenSwitchingToMockWithoutTheTypedWord(string? confirm)
+        {
+            var f = new Fixture();
+
+            var result = await Call(f.Build(), "setMode", Tier.SuperAdmin, new { mode = "Mock", confirm });
+
+            result.Status.Should().Be(400);
+            f.Settings.Verify(s => s.SetModeAsync(It.IsAny<ScoreFeedMode>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task SetMockFeedMode_ShouldReturn400AndStoreNothing_WhenTheConfirmWordIsNotAString()
+        {
+            var f = new Fixture();
+
+            var result = await Call(f.Build(), "setMode", Tier.SuperAdmin, new { mode = "Mock", confirm = 1 });
+
+            result.Status.Should().Be(400);
+            f.Settings.Verify(s => s.SetModeAsync(It.IsAny<ScoreFeedMode>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task SetMockFeedMode_ShouldReturn400AndChangeNothing_WhenMockIsConfirmedTogetherWithAReset()
+        {
+            var f = new Fixture();
+
+            var result = await Call(f.Build(), "setMode", Tier.SuperAdmin, new { mode = "Mock", confirm = "MOCK", resetConfirm = 4 });
+
+            result.Status.Should().Be(400);
+            f.Settings.Verify(s => s.SetModeAsync(It.IsAny<ScoreFeedMode>()), Times.Never);
+            f.Reset.Verify(r => r.ApplyAsync(It.IsAny<int>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task SetMockFeedMode_ShouldReturn400AndStoreNothing_WhenSwitchingToMockWithNoConfirmField()
+        {
+            var f = new Fixture();
+
+            var result = await Call(f.Build(), "setMode", Tier.SuperAdmin, new { mode = "Mock" });
+
+            result.Status.Should().Be(400);
+            f.Settings.Verify(s => s.SetModeAsync(It.IsAny<ScoreFeedMode>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task PreviewMockFeedEnable_ShouldReturnTheMatchingGamesAndChangeNothing_WhenSuperAdmin()
+        {
+            var f = new Fixture();
+
+            var result = await Call(f.Build(), "enablePreview", Tier.SuperAdmin);
+
+            result.Status.Should().Be(200);
+            result.Body.Should().Contain("\"matchingGames\":2").And.Contain("A Bowl");
             f.Settings.Verify(s => s.SetModeAsync(It.IsAny<ScoreFeedMode>()), Times.Never);
         }
 

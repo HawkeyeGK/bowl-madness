@@ -26,6 +26,10 @@ namespace BowlPoolManager.Api.Functions.Admin
         private readonly IMockFeedStartingSet _startingSet;
         private readonly IScoreFeedSettingsStore _settings;
         private readonly IMockFeedResetService _reset;
+        private readonly IMockFeedImpactService _impact;
+
+        // Switching TO Mock needs this word typed by the admin; the server checks it, not just the page.
+        public const string MockConfirmWord = "MOCK";
 
         public MockFeedFunctions(
             ILoggerFactory loggerFactory,
@@ -33,7 +37,8 @@ namespace BowlPoolManager.Api.Functions.Admin
             IMockFeedStore store,
             IMockFeedStartingSet startingSet,
             IScoreFeedSettingsStore settings,
-            IMockFeedResetService reset)
+            IMockFeedResetService reset,
+            IMockFeedImpactService impact)
         {
             _logger = loggerFactory.CreateLogger<MockFeedFunctions>();
             _userRepo = userRepo;
@@ -41,6 +46,7 @@ namespace BowlPoolManager.Api.Functions.Admin
             _startingSet = startingSet;
             _settings = settings;
             _reset = reset;
+            _impact = impact;
         }
 
         // ── Mode ─────────────────────────────────────────────────────────────
@@ -56,7 +62,18 @@ namespace BowlPoolManager.Api.Functions.Admin
             return await JsonResponseAsync(req, new { mode = mode.ToString() });
         }
 
-        // Body: { "mode": "Live" | "Mock", "resetConfirm": <games shown in the preview> (optional) }.
+        // Read only: the linked games of the current season that the mock would update if it were switched on.
+        [Function("PreviewMockFeedEnable")]
+        public async Task<HttpResponseData> PreviewMockFeedEnable(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "MockFeed/EnablePreview")] HttpRequestData req)
+        {
+            var refused = await CheckAsync(req);
+            if (refused != null) return refused;
+
+            return await JsonResponseAsync(req, await _impact.PreviewAsync());
+        }
+
+        // Body: { "mode": "Live" | "Mock", "confirm": "MOCK" (required for Mock), "resetConfirm": <games shown in the preview> (optional) }.
         // resetConfirm is only valid when switching from Mock to Live: the stored mode must be Mock, the preview
         // count must still match, then the mode goes to Live FIRST (so no refresh applies mock scores) and the
         // games are reset. There is no stand-alone reset: it cannot tell mock results from real ones, so it only
@@ -70,7 +87,10 @@ namespace BowlPoolManager.Api.Functions.Admin
 
             var body = await ReadModeBodyAsync(req);
             if (body == null) return await TextResponseAsync(req, HttpStatusCode.BadRequest, "Mode must be Live or Mock, and resetConfirm a whole number.");
-            var (mode, resetConfirm) = body.Value;
+            var (mode, resetConfirm, confirm) = body.Value;
+
+            if (mode == ScoreFeedMode.Mock && !string.Equals(confirm, MockConfirmWord, StringComparison.Ordinal))
+                return await TextResponseAsync(req, HttpStatusCode.BadRequest, "Type MOCK to switch to the mock feed.");
 
             if (resetConfirm == null)
             {
@@ -114,7 +134,7 @@ namespace BowlPoolManager.Api.Functions.Admin
 
         // Exactly "Live" or "Mock"; resetConfirm, when present, a whole number of 0 or more. Anything else, a missing
         // body or bad JSON gives null.
-        private static async Task<(ScoreFeedMode Mode, int? ResetConfirm)?> ReadModeBodyAsync(HttpRequestData req)
+        private static async Task<(ScoreFeedMode Mode, int? ResetConfirm, string? Confirm)?> ReadModeBodyAsync(HttpRequestData req)
         {
             try
             {
@@ -138,7 +158,8 @@ namespace BowlPoolManager.Api.Functions.Admin
                     if (c.ValueKind != JsonValueKind.Number || !c.TryGetInt32(out var n) || n < 0) return null;
                     confirm = n;
                 }
-                return (mode, confirm);
+                string? word = root.TryGetProperty("confirm", out var w) && w.ValueKind == JsonValueKind.String ? w.GetString() : null;
+                return (mode, confirm, word);
             }
             catch (JsonException)
             {

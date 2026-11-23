@@ -80,6 +80,7 @@ builder.Services.AddSingleton<IMockFeedStore, MockFeedStore>();
 builder.Services.AddSingleton<IMockFeedStartingSet, EmbeddedMockFeedStartingSet>();
 builder.Services.AddSingleton<IScoreFeedSettingsStore, ScoreFeedSettingsStore>();
 builder.Services.AddSingleton<IMockFeedResetService, MockFeedResetService>();
+builder.Services.AddSingleton<IMockFeedImpactService, MockFeedImpactService>();
 builder.Services.AddSingleton<MockScoreFeed>();
 builder.Services.AddSingleton<IScoreFeed>(sp => new SwitchingScoreFeed(
     sp.GetRequiredService<CfbdScoreFeed>(),
