@@ -46,12 +46,14 @@ Test environment and score feed mock: decided, see section 13. Execution plan: d
 
 **Phase 0 done 2026-11-22:** the test site (swa-bowlmadness-test, its own database), the test guard with `ResetTestData` and three scenarios, tests gating every deploy, and the baseline serialization and endpoint tests are on production's `main` (PR 147). 30 tests are labelled `KnownFailure` and skipped by CI until their issues are fixed. The score feed mock is still Phase 1.1 group A.
 
+**Phase 1.0 done 2026-11-22:** Core and Api on net10.0, `platform.apiRuntime` set to `dotnet-isolated:10.0`, in production on `main` (PRs 149 and 151). No package changes; the `Azure.Functions.Sdk` switch is a separate follow-up. It reached production after the planned 2026-11-10 date; .NET 8 deploys were still accepted.
+
 ### Release 1: platform and fixes, current UI
 Purpose: a supported, correct site that can carry the bowl season by itself if Release 2 slips. Two releases, approved 2026-10-28; 1.1 is not split further.
 
 **1.0: .NET 10 upgrade only (before 2026-11-10).**
 - Move Api and Core from net8.0 to net10.0 (Client and Tests are already net10.0). Set `platform.apiRuntime` to `dotnet-isolated:10.0` in `staticwebapp.config.json`; the file names no runtime today. Update the Functions worker packages.
-- Checks: build, full test suite (no new failures beyond #94), and a full click-through on the test site (Phase 0). Details: docs/plans/phase-1.0-dotnet10.md.
+- Checks: build, full test suite (no new failures beyond the tests labelled KnownFailure), and a full click-through on the test site (Phase 0). Details: docs/plans/phase-1.0-dotnet10.md.
 
 **1.1: fixes before the new UI (~2026-11-20).** One release, four groups, each its own pull request and session, in this order. Details: docs/plans/phase-1.1-fixes.md.
 - A, feed and season setup: shared score-feed interface and mock (section 13), #102 hard-coded 2025 season, #129 New Pool crash. First, because every later group needs pools and scores on the test site.
