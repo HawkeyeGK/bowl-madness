@@ -9,7 +9,7 @@ disagree, this document is the intent and the code is the bug.
 
 - Roles are Player (the default), Admin and SuperAdmin. Each includes the one below it. The first SuperAdmin is the email named in the `BootstrapAdminEmail` setting.
 - Only a SuperAdmin changes roles or disables accounts.
-- A disabled user is treated exactly like an unauthenticated user, on every endpoint. *(Owner decision)*
+- A disabled user is treated exactly like an unauthenticated user, on every endpoint. *(Owner decision)* The one exception: a disabled user who asks for their own profile is told the account is disabled (403), so the site can say so before signing them out.
 - Every rule is enforced by the API function itself. The site routing file protects only the admin pages, so hiding a button is never a protection.
 
 | Tier | May do |
@@ -35,7 +35,8 @@ disagree, this document is the intent and the code is the bug.
 *Source: `Api/Functions/EntryFunctions.cs`, `HoopsEntryFunctions.cs`, `Core/Validation/EntryUpdateValidator.cs`, `HoopsEntryUpdateValidator.cs`.*
 
 - **Locking.** Up to and including the lock date, an entry may be created and changed freely. After it, no new entries and no changes to picks or the tiebreaker; renaming is still allowed unless the pool is concluded or archived.
-- **Admins ignore every lock** and may edit, delete or reassign any entry at any time.
+- **Admins ignore every lock** and may edit, delete or reassign any entry at any time. A player's save never moves an entry to another pool; only an Admin moves entries.
+- **What a save can change.** A save sets only the bracket name (1 to 60 characters, trimmed), the picks and the tiebreaker (0 to 999). Picks must be for games in the pool, except that a pick already stored on the entry is kept. The owner, season, payment status, creation time and audit log come from the stored entry or the server.
 - **Visibility.** Before lock, no one except Admins sees another player's picks, by any route (page, API, backup). The leaderboard shows names and scores only. Once the pool is locked, everyone can see everyone's picks. A player always sees their own. *(Owner decision)*
 - A bracket name is unique within a pool, ignoring case. A player's save is always recorded as theirs.
 - A player can delete their own entry until lock.
@@ -52,7 +53,7 @@ disagree, this document is the intent and the code is the bug.
 The same rules apply to football and hoops.
 
 - A correct pick on a final game earns that game's points. Football points are set per game; hoops points come from a per-round table on the pool.
-- Games cannot end tied. *(Owner decision)*
+- Games cannot end tied. *(Owner decision)* A game is Final only with both scores and a winner. A Final without them is refused from the score feed and from the results page, and scoring treats such a game as undecided.
 - **Max possible** is the current score plus the points of every unplayed pick whose team has not yet lost.
 - **Rank order:** score, then max possible, then the pool's first tiebreaker, then its second, then name. *(Owner decision)*
 - Entries that tie on all of those share a rank (1, 2, 2, 4), listed by name. Prizes for a shared rank are split evenly by hand. *(Owner decision)*
@@ -68,6 +69,7 @@ The same rules apply to football and hoops.
 
 - Scores refresh lazily when games are read; games not linked to the feed are updated by hand.
 - When a game goes final, its winner fills the next game's slot and cascades; a game that is no longer final resets that slot.
+- When a game's winner advances, it fills the slot of the next game as follows: with two feeding games, the earlier kickoff goes to home; with one, the winner fills the slot that does not already hold a seeded team.
 - **Mock score feed.** A SuperAdmin can switch football scores between Live (College Football Data) and Mock (games edited on the Score Feed page). It works on the test site and on production. While Mock is on, the site shows and scores the mock's results for linked games, for every visitor, and real scores are not applied. The Score Feed page shows a warning while Mock is on; no other page does. There is no automatic block (for example after a pool locks). The default, when nothing is stored, is Live. The test-data reset sets it back to Live. Switching to Mock first shows which linked games of the current season it could change (and their names), and the admin must type MOCK to confirm; the server enforces the same confirmation.
 - **Switching back to Live** asks whether to reset the current season's football games. A reset is only possible as part of switching from Mock to Live. "Switch and reset" lists the games first, with a warning that every result on them is cleared whatever its source (real and hand-entered results too). It then clears the scores of linked games that have a result, sets them to Scheduled, and returns the later-round teams that those results had advanced to "Winner of ...". Pools, entries and picks are not changed, so standings return to zero. "Switch only" leaves results as they are. Slots edited by hand, and later games whose result was entered by hand, are left alone and listed.
 - **Before the first reset on production**, run the `/data-change` procedure (confirms continuous backup is on and records the restore point).

@@ -1,6 +1,6 @@
 # Phase 1.1: fixes before the new UI
 
-Status: waits for Phase 1.0. Written 2026-10-29. Part of docs/UPGRADE-PLAN-2026.md (sections 3, 12 and 13). One release, built as four groups; run each group in its own session, in the order below.
+Status: done 2026-11-23 (in production on `main`, PR 167). Written 2026-10-29. Part of docs/UPGRADE-PLAN-2026.md (sections 3, 12 and 13). One release, built as four groups; run each group in its own session, in the order below.
 
 ## Start here (for a new session)
 1. Read CLAUDE.md, docs/BUSINESS-RULES.md, docs/UPGRADE-PLAN-2026.md sections 3, 12 and 13, then this file.
@@ -55,7 +55,7 @@ Group A, group B, #129, #128 and #130. If the date is at risk, the rest of group
 - #98: a disabled user is treated as signed out on every endpoint.
 - Each fix flips its Phase 0 `KnownFailure` tests.
 
-**Progress:** [ ] #93 [ ] #97 [ ] #98 [ ] #99 + #134 [ ] #131 [ ] #133 [ ] reviews [ ] test site check [ ] merged
+**Progress:** [x] #93 [x] #97 [x] #98 [x] #99 + #134 [x] #131 [x] #133 [x] reviews [x] test site check [x] merged (PR 160)
 
 ---
 
@@ -76,7 +76,7 @@ Group A, group B, #129, #128 and #130. If the date is at risk, the rest of group
 5. #94: find out whether the tests or the code are wrong; fix; remove the `KnownFailure` label.
 6. Switch the pages and the server to the shared code.
 
-**Progress:** [x] characterization tests [x] slot rule + #130 [x] simulator + #136 #109 #127 [x] replay (fixture test; the `last-season-replay` test-site scenario is not built) [x] #94 [x] pages and server switched [ ] reviews [ ] test site check [x] merged
+**Progress:** [x] characterization tests [x] slot rule + #130 [x] simulator + #136 #109 #127 [x] replay (fixture test; the `last-season-replay` test-site scenario is not built) [x] #94 [x] pages and server switched [x] reviews [x] test site check [x] merged (PR 165)
 
 **Decision needed from the owner (before step 5, #94):** Phase 0 added 28 new `KnownFailure` tests beside the two #94 tests (30 in all; CI skips them). Decide whether to fix any of the new ones together with #94 in this group, or leave them for the phase that touches that code anyway. Where they stand today:
 - 20 are already owned by group B, which flips them with its fixes: #93 (4), #98 (2), and #97, #99, #131 (14, football and hoops).
@@ -99,9 +99,11 @@ Either way, file issues for the two "no issue yet" items first so each label nam
 
 **Also in this group:** #161 (set `IsAdminEntered` when an Admin creates an entry for someone else; in `EntrySubmission.Build`).
 
-**Progress:** [x] #128 [x] #137 [x] #132 [x] #135 [x] #107 [x] #161 [ ] reviews [ ] test site check [ ] merged
+**Progress:** [x] #128 [x] #137 [x] #132 [x] #135 [x] #107 [x] #161 [x] reviews [x] test site check (in the release checklist) [x] merged (PR 166)
 
 ---
 
 ## Release
 When all four groups are merged (into `staging` if Phase 0 chose that flow), run the whole Phase 0 and 1.0 checklists on the test site again with the `entry-window`, `mid-season` and `last-season-replay` scenarios, then ask the owner to release to production. After release: read-only smoke test and log check (docs/INFRASTRUCTURE.md "Reading the logs"). Update docs/UPGRADE-PLAN-2026.md, ARCHITECTURAL_CONTEXT.md (simulator, score-feed interface, mock) and propose BUSINESS-RULES edits where behavior was clarified.
+
+**Release progress:** [x] release checklist on the test site, 2026-11-23 (`entry-window` and `mid-season`; `last-season-replay` covered by its fixture test, by owner decision) [x] released (PR 167, merge `bd7c70c`, deployed 17:20 UTC) [x] read-only production smoke test [ ] log check for the first hour [x] BUSINESS-RULES edits (on `main` 289ecbc, 8445ec8, and in PR 166) [x] ARCHITECTURAL_CONTEXT (simulator in PR 165, score feed in PR 157)
