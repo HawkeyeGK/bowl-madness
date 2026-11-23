@@ -30,7 +30,7 @@ namespace BowlPoolManager.Tests.Api
                 Pools.Setup(p => p.GetPoolAsync("pool-open")).ReturnsAsync(MakePool("pool-open", locked: false));
                 Pools.Setup(p => p.GetPoolAsync("pool-open-2")).ReturnsAsync(MakePool("pool-open-2", locked: false));
                 Pools.Setup(p => p.GetPoolAsync("pool-locked")).ReturnsAsync(MakePool("pool-locked", locked: true));
-                Games.Setup(g => g.GetGamesAsync(It.IsAny<string?>())).ReturnsAsync(new List<BowlGame> { new() { Id = "game-1", BowlName = "First Bowl" } });
+                Games.Setup(g => g.GetGamesAsync(It.IsAny<string?>())).ReturnsAsync(new List<BowlGame> { new() { Id = "game-1", BowlName = "First Bowl", TeamHome = "Team A", TeamAway = "Team B" } });
                 Entries.Setup(e => e.IsBracketNameTakenAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>())).ReturnsAsync(false);
                 Entries.Setup(e => e.AddEntryAsync(It.IsAny<BracketEntry>()))
                     .Callback<BracketEntry>(e => Saved = e)

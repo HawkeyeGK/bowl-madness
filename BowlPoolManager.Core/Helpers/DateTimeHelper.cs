@@ -34,6 +34,24 @@ namespace BowlPoolManager.Core.Helpers
             return TimeZoneInfo.ConvertTimeFromUtc(utc, _centralTimeZone);
         }
 
+        /// <summary>
+        /// The one way to show a stored time: Central, formatted, with " CT" after it (BUSINESS-RULES section 7).
+        /// A value of unspecified kind is read as UTC, which is how the site stores times.
+        /// </summary>
+        public static string ToCentralLabel(DateTime utc, string format)
+        {
+            var asUtc = utc.Kind switch
+            {
+                DateTimeKind.Local => utc.ToUniversalTime(),
+                _ => DateTime.SpecifyKind(utc, DateTimeKind.Utc)
+            };
+            return ToCentral(asUtc).ToString(format) + " CT";
+        }
+
+        /// <summary>Same, for a time that may be missing; <paramref name="whenNull"/> is shown then.</summary>
+        public static string ToCentralLabel(DateTime? utc, string format, string whenNull = "") =>
+            utc.HasValue ? ToCentralLabel(utc.Value, format) : whenNull;
+
         public static DateTime FromCentral(DateTime central)
         {
             // If the input is already UTC, just return it

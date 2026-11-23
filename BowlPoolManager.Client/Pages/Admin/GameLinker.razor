@@ -52,7 +52,7 @@ else
                                 <strong>@game.BowlName</strong><br/>
                                 <span class="text-muted small">@game.TeamHome vs @game.TeamAway</span>
                             </td>
-                            <td>@game.StartTime.ToLocalTime().ToString("MMM dd, h:mm tt")</td>
+                            <td>@DateTimeHelper.ToCentralLabel(game.StartTime, "MMM dd, h:mm tt")</td>
                             <td>
                                 @if(IsLinked(game))
                                 {

@@ -33,7 +33,7 @@
                 else
                 {
                     <div class="text-end small text-muted">
-                        @DateTimeHelper.ToCentral(Game.StartTime).ToString("MMM d, h:mm tt")
+                        @DateTimeHelper.ToCentralLabel(Game.StartTime, "MMM d, h:mm tt")
                     </div>
                 }
             </div>
@@ -162,8 +162,10 @@
         bool isSelected = HasPick && (UserPick == HomeTeamName || UserPick == AwayTeamName);
         var homeInfo = VisualHelper.GetTeamInfo(HomeTeamName, Game, AllGames);
         var awayInfo = VisualHelper.GetTeamInfo(AwayTeamName, Game, AllGames);
-        bool isGameReady = HomeTeamName != "TBD" && AwayTeamName != "TBD";
-        bool isDisabled = !isGameReady; // Parent handles "IsLocked" but here we also check readiness
+        // A slot cannot be picked while its team is not known (issue 128). The parent says which slots wait for an
+        // earlier pick; a plain "TBD" is never pickable either. The parent handles "IsLocked".
+        bool awayDisabled = AwayUnavailable || VisualHelper.IsTBD(AwayTeamName);
+        bool homeDisabled = HomeUnavailable || VisualHelper.IsTBD(HomeTeamName);
 
         <div class="card h-100 shadow-sm scoreboard-card @(isSelected ? "border-primary" : "")">
             <div class="card-header bg-white border-bottom-0 pt-3 pb-2 d-flex justify-content-between align-items-center">
@@ -173,9 +175,13 @@
                     {
                         <span class="badge bg-warning text-dark ms-2">Playoff</span>
                     }
+                    @if (PickCleared)
+                    {
+                        <span class="badge bg-info text-dark ms-2" title="An earlier pick changed, so this pick was cleared.">Pick cleared</span>
+                    }
                 </div>
                 <div class="text-end small text-muted">
-                    <div>@DateTimeHelper.ToCentral(Game.StartTime).ToString("MMM d, h:mm tt")</div>
+                    <div>@DateTimeHelper.ToCentralLabel(Game.StartTime, "MMM d, h:mm tt")</div>
                 </div>
             </div>
             
@@ -188,10 +194,10 @@
                 <div class="mb-2">
                     <input type="radio" class="btn-check" name="@Game.Id" id="@($"{Game.Id}_away")" 
                             checked="@(UserPick == AwayTeamName && AwayTeamName != "TBD")" 
-                            disabled="@isDisabled"
+                            disabled="@awayDisabled"
                             @onchange="@(async () => await OnPickSelected.InvokeAsync(AwayTeamName))" autocomplete="off">
                     
-                    <label class="d-flex align-items-center team-row p-2 w-100 position-relative @(UserPick == AwayTeamName && AwayTeamName != "TBD" ? "selected-pick" : "unselected-pick") @(isDisabled ? "opacity-50" : "cursor-pointer")" 
+                    <label class="d-flex align-items-center team-row p-2 w-100 position-relative @(UserPick == AwayTeamName && AwayTeamName != "TBD" ? "selected-pick" : "unselected-pick") @(awayDisabled ? "opacity-50" : "cursor-pointer")" 
                             for="@($"{Game.Id}_away")"
                             style="border-left: 5px solid @(VisualHelper.GetColor(awayInfo, AwayTeamName));">
                         
@@ -232,10 +238,10 @@
                 <div>
                     <input type="radio" class="btn-check" name="@Game.Id" id="@($"{Game.Id}_home")" 
                             checked="@(UserPick == HomeTeamName && HomeTeamName != "TBD")" 
-                            disabled="@isDisabled"
+                            disabled="@homeDisabled"
                             @onchange="@(async () => await OnPickSelected.InvokeAsync(HomeTeamName))" autocomplete="off">
                     
-                    <label class="d-flex align-items-center team-row p-2 w-100 position-relative @(UserPick == HomeTeamName && HomeTeamName != "TBD" ? "selected-pick" : "unselected-pick") @(isDisabled ? "opacity-50" : "cursor-pointer")" 
+                    <label class="d-flex align-items-center team-row p-2 w-100 position-relative @(UserPick == HomeTeamName && HomeTeamName != "TBD" ? "selected-pick" : "unselected-pick") @(homeDisabled ? "opacity-50" : "cursor-pointer")" 
                             for="@($"{Game.Id}_home")"
                             style="border-left: 5px solid @(VisualHelper.GetColor(homeInfo, HomeTeamName));">
                         
@@ -271,6 +277,11 @@
                         }
                     </label>
                 </div>
+
+                @if (!string.IsNullOrEmpty(Hint))
+                {
+                    <div class="small text-muted fst-italic mt-2"><i class="bi bi-info-circle me-1"></i>@Hint</div>
+                }
             </div>
         </div>
     }
@@ -285,6 +296,14 @@
     [Parameter] public HashSet<string>? EliminatedTeams { get; set; }
     [Parameter] public List<BowlGame> AllGames { get; set; } = new();
     [Parameter] public EventCallback<string> OnPickSelected { get; set; }
+
+    // Issue 128: a slot whose team depends on an earlier pick the player has not made cannot be picked.
+    [Parameter] public bool HomeUnavailable { get; set; }
+    [Parameter] public bool AwayUnavailable { get; set; }
+    /// <summary>Small line under the teams, for example "Pick R1A and R1B first."</summary>
+    [Parameter] public string? Hint { get; set; }
+    /// <summary>True when changing an earlier pick just cleared this game's pick.</summary>
+    [Parameter] public bool PickCleared { get; set; }
 
     private bool HasPick => !string.IsNullOrEmpty(UserPick);
 

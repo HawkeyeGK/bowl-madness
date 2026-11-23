@@ -32,7 +32,7 @@ namespace BowlPoolManager.Tests.Api
             {
                 Pools.Setup(p => p.GetPoolAsync("pool-open")).ReturnsAsync(OpenPool);
                 Pools.Setup(p => p.GetPoolAsync("pool-locked")).ReturnsAsync(LockedPool);
-                Games.Setup(g => g.GetGamesAsync(It.IsAny<string?>())).ReturnsAsync(new List<BowlGame> { new() { Id = "game-1" } });
+                Games.Setup(g => g.GetGamesAsync(It.IsAny<string?>())).ReturnsAsync(new List<BowlGame> { new() { Id = "game-1", TeamHome = "Team A", TeamAway = "Team B" } });
                 Entries.Setup(e => e.IsBracketNameTakenAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>())).ReturnsAsync(false);
                 Entries.Setup(e => e.AddEntryAsync(It.IsAny<BracketEntry>()))
                     .Callback<BracketEntry>(e => Saved = e)
