@@ -9,7 +9,7 @@ disagree, this document is the intent and the code is the bug.
 
 - Roles are Player (the default), Admin and SuperAdmin. Each includes the one below it. The first SuperAdmin is the email named in the `BootstrapAdminEmail` setting.
 - Only a SuperAdmin changes roles or disables accounts.
-- A disabled user is treated exactly like an unauthenticated user, on every endpoint. *(Owner decision)*
+- A disabled user is treated exactly like an unauthenticated user, on every endpoint. *(Owner decision)* The one exception: a disabled user who asks for their own profile is told the account is disabled (403), so the site can say so before signing them out.
 - Every rule is enforced by the API function itself. The site routing file protects only the admin pages, so hiding a button is never a protection.
 
 | Tier | May do |
@@ -35,7 +35,8 @@ disagree, this document is the intent and the code is the bug.
 *Source: `Api/Functions/EntryFunctions.cs`, `HoopsEntryFunctions.cs`, `Core/Validation/EntryUpdateValidator.cs`, `HoopsEntryUpdateValidator.cs`.*
 
 - **Locking.** Up to and including the lock date, an entry may be created and changed freely. After it, no new entries and no changes to picks or the tiebreaker; renaming is still allowed unless the pool is concluded or archived.
-- **Admins ignore every lock** and may edit, delete or reassign any entry at any time.
+- **Admins ignore every lock** and may edit, delete or reassign any entry at any time. A player's save never moves an entry to another pool; only an Admin moves entries.
+- **What a save can change.** A save sets only the bracket name (1 to 60 characters, trimmed), the picks and the tiebreaker (0 to 999). Picks must be for games in the pool, except that a pick already stored on the entry is kept. The owner, season, payment status, creation time and audit log come from the stored entry or the server.
 - **Visibility.** Before lock, no one except Admins sees another player's picks, by any route (page, API, backup). The leaderboard shows names and scores only. Once the pool is locked, everyone can see everyone's picks. A player always sees their own. *(Owner decision)*
 - A bracket name is unique within a pool, ignoring case. A player's save is always recorded as theirs.
 - A player can delete their own entry until lock.
@@ -49,7 +50,7 @@ disagree, this document is the intent and the code is the bug.
 The same rules apply to football and hoops.
 
 - A correct pick on a final game earns that game's points. Football points are set per game; hoops points come from a per-round table on the pool.
-- Games cannot end tied. *(Owner decision)*
+- Games cannot end tied. *(Owner decision)* A game is Final only with both scores and a winner. A Final without them is refused from the score feed and from the results page, and scoring treats such a game as undecided.
 - **Max possible** is the current score plus the points of every unplayed pick whose team has not yet lost.
 - **Rank order:** score, then max possible, then the pool's first tiebreaker, then its second, then name. *(Owner decision)*
 - Entries that tie on all of those share a rank (1, 2, 2, 4), listed by name. Prizes for a shared rank are split evenly by hand. *(Owner decision)*
