@@ -449,7 +449,9 @@
     private async Task LoadPoolData(string poolId)
     {
         var gamesTask = Http.GetFromJsonAsync<List<HoopsGame>>($"api/GetHoopsGames?poolId={poolId}");
-        var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetHoopsEntries?poolId={poolId}");
+        // The entries endpoint needs the pool's own season, which is not always the current season id (BUSINESS-RULES section 6).
+        var poolSeasonId = poolList.FirstOrDefault(p => p.Id == poolId)?.SeasonId ?? currentSeasonId;
+        var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetHoopsEntries?poolId={poolId}&seasonId={poolSeasonId}");
         await Task.WhenAll(gamesTask, entriesTask);
 
         games = await gamesTask ?? new();

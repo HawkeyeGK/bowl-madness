@@ -41,7 +41,8 @@ namespace BowlPoolManager.Api.Functions
         [Function("AnalyzeLegacyData")]
         public async Task<IActionResult> AnalyzeLegacyData([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "migration/analyze")] HttpRequest req)
         {
-            if (!await IsSuperAdminAsync(req)) return new StatusCodeResult(StatusCodes.Status403Forbidden);
+            var refused = await SecurityHelper.RefuseUnlessSuperAdminAsync(req, _userRepository);
+            if (refused != null) return refused;
 
             _logger.LogInformation("Analyzing legacy data...");
 
@@ -70,7 +71,8 @@ namespace BowlPoolManager.Api.Functions
         [Function("ExecuteMigration")]
         public async Task<IActionResult> ExecuteMigration([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "migration/execute")] HttpRequest req)
         {
-            if (!await IsSuperAdminAsync(req)) return new StatusCodeResult(StatusCodes.Status403Forbidden);
+            var refused = await SecurityHelper.RefuseUnlessSuperAdminAsync(req, _userRepository);
+            if (refused != null) return refused;
 
             try
             {
@@ -244,30 +246,6 @@ namespace BowlPoolManager.Api.Functions
             {
                 _logger.LogError(ex, "Error executing migration");
                 return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-            }
-        }
-
-        private async Task<bool> IsSuperAdminAsync(HttpRequest req)
-        {
-            try 
-            {
-                if (!req.Headers.TryGetValue("x-ms-client-principal", out var headerValues)) return false;
-                var header = headerValues.FirstOrDefault();
-                if (string.IsNullOrEmpty(header)) return false;
-
-                var data = Convert.FromBase64String(header);
-                var decoded = System.Text.Encoding.UTF8.GetString(data);
-                
-                var principal = JsonConvert.DeserializeObject<SecurityHelper.ClientPrincipal>(decoded);
-                
-                if (principal == null || string.IsNullOrEmpty(principal.UserId)) return false;
-
-                var user = await _userRepository.GetUserAsync(principal.UserId);
-                return user != null && user.AppRole == Constants.Roles.SuperAdmin;
-            }
-            catch
-            {
-                return false;
             }
         }
     }

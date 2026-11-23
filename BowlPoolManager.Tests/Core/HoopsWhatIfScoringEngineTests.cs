@@ -282,12 +282,14 @@ namespace BowlPoolManager.Tests.Core
         }
 
         // ---------------------------------------------------------------------------
-        // Elimination detection: IsEliminated when MaxPossible < leaderScore
+        // Elimination detection: IsEliminated when MaxPossible < the 3rd place score
         // ---------------------------------------------------------------------------
 
+        // Issue #94: the top three places pay out, so an entry is eliminated when its best possible score is
+        // below the score of the entry in 3rd place (BUSINESS-RULES section 4). These tests use four or more
+        // entries; with three or fewer nobody can be eliminated from the top 3.
         [Fact]
-        [Trait("Category", "KnownFailure")] // Issue #94: fails today; Phase 1.1 group C removes this trait when fixed.
-        public void Calculate_ShouldMarkEntryAsEliminated_WhenMaxPossibleIsLessThanLeaderScore()
+        public void Calculate_ShouldMarkEntryAsEliminated_WhenMaxPossibleIsLessThanThirdPlaceScore()
         {
             var pool = MakePool(new Dictionary<TournamentRound, int>
             {
@@ -295,68 +297,28 @@ namespace BowlPoolManager.Tests.Core
                 { TournamentRound.RoundOf32,  5 },
             });
 
-            // g1 decided: Duke wins (worth 10)
-            // g2 undecided (worth 5)
+            // g1 decided: Duke wins (worth 10). g2 undecided (worth 5).
             var games = new List<HoopsGame>
             {
                 MakeGame("g1", TournamentRound.RoundOf64, "Duke", "UNC",    "Duke"),
                 MakeGame("g2", TournamentRound.RoundOf32, "Duke", "Kansas"),
             };
 
-            // Leader: picked Duke for g1 (10 pts). Also picked Duke for g2 (alive → MaxPossible 15).
-            var leader = MakeEntry("e1", "Leader", new Dictionary<string, string>
-            {
-                { "g1", "Duke" },
-                { "g2", "Duke" },
-            });
+            // Three entries are right on g1 (10 pts each, 3rd place scores 10).
+            var first  = MakeEntry("e1", "First",  new Dictionary<string, string> { { "g1", "Duke" }, { "g2", "Duke" } });
+            var second = MakeEntry("e2", "Second", new Dictionary<string, string> { { "g1", "Duke" }, { "g2", "Duke" } });
+            var third  = MakeEntry("e3", "Third",  new Dictionary<string, string> { { "g1", "Duke" }, { "g2", "Kansas" } });
 
-            // Trailer: wrong on g1, and picked eliminated UNC for g2.
-            // Score=0, MaxPossible=0 → eliminated (0 < 10).
-            var trailer = MakeEntry("e2", "Trailer", new Dictionary<string, string>
-            {
-                { "g1", "UNC" },
-                { "g2", "UNC" },
-            });
+            // Trailer: wrong on g1, and picked the eliminated UNC for g2. Score 0, max 0: below 10.
+            var trailer = MakeEntry("e4", "Trailer", new Dictionary<string, string> { { "g1", "UNC" }, { "g2", "UNC" } });
 
             var simulated = new Dictionary<string, string?> { { "g1", "Duke" } };
 
-            var result = HoopsWhatIfScoringEngine.Calculate(
-                games,
-                new List<BracketEntry> { leader, trailer },
-                pool,
-                simulated);
+            var result = HoopsWhatIfScoringEngine.Calculate(games,
+                new List<BracketEntry> { first, second, third, trailer }, pool, simulated);
 
-            var leaderRow  = result.First(r => r.EntryId == "e1");
-            var trailerRow = result.First(r => r.EntryId == "e2");
-
-            leaderRow.IsEliminated.Should().BeFalse();
-            trailerRow.IsEliminated.Should().BeTrue();
-        }
-
-        [Fact]
-        public void Calculate_ShouldNotMarkLeaderAsEliminated_WhenLeaderHasBestScore()
-        {
-            var pool = MakePool(new Dictionary<TournamentRound, int>
-            {
-                { TournamentRound.RoundOf64, 10 },
-            });
-
-            var games = new List<HoopsGame>
-            {
-                MakeGame("g1", TournamentRound.RoundOf64, "Duke", "UNC", "Duke"),
-            };
-
-            var entry = MakeEntry("e1", "Leader", new Dictionary<string, string>
-            {
-                { "g1", "Duke" },
-            });
-
-            var simulated = new Dictionary<string, string?> { { "g1", "Duke" } };
-
-            var result = HoopsWhatIfScoringEngine.Calculate(
-                games, new List<BracketEntry> { entry }, pool, simulated);
-
-            result[0].IsEliminated.Should().BeFalse();
+            result.First(r => r.EntryId == "e4").IsEliminated.Should().BeTrue();
+            result.Where(r => r.EntryId != "e4").Should().OnlyContain(r => !r.IsEliminated);
         }
 
         // ---------------------------------------------------------------------------
@@ -740,13 +702,8 @@ namespace BowlPoolManager.Tests.Core
         // ---------------------------------------------------------------------------
 
         [Fact]
-        [Trait("Category", "KnownFailure")] // Issue #94: fails today; Phase 1.1 group C removes this trait when fixed.
-        public void Calculate_ShouldUseHighestScoreAsLeaderScore_ForEliminationCheck()
+        public void Calculate_ShouldNotMarkLeaderAsEliminated_WhenLeaderHasBestScore()
         {
-            // Three entries: A=10, B=5, C=0.
-            // C has MaxPossible=0 and should be eliminated (0 < 10).
-            // B has MaxPossible=5 and should be eliminated (5 < 10).
-            // A has MaxPossible=10 and is NOT eliminated.
             var pool = MakePool(new Dictionary<TournamentRound, int>
             {
                 { TournamentRound.RoundOf64, 10 },
@@ -757,29 +714,72 @@ namespace BowlPoolManager.Tests.Core
                 MakeGame("g1", TournamentRound.RoundOf64, "Duke", "UNC", "Duke"),
             };
 
+            var entry = MakeEntry("e1", "Leader", new Dictionary<string, string>
+            {
+                { "g1", "Duke" },
+            });
+
+            var simulated = new Dictionary<string, string?> { { "g1", "Duke" } };
+
+            var result = HoopsWhatIfScoringEngine.Calculate(
+                games, new List<BracketEntry> { entry }, pool, simulated);
+
+            result[0].IsEliminated.Should().BeFalse();
+        }
+
+        [Fact]
+        public void Calculate_ShouldUseThirdPlaceScoreAsThreshold_ForEliminationCheck()
+        {
+            // Five entries: A, B and C score 10 (3rd place scores 10); D can still reach only 5; E can reach 0.
+            var pool = MakePool(new Dictionary<TournamentRound, int>
+            {
+                { TournamentRound.RoundOf64, 10 },
+                { TournamentRound.RoundOf32,  5 },
+            });
+
+            var games = new List<HoopsGame>
+            {
+                MakeGame("g1", TournamentRound.RoundOf64, "Duke", "UNC", "Duke"),
+                MakeGame("g2", TournamentRound.RoundOf32, "Duke", "Kansas"),
+            };
+
             var entries = new List<BracketEntry>
             {
-                MakeEntry("eA", "A", new Dictionary<string, string> { { "g1", "Duke" } }),
-                MakeEntry("eB", "B", new Dictionary<string, string>()),            // no pick for g1
-                MakeEntry("eC", "C", new Dictionary<string, string> { { "g1", "UNC" } }), // wrong
+                MakeEntry("eA", "A", new Dictionary<string, string> { { "g1", "Duke" }, { "g2", "Duke" } }),
+                MakeEntry("eB", "B", new Dictionary<string, string> { { "g1", "Duke" }, { "g2", "Kansas" } }),
+                MakeEntry("eC", "C", new Dictionary<string, string> { { "g1", "Duke" } }),
+                MakeEntry("eD", "D", new Dictionary<string, string> { { "g1", "UNC" }, { "g2", "Duke" } }),   // wrong, but g2 is alive: max 5
+                MakeEntry("eE", "E", new Dictionary<string, string> { { "g1", "UNC" }, { "g2", "UNC" } }),    // wrong, UNC is out: max 0
             };
 
             var simulated = new Dictionary<string, string?> { { "g1", "Duke" } };
 
             var result = HoopsWhatIfScoringEngine.Calculate(games, entries, pool, simulated);
 
-            var rowA = result.First(r => r.EntryId == "eA");
-            var rowB = result.First(r => r.EntryId == "eB");
-            var rowC = result.First(r => r.EntryId == "eC");
+            result.First(r => r.EntryId == "eA").IsEliminated.Should().BeFalse();
+            result.First(r => r.EntryId == "eB").IsEliminated.Should().BeFalse();
+            result.First(r => r.EntryId == "eC").IsEliminated.Should().BeFalse();
+            result.First(r => r.EntryId == "eD").MaxPossible.Should().Be(5);
+            result.First(r => r.EntryId == "eD").IsEliminated.Should().BeTrue();   // 5 < 10
+            result.First(r => r.EntryId == "eE").MaxPossible.Should().Be(0);
+            result.First(r => r.EntryId == "eE").IsEliminated.Should().BeTrue();   // 0 < 10
+        }
 
-            rowA.Score.Should().Be(10);
-            rowA.IsEliminated.Should().BeFalse();
+        [Fact]
+        public void Calculate_ShouldNotEliminateAnyone_WhenThreeOrFewerEntries()
+        {
+            var pool = MakePool(new Dictionary<TournamentRound, int> { { TournamentRound.RoundOf64, 10 } });
+            var games = new List<HoopsGame> { MakeGame("g1", TournamentRound.RoundOf64, "Duke", "UNC", "Duke") };
+            var entries = new List<BracketEntry>
+            {
+                MakeEntry("eA", "A", new Dictionary<string, string> { { "g1", "Duke" } }),
+                MakeEntry("eB", "B", new Dictionary<string, string> { { "g1", "UNC" } }),
+                MakeEntry("eC", "C", new Dictionary<string, string> { { "g1", "UNC" } }),
+            };
 
-            rowB.Score.Should().Be(0);
-            rowB.IsEliminated.Should().BeTrue(); // MaxPossible=0 < leaderScore=10
+            var result = HoopsWhatIfScoringEngine.Calculate(games, entries, pool, new Dictionary<string, string?> { { "g1", "Duke" } });
 
-            rowC.Score.Should().Be(0);
-            rowC.IsEliminated.Should().BeTrue(); // MaxPossible=0 < leaderScore=10
+            result.Should().OnlyContain(r => !r.IsEliminated);
         }
     }
 }

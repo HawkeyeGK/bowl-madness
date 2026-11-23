@@ -39,7 +39,7 @@ Group A, group B, #129, #128 and #130. If the date is at risk, the rest of group
 6. #129: New Pool takes the year from the current season's `SeasonId`.
 7. Tests: the scoring service against the mock (status changes, scores, a final with unmatched names, which sets up #133 in group B).
 
-**Progress:** [x] interface agreed [x] CFBD implementation + #102 [x] mock [x] admin page [x] starting set [x] #129 [x] tests [x] test site check [ ] merged
+**Progress:** [x] interface agreed [x] CFBD implementation + #102 [x] mock [x] admin page [x] starting set [x] #129 [x] tests [x] test site check [x] merged
 
 ---
 
@@ -76,7 +76,7 @@ Group A, group B, #129, #128 and #130. If the date is at risk, the rest of group
 5. #94: find out whether the tests or the code are wrong; fix; remove the `KnownFailure` label.
 6. Switch the pages and the server to the shared code.
 
-**Progress:** [ ] characterization tests [ ] slot rule + #130 [ ] simulator + #136 #109 #127 [ ] replay [ ] #94 [ ] pages and server switched [ ] reviews [ ] test site check [ ] merged
+**Progress:** [x] characterization tests [x] slot rule + #130 [x] simulator + #136 #109 #127 [x] replay (fixture test; the `last-season-replay` test-site scenario is not built) [x] #94 [x] pages and server switched [ ] reviews [ ] test site check [x] merged
 
 **Decision needed from the owner (before step 5, #94):** Phase 0 added 28 new `KnownFailure` tests beside the two #94 tests (30 in all; CI skips them). Decide whether to fix any of the new ones together with #94 in this group, or leave them for the phase that touches that code anyway. Where they stand today:
 - 20 are already owned by group B, which flips them with its fixes: #93 (4), #98 (2), and #97, #99, #131 (14, football and hoops).
@@ -97,7 +97,9 @@ Either way, file issues for the two "no issue yet" items first so each label nam
 - #135: decided, use the current season's pool when a code matches more than one.
 - #107: one display helper that always returns Central with "CT"; apply it everywhere listed in the issue comment.
 
-**Progress:** [ ] #128 [ ] #137 [ ] #132 [ ] #135 [ ] #107 [ ] reviews [ ] test site check [ ] merged
+**Also in this group:** #161 (set `IsAdminEntered` when an Admin creates an entry for someone else; in `EntrySubmission.Build`).
+
+**Progress:** [x] #128 [x] #137 [x] #132 [x] #135 [x] #107 [x] #161 [ ] reviews [ ] test site check [ ] merged
 
 ---
 

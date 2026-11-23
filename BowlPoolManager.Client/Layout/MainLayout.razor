@@ -56,18 +56,14 @@
 
                 if (userProfile != null && userProfile.IsDisabled)
                 {
-                    // 1. Show Red Card
-                    securityMessage = "Access Denied: Your account has been disabled.";
-                    showSecurityToast = true;
-                    StateHasChanged();
-
-                    // 2. Wait for them to read it
-                    await Task.Delay(3000);
-                    
-                    // 3. Eject (Force Logout)
-                    Nav.NavigateTo("/.auth/logout?post_logout_redirect_uri=/", forceLoad: true);
+                    await ShowDisabledAndSignOutAsync();
                 }
             }
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            // The server answers GetMe with 403 for a disabled account (issue 98).
+            await ShowDisabledAndSignOutAsync();
         }
         catch (Exception ex)
         {
@@ -76,5 +72,19 @@
             // but we also can't check for bans. 
             Console.WriteLine($"Auth Check Failed: {ex.Message}");
         }
+    }
+
+    private async Task ShowDisabledAndSignOutAsync()
+    {
+        // 1. Show Red Card
+        securityMessage = "Access Denied: Your account has been disabled.";
+        showSecurityToast = true;
+        StateHasChanged();
+
+        // 2. Wait for them to read it
+        await Task.Delay(3000);
+
+        // 3. Eject (Force Logout)
+        Nav.NavigateTo("/.auth/logout?post_logout_redirect_uri=/", forceLoad: true);
     }
 }

@@ -6,6 +6,8 @@ using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
 using BowlPoolManager.Core; // Ensure access to Constants
+using BowlPoolManager.Api.Helpers;
+using BowlPoolManager.Api.Repositories;
 
 namespace BowlPoolManager.Api.Functions
 {
@@ -13,16 +15,21 @@ namespace BowlPoolManager.Api.Functions
     {
         private readonly CosmosClient _cosmosClient;
         private readonly ILogger<BackupFunctions> _logger;
+        private readonly IUserRepository _userRepo;
 
-        public BackupFunctions(CosmosClient cosmosClient, ILogger<BackupFunctions> logger)
+        public BackupFunctions(CosmosClient cosmosClient, ILogger<BackupFunctions> logger, IUserRepository userRepo)
         {
             _cosmosClient = cosmosClient;
             _logger = logger;
+            _userRepo = userRepo;
         }
 
         [Function("GetBackupData")]
         public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req)
         {
+            var refused = await SecurityHelper.RefuseUnlessSuperAdminAsync(req, _userRepo);
+            if (refused != null) return refused;
+
             _logger.LogInformation("Backup download requested.");
 
             var db = _cosmosClient.GetDatabase(Constants.Database.DbName);

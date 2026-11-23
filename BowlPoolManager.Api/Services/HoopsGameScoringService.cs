@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using BowlPoolManager.Core.Domain;
+using BowlPoolManager.Core.Helpers;
 using BowlPoolManager.Api.Repositories;
 
 namespace BowlPoolManager.Api.Services
@@ -263,52 +264,15 @@ namespace BowlPoolManager.Api.Services
                 .ThenBy(g => g.Id)
                 .ToList();
 
-            bool isHomeSlot = true;
-
+            // Same slot rule as football (BracketSlots): with one feeder the slot is the one that is not a seed,
+            // whatever the slot holds right now (issue 130).
             var myIndex = feeders.FindIndex(f => string.Equals(f.Id, completedGame.Id, StringComparison.OrdinalIgnoreCase));
-
-            if (myIndex >= 0)
-            {
-                if (feeders.Count > 1)
-                {
-                    isHomeSlot = (myIndex == 0);
-                }
-                else
-                {
-                    var winnerName = completedGame.WinningTeamName;
-
-                    if (!string.IsNullOrEmpty(winnerName))
-                    {
-                        bool homeHasWinner = string.Equals(nextGame.TeamHome, winnerName, StringComparison.OrdinalIgnoreCase);
-                        bool awayHasWinner = string.Equals(nextGame.TeamAway, winnerName, StringComparison.OrdinalIgnoreCase);
-
-                        if (homeHasWinner && !awayHasWinner)
-                        {
-                            isHomeSlot = true;
-                        }
-                        else if (awayHasWinner && !homeHasWinner)
-                        {
-                            isHomeSlot = false;
-                        }
-                        else
-                        {
-                            bool homeIsPlaceholder = IsPlaceholder(nextGame.TeamHome);
-                            bool awayIsPlaceholder = IsPlaceholder(nextGame.TeamAway);
-                            if (!homeIsPlaceholder && awayIsPlaceholder) isHomeSlot = false;
-                        }
-                    }
-                    else
-                    {
-                        bool homeIsPlaceholder = IsPlaceholder(nextGame.TeamHome);
-                        bool awayIsPlaceholder = IsPlaceholder(nextGame.TeamAway);
-                        if (!homeIsPlaceholder && awayIsPlaceholder) isHomeSlot = false;
-                    }
-                }
-            }
-            else
+            if (myIndex < 0)
             {
                 _logger.LogWarning($"PropagateWinner: Game '{completedGame.Id}' not found in feeders list for NextGame '{nextGame.Id}'.");
             }
+            bool isHomeSlot = BracketSlots.IsHomeSlot(myIndex, feeders.Count, nextGame.TeamHome, nextGame.TeamAway,
+                completedGame.TeamHome, completedGame.TeamAway, GetRevertPlaceholder(completedGame));
 
             bool changed = false;
 

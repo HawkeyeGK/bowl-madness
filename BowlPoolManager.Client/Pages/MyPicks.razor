@@ -204,7 +204,7 @@
                           }
                         else if (EntryPool != null)
                         {
-                            <span class="text-muted small">Deadline: @EntryPool.LockDate.ToLocalTime().ToString("g")</span>
+                            <span class="text-muted small">Deadline: @DateTimeHelper.ToCentralLabel(EntryPool.LockDate, "g")</span>
                          }
                     </div>
                 </div>
@@ -254,27 +254,44 @@
                 @* GAMES LIST *@
                 <div class="card shadow-sm mb-5">
                     <div class="card-header bg-dark text-white fw-bold">
-                        Make Your Picks (@(activeEntry.Picks?.Count ?? 0) / @ValidGames.Count Selected)
+                        @{ var poolGames = ValidGames; var picked = PickedCount(poolGames); }
+                        Make Your Picks: @picked of @poolGames.Count picked@(poolGames.Count - picked > 0 ? $", {poolGames.Count - picked} left" : "")
                     </div>
+
+                    @if (!string.IsNullOrEmpty(clearNotice))
+                    {
+                        <div class="alert alert-warning alert-dismissible m-3 mb-0" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i> @clearNotice
+                            <button type="button" class="btn-close" aria-label="Dismiss" @onclick="DismissClearNotice"></button>
+                        </div>
+                    }
+
                     <div class="row row-cols-1 row-cols-lg-2 g-4">
-                        @foreach (var game in ValidGames.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
+                        @{ var matchups = EntryPickRules.Resolve(allSeasonGames, activeEntry.Picks); }
+                        @foreach (var game in poolGames.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
                         {
                             string pick = "";
                             if (activeEntry.Picks?.TryGetValue(game.Id, out var p) == true)
                             {
                                 pick = p;
                             }
-                            
-                            var slots = BracketHelper.ResolveMatchup(game, activeEntry.Picks, allSeasonGames);
+
+                            var slots = matchups[game.Id];
+                            var waiting = new[] { slots.HomeWaitsFor, slots.AwayWaitsFor }.Where(n => n != null).ToList();
+                            string? hint = waiting.Any() ? $"Pick {string.Join(" and ", waiting)} first." : null;
 
                             <div class="col">
-                                <GameCard Game="@game" 
-                                          HomeTeamName="@slots.Home" 
-                                          AwayTeamName="@slots.Away" 
-                                          UserPick="@pick" 
-                                          IsLocked="@IsEntryLocked" 
-                                          AllGames="@allSeasonGames" 
-                                          EliminatedTeams="@eliminatedTeams" 
+                                <GameCard Game="@game"
+                                          HomeTeamName="@slots.HomeLabel"
+                                          AwayTeamName="@slots.AwayLabel"
+                                          HomeUnavailable="@(slots.Home == null)"
+                                          AwayUnavailable="@(slots.Away == null)"
+                                          Hint="@hint"
+                                          PickCleared="@clearedGameIds.Contains(game.Id)"
+                                          UserPick="@pick"
+                                          IsLocked="@IsEntryLocked"
+                                          AllGames="@allSeasonGames"
+                                          EliminatedTeams="@eliminatedTeams"
                                           OnPickSelected="@((p) => UpdatePick(game.Id, p))" />
                             </div>
                         }
@@ -384,14 +401,8 @@
             }
             else if (!string.IsNullOrEmpty(joinModel.InviteCode))
             {
-                // Find pool by invite code - PRIORITIZE ACTIVE POOLS
-                targetPool = pools.FirstOrDefault(p => 
-                    string.Equals(p.InviteCode, joinModel.InviteCode, StringComparison.OrdinalIgnoreCase) && 
-                    !p.IsArchived);
-                
-                // Fallback: If no active pool found, allow archived? (User request implies strictly active check)
-                // For now, let's stick to the requirement: "only active pools should be checked"
-
+                // The code opens the current season's open pool (issue 135)
+                targetPool = FindPoolByCode(joinModel.InviteCode);
             }
             
             if (targetPool != null && targetPool.GameIds != null && targetPool.GameIds.Any())
@@ -487,6 +498,14 @@
         }
     }
 
+    // Codes are reused every year; a code that matches more than one pool opens the current season's pool (issue 135).
+    private BowlPool? FindPoolByCode(string? code) =>
+        InviteCodeLookup.Find(pools, code, new[] { currentSeasonId }, p => p.InviteCode, p => p.SeasonId, p => p.IsArchived);
+
+    // Picks that lead to a playable game, out of the pool's games (issue 137).
+    private int PickedCount(List<BowlGame> poolGames) =>
+        EntryPickRules.CountValid(allSeasonGames, poolGames.Select(g => g.Id), activeEntry.Picks);
+
     private void CreateAdditionalEntry()
     {
         errorMessage = "";
@@ -503,9 +522,7 @@
         }
 
         // VALIDATION: Check if code corresponds to an valid, active pool
-        var targetPool = pools.FirstOrDefault(p => 
-            string.Equals(p.InviteCode, joinModel.InviteCode, StringComparison.OrdinalIgnoreCase) && 
-            !p.IsArchived);
+        var targetPool = FindPoolByCode(joinModel.InviteCode);
 
         if (targetPool == null)
         {
@@ -523,7 +540,8 @@
         activeEntry.Picks = new Dictionary<string, string>(); // Safe Init
         activeEntry.Id = "";
         activeEntry.PoolId = targetPool.Id; // Pre-set the Pool ID
-        
+        ResetClearNotice();
+
         viewMode = ViewMode.Editor;
     }
 
@@ -545,6 +563,22 @@
         if (activeEntry.Picks == null) activeEntry.Picks = new Dictionary<string, string>();
 
         errorMessage = "";
+        ResetClearNotice();
+
+        // An entry saved before this check may hold picks that cannot be made; clear them here and say so (issue 128).
+        // Not once the pool is locked: picks can no longer change then.
+        bool poolLocked = pool != null && DateTime.UtcNow > pool.LockDate;
+        if (!poolLocked)
+        {
+            var cleaned = EntryPickRules.ClearInvalid(allSeasonGames, activeEntry.Picks);
+            if (cleaned.ClearedGameIds.Count > 0)
+            {
+                activeEntry.Picks = cleaned.Picks;
+                MarkCleared(cleaned.ClearedGameIds,
+                    $"Some saved picks no longer lead to a game you can pick, so they were cleared: {GameNames(cleaned.ClearedGameIds)}. Pick them again, then save.");
+            }
+        }
+
         viewMode = ViewMode.Editor;
     }
 
@@ -552,12 +586,51 @@
     {
         viewMode = ViewMode.Dashboard;
         errorMessage = "";
+        ResetClearNotice();
     }
+
+    // --- Cleared-pick notice (issue 128) ---
+    private string clearNotice = "";
+    private HashSet<string> clearedGameIds = new();
+
+    private void ResetClearNotice()
+    {
+        clearNotice = "";
+        clearedGameIds = new HashSet<string>();
+    }
+
+    private void DismissClearNotice() => clearNotice = "";
+
+    private void MarkCleared(List<string> gameIds, string message)
+    {
+        clearedGameIds = new HashSet<string>(gameIds);
+        clearNotice = message;
+    }
+
+    private string GameNames(IEnumerable<string> gameIds) =>
+        string.Join(", ", gameIds.Select(id => allSeasonGames.FirstOrDefault(g => g.Id == id)?.BowlName ?? "a game"));
 
     private void UpdatePick(string gameId, string winner)
     {
         if (activeEntry.Picks == null) activeEntry.Picks = new Dictionary<string, string>();
         activeEntry.Picks[gameId] = winner;
+
+        // A new pick can break picks in later games that built on the old one: clear them and say which (issue 128).
+        var cleaned = EntryPickRules.ClearInvalid(allSeasonGames, activeEntry.Picks);
+        activeEntry.Picks = cleaned.Picks;
+
+        clearedGameIds.Remove(gameId);
+        if (cleaned.ClearedGameIds.Count > 0)
+        {
+            var gameName = allSeasonGames.FirstOrDefault(g => g.Id == gameId)?.BowlName ?? "that game";
+            MarkCleared(cleaned.ClearedGameIds,
+                $"Changing your pick for {gameName} cleared your pick for {GameNames(cleaned.ClearedGameIds)}. Pick again.");
+        }
+        else
+        {
+            clearedGameIds.Remove(gameId);
+            if (clearedGameIds.Count == 0) clearNotice = "";
+        }
         StateHasChanged();
     }
 
@@ -612,17 +685,14 @@
         // FIX: Ensure Picks is not null before LINQ query
         activeEntry.Picks ??= new Dictionary<string, string>();
 
-        // --- VALIDATION: CHECK MISSING PICKS ---
-        // Ensure we only validate games that are officially part of this pool
-        var currentGames = ValidGames;
-        var missingGames = currentGames.Where(g => !activeEntry.Picks.ContainsKey(g.Id) || string.IsNullOrEmpty(activeEntry.Picks[g.Id]))
-                                .OrderBy(g => g.StartTime)
-                                .ToList();
-        if (missingGames.Any() && !IsEntryLocked)
+        // Picks may be saved part-way before lock (BUSINESS-RULES section 3). Junk or stale picks are dropped first,
+        // and only valid picks are counted for the "left" message. Locked pools keep their stored picks.
+        int picksLeft = 0;
+        if (!IsEntryLocked)
         {
-            string gameList = string.Join(", ", missingGames.Select(g => g.BowlName));
-            TriggerToast($"Please select a winner for: {gameList}", false);
-            return;
+            activeEntry.Picks = EntryPickRules.ClearInvalid(allSeasonGames, activeEntry.Picks).Picks;
+            var poolGames = ValidGames;
+            picksLeft = poolGames.Count - PickedCount(poolGames);
         }
 
         isSaving = true;
@@ -660,7 +730,9 @@
                     if (masterIndex >= 0) myEntries[masterIndex] = savedEntry;
                     else myEntries.Add(savedEntry);
                     
-                    TriggerToast("Bracket saved successfully!", true);
+                    TriggerToast(picksLeft > 0
+                        ? $"Bracket saved. {picksLeft} {(picksLeft == 1 ? "pick" : "picks")} left to make before the deadline."
+                        : "Bracket saved successfully!", true);
                     viewMode = ViewMode.Dashboard;
                     
                     AppState.NotifyDataChanged();

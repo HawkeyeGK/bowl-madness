@@ -106,7 +106,7 @@
 
     private string GetFormattedTime()
     {
-        return DateTimeHelper.ToCentral(Game.StartTime).ToString("MMM d • h:mm tt");
+        return DateTimeHelper.ToCentralLabel(Game.StartTime, "MMM d • h:mm tt");
     }
 
     private string GetColor(TeamInfo? info, string resolvedName)
@@ -153,42 +153,13 @@
 
         if (AllGames == null) return ("TBD", null);
 
-        // Logic from Results.razor
-        var feeders = AllGames
-            .Where(g => g.NextGameId == Game.Id)
-            .OrderBy(g => g.StartTime)
-            .ToList();
+        // The shared slot rule (BracketSlots): start time orders the feeders, and with one feeder it fills
+        // the slot that is not already a seed.
+        var feeders = BracketSlots.FeedersOf(Game, AllGames);
 
         if (feeders.Count == 0) return ("TBD", null);
 
-        BowlGame? targetFeeder = null;
-
-        if (feeders.Count == 1) 
-        {
-            targetFeeder = feeders[0];
-        }
-        else
-        {
-            // 2 Feeders: Disambiguate
-            string otherSlotName = isHome ? Game.TeamAway : Game.TeamHome;
-            BowlGame? claimedFeeder = null;
-
-            if (!string.IsNullOrEmpty(otherSlotName) && !otherSlotName.Equals("TBD", StringComparison.OrdinalIgnoreCase))
-            {
-                claimedFeeder = feeders.FirstOrDefault(f => f.Status == GameStatus.Final && f.WinningTeamName == otherSlotName);
-            }
-
-            if (claimedFeeder != null)
-            {
-                var unclaimed = feeders.FirstOrDefault(f => f.Id != claimedFeeder.Id);
-                targetFeeder = unclaimed;
-            }
-            else
-            {
-                // Deterministic assignment
-                targetFeeder = isHome ? feeders[0] : feeders[1];
-            }
-        }
+        BowlGame? targetFeeder = feeders.FirstOrDefault(f => BracketSlots.IsHomeSlot(f, Game, AllGames) == isHome);
 
         if (targetFeeder != null)
         {

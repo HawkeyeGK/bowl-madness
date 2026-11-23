@@ -189,10 +189,9 @@ namespace BowlPoolManager.Tests.Api
             game.GameDetail.Should().Be("In Progress");
         }
 
-        // Known failure: #133. A final whose team names do not match the link is marked Final with no scores,
-        // and the leaderboard then awards it to the away team. Group B fixes the service and removes this label.
+        // #133. A final whose team names do not match the link is marked Final with no scores,
+        // and the leaderboard then awards it to the away team.
         [Fact]
-        [Trait("Category", "KnownFailure")]
         public async Task CheckAndRefreshScoresAsync_ShouldNotMarkFinal_WhenFinalGameNamesDoNotMatchTheLink()
         {
             var game = Local();
@@ -201,6 +200,36 @@ namespace BowlPoolManager.Tests.Api
             await _service.CheckAndRefreshScoresAsync(new List<BowlGame> { game });
 
             game.Status.Should().NotBe(GameStatus.Final);
+        }
+
+        // Issue 133: a Final needs both scores matched and a winner. A tie, or a score the feed does not give, is not usable.
+        [Theory]
+        [InlineData(20, 20)]
+        [InlineData(null, 20)]
+        [InlineData(20, null)]
+        public async Task CheckAndRefreshScoresAsync_ShouldNotMarkFinal_WhenFinalHasNoWinner(int? homePoints, int? awayPoints)
+        {
+            var game = Local();
+            await Feed(FeedGameStatus.Final, "Home State", homePoints, "Away Tech", awayPoints);
+
+            await _service.CheckAndRefreshScoresAsync(new List<BowlGame> { game });
+
+            game.Status.Should().NotBe(GameStatus.Final);
+            game.WinningTeamName.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task CheckAndRefreshScoresAsync_ShouldMarkFinalWithWinner_WhenFinalNamesMatchAndScoresDiffer()
+        {
+            var game = Local();
+            await Feed(FeedGameStatus.Final, "Away Tech", 31, "Home State", 17); // feed lists the teams the other way round
+
+            await _service.CheckAndRefreshScoresAsync(new List<BowlGame> { game });
+
+            game.Status.Should().Be(GameStatus.Final);
+            game.TeamHomeScore.Should().Be(17);
+            game.TeamAwayScore.Should().Be(31);
+            game.WinningTeamName.Should().Be("Away Tech");
         }
     }
 }

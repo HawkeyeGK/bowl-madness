@@ -8,6 +8,13 @@ namespace BowlPoolManager.Core.Helpers
         public static List<LeaderboardRow> Calculate(List<BowlGame> games, List<BracketEntry> entries, BowlPool? poolConfig = null)
             => Calculate(games.Cast<IScorable>().ToList(), entries, poolConfig);
 
+        // The team that won a Final game, or null when both scores are not present or they are level.
+        private static string? DecidedWinner(IScorable game)
+        {
+            if (game.TeamHomeScore is not int home || game.TeamAwayScore is not int away || home == away) return null;
+            return home > away ? game.TeamHome : game.TeamAway;
+        }
+
         public static List<LeaderboardRow> Calculate(List<IScorable> games, List<BracketEntry> entries, BowlPool? poolConfig = null)
         {
             // 1. Identify Eliminated Teams (Teams that have lost any FINAL game)
@@ -29,10 +36,11 @@ namespace BowlPoolManager.Core.Helpers
             if (!string.IsNullOrEmpty(tieBreakerGameId))
             {
                 var tbGame = games.FirstOrDefault(g => g.Id == tieBreakerGameId);
-                if (tbGame != null && tbGame.Status == GameStatus.Final)
+                // Decided only when Final with both scores and a winner, as for picks (issue 163).
+                if (tbGame != null && tbGame.Status == GameStatus.Final && DecidedWinner(tbGame) != null)
                 {
                     isTieBreakerFinal = true;
-                    tieBreakerTotalPoints = (tbGame.TeamHomeScore ?? 0) + (tbGame.TeamAwayScore ?? 0);
+                    tieBreakerTotalPoints = tbGame.TeamHomeScore!.Value + tbGame.TeamAwayScore!.Value;
                 }
             }
 
@@ -66,10 +74,12 @@ namespace BowlPoolManager.Core.Helpers
                 {
                     if (!entry.Picks.TryGetValue(game.Id, out var pick)) continue;
 
-                    if (game.Status == GameStatus.Final)
+                    // A Final game with no winner (a missing score or a tie) is undecided, not a win for the away team (issue 133).
+                    string? winner = game.Status == GameStatus.Final ? DecidedWinner(game) : null;
+
+                    if (winner != null)
                     {
                         // SCENARIO 1: Game is Over
-                        string winner = (game.TeamHomeScore > game.TeamAwayScore) ? game.TeamHome : game.TeamAway;
 
                         if (string.Equals(pick, winner, StringComparison.OrdinalIgnoreCase))
                         {
@@ -87,7 +97,7 @@ namespace BowlPoolManager.Core.Helpers
                     }
                     else
                     {
-                        // SCENARIO 2: Game is Future / In-Progress
+                        // SCENARIO 2: Game is Future / In-Progress / Final with no winner
                         if (!eliminatedTeams.Contains(pick))
                         {
                             maxPossible += game.PointValue;

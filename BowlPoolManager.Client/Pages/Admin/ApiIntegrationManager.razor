@@ -77,7 +77,7 @@
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="text-muted">Last Synced:</span>
-                        <span>@(Status?.LastSyncUtc?.ToLocalTime().ToString("g") ?? "Never")</span>
+                        <span>@DateTimeHelper.ToCentralLabel(Status?.LastSyncUtc, "g", "Never")</span>
                     </div>
                 </div>
                 <div class="card-footer bg-transparent border-top-0 pb-3 text-end">
@@ -112,7 +112,7 @@
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="text-muted">Last Synced:</span>
-                        <span>@(Status?.BasketballLastSyncUtc?.ToLocalTime().ToString("g") ?? "Never")</span>
+                        <span>@DateTimeHelper.ToCentralLabel(Status?.BasketballLastSyncUtc, "g", "Never")</span>
                     </div>
                 </div>
                 <div class="card-footer bg-transparent border-top-0 pb-3 text-end">

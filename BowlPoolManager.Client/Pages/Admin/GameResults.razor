@@ -277,6 +277,11 @@
             else
             {
                 Console.WriteLine($"Save failed: {response.StatusCode}");
+                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+                {
+                    statusMessage = $"Not saved: {await response.Content.ReadAsStringAsync()}";
+                    StateHasChanged();
+                }
             }
         }
         catch (Exception ex)
@@ -324,59 +329,12 @@
 
         if (games == null) return "TBD";
 
-        // Logic matched from ScoreboardCard & GameScoringService
-        var feeders = games
-            .Where(g => string.Equals(g.NextGameId, game.Id, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(g => g.StartTime)
-            .ThenBy(g => g.BowlName) // Stable sort
-            .ToList();
+        // The shared slot rule (BracketSlots), the same one the server and the scoreboard use.
+        var feeders = BracketSlots.FeedersOf(game, games);
 
         if (feeders.Count == 0) return "TBD";
 
-        BowlGame? targetFeeder = null;
-        
-        // Determine slot based on feed index
-        // Find myself in the feeders list? No, I am the 'NextGame' here.
-        // We need to find which feeder corresponds to 'isHome' slot.
-
-        if (feeders.Count > 1)
-        {
-            // 0 -> Home, 1 -> Away
-            targetFeeder = isHome ? feeders[0] : feeders[1];
-        }
-        else
-        {
-            // Single Feeder
-            // Heuristic: Determine which slot this feeder propagates to.
-            
-            string otherSlotName = isHome ? game.TeamAway : game.TeamHome;
-            bool otherIsPlaceholder = IsTBD(otherSlotName);
-            
-            // Get the feeder's winner (if final)
-            var feederWinner = feeders[0].Status == GameStatus.Final ? feeders[0].WinningTeamName : null;
-            
-            if (!otherIsPlaceholder) 
-            {
-                // Other slot has a real team name.
-                // Check if the feeder's winner MATCHES the other slot.
-                // If so, the feeder already propagated there - this slot is unrelated (BYE team or different source).
-                if (feederWinner != null && string.Equals(feederWinner, otherSlotName, StringComparison.OrdinalIgnoreCase))
-                {
-                    // Feeder already propagated to the other slot - this slot doesn't get this feeder
-                    targetFeeder = null;
-                }
-                else
-                {
-                    // Other slot is filled by someone else (e.g., BYE team), so I get this feeder
-                    targetFeeder = feeders[0];
-                }
-            }
-            else
-            {
-                // Both slots are placeholders. Default to Home gets the feeder.
-                if (isHome) targetFeeder = feeders[0];
-            }
-        }
+        BowlGame? targetFeeder = feeders.FirstOrDefault(f => BracketSlots.IsHomeSlot(f, game, games) == isHome);
 
         if (targetFeeder != null)
         {
