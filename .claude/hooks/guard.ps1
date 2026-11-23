@@ -15,6 +15,9 @@
   R5c also needs clean to be the git subcommand (after any git options such as -C, -c or
   --git-dir), and its -f
   letter is case-sensitive, so a commit message that says "clean" or a PowerShell -Force does not trip it.
+  R5e reads its -n cluster case-sensitively (lowercase letters only), so a PowerShell parameter
+  such as -ExpandProperty or -NoNewline later in the command does not trip it. It still reads the
+  whole text, so a later lowercase -n flag (head -n 5, git log -n 1) is refused; run the commit on its own.
 
   Contract with wrapper.src.ps1 (the registered hook command, unchanged):
     refuse          : reason on stderr, exit 2
@@ -88,7 +91,7 @@ $Rules = @(
     @('R5b', 'refuse', 'sh', '\bgit\b.*\breset\b.*--hard', 'git reset --hard.'),
     @('R5c', 'refuse', 'sh', '\bgit(?:\s+(?:-[cC]|--(?:git-dir|work-tree|namespace|config-env))\s+\S+|\s+--?[\w-]+(?:=\S+)?)*\s+clean\b~(?:(?-i:\s-[a-zA-Z]*f[a-zA-Z]*)(?![\w-])|\s--force\b)', 'git clean with force.'),
     @('R5d', 'refuse', 'sh', '\bgit\b.*(?:\b(?:filter-branch|filter-repo)\b|\breflog\s+expire\b|\bgc\b.*--prune|\bupdate-ref\b.*\s-d\b)', 'git history rewrite or object pruning.'),
-    @('R5e', 'refuse', 'sh', '\bgit\b.*\bcommit\b.*(?:\s--no-verify\b|\s-[a-z]*n[a-z]*\b)', 'git commit that skips the commit hooks (-n or --no-verify).'),
+    @('R5e', 'refuse', 'sh', '\bgit\b.*\bcommit\b.*(?:\s--no-verify\b|(?-i:\s-[a-z]*n[a-z]*)(?![\w-]))', 'git commit that skips the commit hooks (-n or --no-verify).'),
     @('R6a', 'refuse', 'sh', '\bgh\b.*(?:\brepo\s+(?:delete|archive|rename|transfer)\b|\brepo\s+edit\b.*--visibility|\brelease\s+delete\b|\b(?:secret|variable)\s+(?:set|delete)\b|\bworkflow\s+disable\b|\bpr\s+merge\b.*--admin)', 'destructive or settings-changing gh command.'),
     @('R6b', 'refuse', 'sh', '\bgh\b.*\bapi\b.*(?:\s-x\s*["'']?delete\b|--method[\s=]+["'']?delete\b)', 'gh api DELETE.'),
     @('R6c', 'refuse', 'sh', '\bremove-az\w*', 'Remove-Az cmdlet.'),

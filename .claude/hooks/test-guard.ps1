@@ -120,6 +120,15 @@ C 'R5e-cluster' REFUSE 'git commit -an -m x'
 C 'R5e-near' ALLOW 'git commit -m "add new thing"'
 C 'R5e-am-near' ALLOW 'git commit -am x'
 C 'R5e-amend-near' ALLOW 'git commit --amend --no-edit'
+C 'R5e-dash-C' REFUSE 'git -C repo commit -n -F msg.txt'
+C 'R5e-cluster-after-message' REFUSE 'git commit -F msg.txt -qn'
+# near-misses: the old rule refused these (a capitalised PowerShell parameter later in the command)
+C 'R5e-expandproperty-near' ALLOW 'cd C:\repo; git commit -F "C:\tmp\msg.txt"; git log --oneline -2; git status --short | Measure-Object | Select-Object -ExpandProperty Count' PowerShell
+C 'R5e-encoding-near' ALLOW 'Set-Content msg.txt "x" -Encoding utf8; git commit -F msg.txt' PowerShell
+C 'R5e-nonewline-near' ALLOW 'git commit -F msg.txt; Write-Host done -NoNewline' PowerShell
+C 'R5e-message-file-dash-near' ALLOW 'git commit -F C:\tmp\04da4018-697c-43b7\commit_msg.txt'
+# accepted: a later lowercase -n flag is still refused (whole-text rule)
+C 'R5e-later-lowercase-n-accepted' REFUSE 'git commit -F msg.txt; git log -n 1'
 C 'R5b-reset' REFUSE 'git reset --hard HEAD~1'
 C 'R5c-clean' REFUSE 'git clean -fd'
 C 'R5c-cluster-xdf' REFUSE 'git clean -xdf'
