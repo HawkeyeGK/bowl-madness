@@ -1,0 +1,344 @@
+@page "/admin/score-feed"
+@using System.Text.Json
+@using BowlPoolManager.Core
+@using BowlPoolManager.Core.ScoreFeed
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
+@inject HttpClient Http
+
+<PageTitle>Score Feed</PageTitle>
+
+<div class="container-fluid mt-3 px-4">
+    <div class="d-flex justify-content-between align-items-end mb-3">
+        <h1 class="h3 fw-bold mb-0"><i class="bi bi-broadcast text-warning"></i> Score Feed</h1>
+        <a href="admin/dashboard" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Dashboard
+        </a>
+    </div>
+
+    @if (loading)
+    {
+        <div class="text-muted">Loading...</div>
+    }
+    else if (!string.IsNullOrEmpty(loadError))
+    {
+        <div class="alert alert-danger">@loadError</div>
+    }
+    else
+    {
+        @if (mockOn)
+        {
+            <div class="alert alert-warning border-warning border-2">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <strong>Mock feed is on.</strong> Score updates use the games on this page, not College Football Data. Switch back to Live before the season starts.
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="mb-3 p-2 rounded @(success ? "bg-success-subtle text-success border border-success" : "bg-danger-subtle text-danger border border-danger")">
+                <strong>@message</strong>
+            </div>
+        }
+
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white fw-bold">Feed</div>
+            <div class="card-body">
+                <div class="btn-group" role="group" aria-label="Score feed">
+                    <button class="btn @(!mockOn ? "btn-success" : "btn-outline-secondary")" @onclick="SelectLive" disabled="@(busy || !mockOn)">Live</button>
+                    <button class="btn @(mockOn ? "btn-warning" : "btn-outline-secondary")" @onclick="SelectMock" disabled="@(busy || mockOn)">Mock</button>
+                </div>
+                <span class="text-muted small ms-3">
+                    Live uses College Football Data. Mock uses the games below.
+                </span>
+
+                @if (enableSummary != null)
+                {
+                    <div class="mt-3 p-3 border rounded bg-light">
+                        <p class="mb-2">
+                            Switch to the mock feed? While it is on, score updates for linked games come from the mock games on this page,
+                            not College Football Data, and every visitor sees the result.
+                        </p>
+                        @if (enableSummary.MatchingGames == 0)
+                        {
+                            <p class="mb-2">No linked game of the current season matches a mock game, so no real game would change right now.
+                               (@enableSummary.LinkedGames linked game(s) in the current season.)</p>
+                        }
+                        else
+                        {
+                            <p class="mb-1 fw-bold text-danger">
+                                @enableSummary.MatchingGames linked game(s) of the current season match a mock game and would take its status and scores:
+                            </p>
+                            <ul class="small">@foreach (var n in enableSummary.GameNames) { <li>@n</li> }</ul>
+                        }
+                        <label class="form-label" for="mock-confirm">Type MOCK to confirm</label>
+                        <input id="mock-confirm" class="form-control mb-2" style="max-width:12rem" autocomplete="off"
+                               @bind="confirmText" @bind:event="oninput" />
+                        <button class="btn btn-warning me-2" @onclick="ConfirmMock" disabled="@(busy || confirmText != "MOCK")">Switch to Mock</button>
+                        <button class="btn btn-link" @onclick="CancelEnable" disabled="@busy">Cancel</button>
+                    </div>
+                }
+
+                @if (preview != null)
+                {
+                    <div class="mt-3 p-3 border rounded bg-light">
+                        @if (preview.GamesToReset == 0)
+                        {
+                            <p class="mb-2">No linked games of the current season have a result from the mock.</p>
+                        }
+                        else
+                        {
+                            <p class="mb-2">
+                                Reset the current season's football games to the start? <strong>@preview.GamesToReset linked game(s)</strong>
+                                lose their scores and go back to Scheduled, and <strong>@preview.SlotsToClear later-round slot(s)</strong>
+                                return to "Winner of ...". Pools, entries and picks are not changed. Standings go back to zero.
+                            </p>
+                            <p class="mb-2 small fw-bold text-danger">
+                                This clears every result on these games, whatever its source: real scores and results entered by hand too.
+                            </p>
+                            <p class="mb-1 small fw-bold">Games that will be reset:</p>
+                            <ul class="small">@foreach (var n in preview.GameNames) { <li>@n</li> }</ul>
+                        }
+
+                        @if (preview.NeedsReview.Count > 0)
+                        {
+                            <p class="mb-1 small fw-bold">Check these by hand (not changed):</p>
+                            <ul class="small">@foreach (var n in preview.NeedsReview) { <li>@n</li> }</ul>
+                        }
+                        @if (preview.LeftAlone.Count > 0)
+                        {
+                            <p class="mb-1 small fw-bold">Slots edited by hand (not changed):</p>
+                            <ul class="small">@foreach (var n in preview.LeftAlone) { <li>@n</li> }</ul>
+                        }
+
+                        @if (preview.GamesToReset > 0)
+                        {
+                            <button class="btn btn-danger me-2" @onclick="() => SwitchToLive(true)" disabled="@busy">Switch and reset</button>
+                        }
+                        <button class="btn btn-outline-primary me-2" @onclick="() => SwitchToLive(false)" disabled="@busy">Switch only</button>
+                        <button class="btn btn-link" @onclick="CancelPreview" disabled="@busy">Cancel</button>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="alert alert-info">
+            These are the games the mock feed reports. Linked games in the pools pick up changes the next time
+            the games are read (about every 2 minutes). Changing the team names here tests a name mismatch.
+        </div>
+
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-bold">Starting set</span>
+                <button class="btn btn-sm btn-outline-danger" @onclick="LoadStartingSet" disabled="@busy">
+                    Replace all games with the starting set
+                </button>
+            </div>
+            <div class="card-body small text-muted">
+                A recording of last season's real postseason games. It replaces every game below.
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-bold">Games (@games.Count)</span>
+                <button class="btn btn-sm btn-outline-primary" @onclick="AddGame" disabled="@busy">Add game</button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Id</th><th>Notes</th><th>Home team</th><th>Pts</th><th>Away team</th><th>Pts</th>
+                            <th>Status</th><th>Period</th><th>Clock</th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var g in games)
+                        {
+                            <tr>
+                                <td style="width:7rem"><input class="form-control form-control-sm" @bind="g.ExternalId" /></td>
+                                <td><input class="form-control form-control-sm" @bind="g.Notes" /></td>
+                                <td><input class="form-control form-control-sm" @bind="g.Home.Name" /></td>
+                                <td style="width:5rem"><input type="number" class="form-control form-control-sm" @bind="g.Home.Points" /></td>
+                                <td><input class="form-control form-control-sm" @bind="g.Away.Name" /></td>
+                                <td style="width:5rem"><input type="number" class="form-control form-control-sm" @bind="g.Away.Points" /></td>
+                                <td style="width:9rem">
+                                    <select class="form-select form-select-sm" @bind="g.Status">
+                                        <option value="@FeedGameStatus.Scheduled">Scheduled</option>
+                                        <option value="@FeedGameStatus.InProgress">In progress</option>
+                                        <option value="@FeedGameStatus.Final">Final</option>
+                                    </select>
+                                </td>
+                                <td style="width:5rem"><input type="number" class="form-control form-control-sm" @bind="g.Period" /></td>
+                                <td style="width:6rem"><input class="form-control form-control-sm" @bind="g.Clock" /></td>
+                                <td class="text-nowrap">
+                                    <button class="btn btn-sm btn-primary" @onclick="() => Save(g)" disabled="@busy">Save</button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(g)" disabled="@busy">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    private bool loading = true;
+    private string? loadError;
+    private bool mockOn;
+    private bool busy;
+    private bool success;
+    private string? message;
+    private List<FeedGame> games = new();
+    private MockFeedResetSummary? preview;
+    private MockFeedEnableSummary? enableSummary;
+    private string confirmText = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(await Http.GetStringAsync("api/MockFeed/Mode"));
+            mockOn = doc.RootElement.GetProperty("mode").GetString() == "Mock";
+            await Reload();
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Could not load the score feed settings: {ex.Message}";
+        }
+        loading = false;
+    }
+
+    private async Task Reload()
+    {
+        games = await Http.GetFromJsonAsync<List<FeedGame>>("api/MockFeed/Games", JsonOptions) ?? new();
+    }
+
+    // Switching to Mock first shows which real games it could change, and needs MOCK typed to confirm.
+    private Task SelectMock() => Run(async () =>
+    {
+        var response = await Http.GetAsync("api/MockFeed/EnablePreview");
+        if (!response.IsSuccessStatusCode) return await Failure(response);
+        enableSummary = await response.Content.ReadFromJsonAsync<MockFeedEnableSummary>(JsonOptions);
+        if (enableSummary == null) return "Error: the preview came back empty. Nothing was changed.";
+        confirmText = string.Empty;
+        return string.Empty;
+    });
+
+    private Task ConfirmMock() => Run(async () =>
+    {
+        var response = await Http.PostAsJsonAsync("api/MockFeed/Mode", new { mode = "Mock", confirm = confirmText });
+        if (!response.IsSuccessStatusCode) return await Failure(response);
+        mockOn = true;
+        enableSummary = null;
+        confirmText = string.Empty;
+        return "Mock feed is on.";
+    });
+
+    private void CancelEnable()
+    {
+        enableSummary = null;
+        confirmText = string.Empty;
+    }
+
+    // Switching to Live first shows what a reset would do, so the admin can choose.
+    private Task SelectLive() => Run(async () =>
+    {
+        var response = await Http.GetAsync("api/MockFeed/ResetPreview");
+        if (!response.IsSuccessStatusCode) return await Failure(response);
+        preview = await response.Content.ReadFromJsonAsync<MockFeedResetSummary>(JsonOptions);
+        return string.Empty;
+    });
+
+    private void CancelPreview() => preview = null;
+
+    // One call: the server checks the mode and the count, switches to Live first, then resets (when asked).
+    private Task SwitchToLive(bool reset) => Run(async () =>
+    {
+        var count = preview?.GamesToReset ?? 0;
+        object body = reset ? new { mode = "Live", resetConfirm = count } : new { mode = "Live" };
+
+        var response = await Http.PostAsJsonAsync("api/MockFeed/Mode", body);
+        if (!response.IsSuccessStatusCode)
+        {
+            // A refused reset changes nothing; the page stays on Mock. A mismatch means the preview is out of date.
+            preview = null;
+            mockOn = await ReadModeAsync() == "Mock";
+            return await Failure(response);
+        }
+
+        mockOn = false;
+        preview = null;
+        return reset ? $"Live feed is on. {count} game(s) reset to the start." : "Live feed is on. Game results were left as they are.";
+    });
+
+    private async Task<string?> ReadModeAsync()
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(await Http.GetStringAsync("api/MockFeed/Mode"));
+            return doc.RootElement.GetProperty("mode").GetString();
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private void AddGame()
+    {
+        var next = games.Select(g => int.TryParse(g.ExternalId, out var n) ? n : 0).DefaultIfEmpty(0).Max() + 1;
+        games.Add(new FeedGame { ExternalId = next.ToString() });
+    }
+
+    private Task Save(FeedGame game) => Run(async () =>
+    {
+        var response = await Http.PostAsJsonAsync("api/MockFeed/Games", game);
+        if (!response.IsSuccessStatusCode) return await Failure(response);
+        return $"Saved game {game.ExternalId}.";
+    });
+
+    private Task Delete(FeedGame game) => Run(async () =>
+    {
+        var response = await Http.DeleteAsync($"api/MockFeed/Games/{Uri.EscapeDataString(game.ExternalId)}");
+        if (!response.IsSuccessStatusCode) return await Failure(response);
+        await Reload();
+        return $"Deleted game {game.ExternalId}.";
+    });
+
+    private Task LoadStartingSet() => Run(async () =>
+    {
+        var response = await Http.PostAsync("api/MockFeed/StartingSet", null);
+        if (!response.IsSuccessStatusCode) return await Failure(response);
+        await Reload();
+        return "Loaded the starting set.";
+    });
+
+    private static async Task<string> Failure(HttpResponseMessage response) =>
+        $"Error: {(int)response.StatusCode} {await response.Content.ReadAsStringAsync()}";
+
+    private async Task Run(Func<Task<string>> action)
+    {
+        busy = true;
+        message = null;
+        try
+        {
+            var result = await action();
+            message = string.IsNullOrEmpty(result) ? null : result;
+            success = message == null || !message.Contains("Error:");
+        }
+        catch (Exception ex)
+        {
+            success = false;
+            message = $"Exception: {ex.Message}";
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

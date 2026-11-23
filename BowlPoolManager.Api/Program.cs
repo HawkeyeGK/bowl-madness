@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Configuration;
 using BowlPoolManager.Api.Services;
+using BowlPoolManager.Api.Services.ScoreFeed;
 using BowlPoolManager.Api.Repositories;
 using BowlPoolManager.Api.Helpers;
 using BowlPoolManager.Core;
@@ -71,6 +72,21 @@ builder.Services.AddSingleton<ITestEnvironment>(sp =>
     new TestEnvironment(sp.GetRequiredService<IConfiguration>(), sp.GetRequiredService<CosmosClient>().Endpoint));
 builder.Services.AddSingleton<ITestDataRepository, TestDataRepository>();
 builder.Services.AddSingleton<ITestScenarioProvider, EmbeddedTestScenarioProvider>();
+
+// --- SCORE FEED. Football uses College Football Data unless a SuperAdmin has switched the stored mode to Mock
+// (Score Feed admin page). The mode is read on every call; missing or unreadable means Live. ---
+builder.Services.AddSingleton<CfbdScoreFeed>();
+builder.Services.AddSingleton<IMockFeedStore, MockFeedStore>();
+builder.Services.AddSingleton<IMockFeedStartingSet, EmbeddedMockFeedStartingSet>();
+builder.Services.AddSingleton<IScoreFeedSettingsStore, ScoreFeedSettingsStore>();
+builder.Services.AddSingleton<IMockFeedResetService, MockFeedResetService>();
+builder.Services.AddSingleton<IMockFeedImpactService, MockFeedImpactService>();
+builder.Services.AddSingleton<MockScoreFeed>();
+builder.Services.AddSingleton<IScoreFeed>(sp => new SwitchingScoreFeed(
+    sp.GetRequiredService<CfbdScoreFeed>(),
+    sp.GetRequiredService<MockScoreFeed>(),
+    sp.GetRequiredService<IScoreFeedSettingsStore>(),
+    sp.GetRequiredService<ILogger<SwitchingScoreFeed>>()));
 // --------------------------------
 
 var host = builder.Build();
