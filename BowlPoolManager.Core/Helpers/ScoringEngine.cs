@@ -36,10 +36,11 @@ namespace BowlPoolManager.Core.Helpers
             if (!string.IsNullOrEmpty(tieBreakerGameId))
             {
                 var tbGame = games.FirstOrDefault(g => g.Id == tieBreakerGameId);
-                if (tbGame != null && tbGame.Status == GameStatus.Final)
+                // Decided only when Final with both scores and a winner, as for picks (issue 163).
+                if (tbGame != null && tbGame.Status == GameStatus.Final && DecidedWinner(tbGame) != null)
                 {
                     isTieBreakerFinal = true;
-                    tieBreakerTotalPoints = (tbGame.TeamHomeScore ?? 0) + (tbGame.TeamAwayScore ?? 0);
+                    tieBreakerTotalPoints = tbGame.TeamHomeScore!.Value + tbGame.TeamAwayScore!.Value;
                 }
             }
 

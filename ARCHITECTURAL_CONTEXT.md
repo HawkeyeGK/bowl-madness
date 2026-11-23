@@ -148,7 +148,8 @@ When an `EntryId` is provided, each match card is annotated with a CSS class bas
 Two pure calculation engines live in `BowlPoolManager.Core/Helpers/`:
 
 - **`ScoringEngine`** ([BowlPoolManager.Core/Helpers/ScoringEngine.cs](BowlPoolManager.Core/Helpers/ScoringEngine.cs)): Calculates real leaderboard rankings from actual game results. Supports configurable tiebreakers (`CorrectPickCount` or `ScoreDelta`) via `BowlPool.PrimaryTieBreaker`/`SecondaryTieBreaker`.
-- **`WhatIfScoringEngine`** ([BowlPoolManager.Core/Helpers/WhatIfScoringEngine.cs](BowlPoolManager.Core/Helpers/WhatIfScoringEngine.cs)): Simulates outcomes by merging a `simulatedWinners` dictionary over real results — used by the "Path to Victory" (`/what-if`) page.
+- **`BracketSimulator`** ([BowlPoolManager.Core/Helpers/BracketSimulator.cs](BowlPoolManager.Core/Helpers/BracketSimulator.cs)): The one football bracket simulator behind "Path to Victory" (`/what-if`). Takes games, entries, the pool and the user's chosen winners; returns each game's teams and winner, each entry's score, Max, rank and whether it can still finish in the top 3, and each pick's state (won, lost, dead, open). Ranking and Max go through `ScoringEngine`, so with no chosen winners it equals the leaderboard.
+- **`BracketSlots`** and **`BracketPropagation`** ([BracketSlots.cs](BowlPoolManager.Core/Helpers/BracketSlots.cs), [BracketPropagation.cs](BowlPoolManager.Core/Helpers/BracketPropagation.cs)): The one slot rule (which slot of the next game a feeder's winner fills) and the copy-forward of a winner or the "Winner of ..." reset. Used by `GameScoringService`, `HoopsGameScoringService`, the simulator, `ScoreboardCard`, `PrintBracket` and `Admin/GameResults`. Hoops Path to Victory still uses `HoopsWhatIfScoringEngine`.
 
 ## 8. Cross-Project Dependencies
 

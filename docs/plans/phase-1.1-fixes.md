@@ -76,7 +76,7 @@ Group A, group B, #129, #128 and #130. If the date is at risk, the rest of group
 5. #94: find out whether the tests or the code are wrong; fix; remove the `KnownFailure` label.
 6. Switch the pages and the server to the shared code.
 
-**Progress:** [ ] characterization tests [ ] slot rule + #130 [ ] simulator + #136 #109 #127 [ ] replay [ ] #94 [ ] pages and server switched [ ] reviews [ ] test site check [ ] merged
+**Progress:** [x] characterization tests [x] slot rule + #130 [x] simulator + #136 #109 #127 [x] replay (fixture test; the `last-season-replay` test-site scenario is not built) [x] #94 [x] pages and server switched [ ] reviews [ ] test site check [ ] merged
 
 **Decision needed from the owner (before step 5, #94):** Phase 0 added 28 new `KnownFailure` tests beside the two #94 tests (30 in all; CI skips them). Decide whether to fix any of the new ones together with #94 in this group, or leave them for the phase that touches that code anyway. Where they stand today:
 - 20 are already owned by group B, which flips them with its fixes: #93 (4), #98 (2), and #97, #99, #131 (14, football and hoops).
