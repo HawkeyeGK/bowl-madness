@@ -39,7 +39,7 @@ Group A, group B, #129, #128 and #130. If the date is at risk, the rest of group
 6. #129: New Pool takes the year from the current season's `SeasonId`.
 7. Tests: the scoring service against the mock (status changes, scores, a final with unmatched names, which sets up #133 in group B).
 
-**Progress:** [x] interface agreed [x] CFBD implementation + #102 [x] mock [x] admin page [x] starting set [x] #129 [x] tests [ ] test site check [ ] merged
+**Progress:** [x] interface agreed [x] CFBD implementation + #102 [x] mock [x] admin page [x] starting set [x] #129 [x] tests [x] test site check [ ] merged
 
 ---
 
