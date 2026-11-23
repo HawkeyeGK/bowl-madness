@@ -195,7 +195,7 @@ namespace BowlPoolManager.Api.Functions
                     ? pool.GameIds
                     : allGames.Select(g => g.Id).ToList();
 
-                var fieldResult = EntrySubmission.Validate(submitted, existingEntry, poolGameIds);
+                var fieldResult = EntrySubmission.Validate(submitted, existingEntry, poolGameIds, allGames);
                 if (!fieldResult.IsValid)
                 {
                     var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
@@ -284,6 +284,105 @@ namespace BowlPoolManager.Api.Functions
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating entry");
+                var error = req.CreateResponse(HttpStatusCode.InternalServerError);
+                await error.WriteStringAsync($"Internal Server Error: {ex.Message}");
+                return error;
+            }
+        }
+
+        /// <summary>
+        /// Moves an entry to another pool of the same season (issue 132). Admin or SuperAdmin only; a player's own
+        /// save can never change an entry's pool (issue 131). Query: entryId, seasonId, newPoolId.
+        /// </summary>
+        [Function("MoveEntry")]
+        public async Task<HttpResponseData> MoveEntry([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+        {
+            try
+            {
+                var caller = await SecurityHelper.GetCallerAsync(req, _userRepo);
+                if (caller == null)
+                {
+                    var unauth = req.CreateResponse(HttpStatusCode.Unauthorized);
+                    await unauth.WriteStringAsync("User is not authenticated.");
+                    return unauth;
+                }
+
+                if (!caller.IsAdmin)
+                {
+                    var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
+                    await forbidden.WriteStringAsync("You must be an admin to move an entry.");
+                    return forbidden;
+                }
+
+                var entryId = req.Query["entryId"];
+                var seasonId = req.Query["seasonId"];
+                var newPoolId = req.Query["newPoolId"];
+                if (string.IsNullOrEmpty(entryId) || string.IsNullOrEmpty(seasonId) || string.IsNullOrEmpty(newPoolId))
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("entryId, seasonId and newPoolId are required.");
+                    return badReq;
+                }
+
+                var entry = await _entryRepo.GetEntryAsync(entryId, seasonId);
+                if (entry == null || entry.Type != Constants.DocumentTypes.BracketEntry)
+                {
+                    var notFound = req.CreateResponse(HttpStatusCode.NotFound);
+                    await notFound.WriteStringAsync("Entry not found.");
+                    return notFound;
+                }
+
+                var target =await _poolRepo.GetPoolAsync(newPoolId);
+                if (target == null)
+                {
+                    var notFound = req.CreateResponse(HttpStatusCode.NotFound);
+                    await notFound.WriteStringAsync("The target pool was not found.");
+                    return notFound;
+                }
+
+                if (string.Equals(entry.PoolId, target.Id, StringComparison.Ordinal))
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("The entry is already in that pool.");
+                    return badReq;
+                }
+
+                if (!string.Equals(entry.SeasonId, target.SeasonId, StringComparison.Ordinal))
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("An entry can only move to a pool of the same season.");
+                    return badReq;
+                }
+
+                if (target.IsArchived)
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync("An entry cannot move to an archived pool.");
+                    return badReq;
+                }
+
+                if (await _entryRepo.IsBracketNameTakenAsync(target.Id, entry.PlayerName, entry.Id))
+                {
+                    var conflict = req.CreateResponse(HttpStatusCode.Conflict);
+                    await conflict.WriteStringAsync($"The bracket name \"{entry.PlayerName}\" is already taken in {target.Name}. Rename the entry first.");
+                    return conflict;
+                }
+
+                var fromPool = await _poolRepo.GetPoolAsync(entry.PoolId);
+                string timestamp = DateTimeHelper.ToCentral(DateTime.UtcNow).ToString("MMM d, yyyy h:mm tt");
+                entry.AuditLog ??= new List<string>();
+                entry.AuditLog.Add($"Moved by {caller.Profile?.Email ?? "Unknown User"} on {timestamp}: {fromPool?.Name ?? entry.PoolId} -> {target.Name}");
+                entry.PoolId = target.Id;
+
+                await _entryRepo.AddEntryAsync(entry);
+
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(entry);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error moving entry");
                 var error = req.CreateResponse(HttpStatusCode.InternalServerError);
                 await error.WriteStringAsync($"Internal Server Error: {ex.Message}");
                 return error;

@@ -78,7 +78,7 @@
                             {
                                 <div class="input-group">
                                     <input type="text" class="form-control" value="@(pools.FirstOrDefault(p => p.Id == entry.PoolId)?.Name ?? "Unknown")" disabled />
-                                    <button class="btn btn-outline-warning" type="button" @onclick="() => showMoveModal = true">
+                                    <button class="btn btn-outline-warning" type="button" @onclick="OpenMoveModal">
                                         <i class="bi bi-arrow-left-right"></i> Move
                                     </button>
                                 </div>
@@ -105,21 +105,31 @@
             @if (!string.IsNullOrEmpty(entry.PoolId))
             {
                 <div class="card shadow-sm mb-5">
+                    @{ var poolGames = ValidGames; var picked = PickedCount(poolGames); }
                     <div class="card-header bg-dark text-white fw-bold">
-                        Picks (@(entry.Picks?.Count ?? 0) / @ValidGames.Count Selected)
+                        Picks: @picked of @poolGames.Count picked@(poolGames.Count - picked > 0 ? $", {poolGames.Count - picked} left" : "")
                     </div>
+                    @if (!string.IsNullOrEmpty(clearNotice))
+                    {
+                        <div class="alert alert-warning alert-dismissible m-3 mb-0" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i> @clearNotice
+                            <button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => clearNotice = string.Empty"></button>
+                        </div>
+                    }
                     <ul class="list-group list-group-flush">
-                        @foreach (var game in ValidGames.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
+                        @{ var matchups = EntryPickRules.Resolve(allGames, entry.Picks); }
+                        @foreach (var game in poolGames.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
                         {
                             string pick = "";
                             if (entry.Picks?.TryGetValue(game.Id, out var p) == true)
                             {
                                 pick = p;
                             }
-                            
+
                             bool isSelected = !string.IsNullOrEmpty(pick);
-                            var slots = GetMatchupSlots(game);
-                            
+                            var slots = matchups[game.Id];
+                            var waiting = new[] { slots.HomeWaitsFor, slots.AwayWaitsFor }.Where(n => n != null).ToList();
+
                             <li class="list-group-item p-3 @(isSelected ? "bg-light-success" : "")">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
                                     <div>
@@ -128,10 +138,14 @@
                                         {
                                             <span class="badge bg-warning text-dark ms-1">Playoff</span>
                                         }
+                                        @if (clearedGameIds.Contains(game.Id))
+                                        {
+                                            <span class="badge bg-info text-dark ms-1">Pick cleared</span>
+                                        }
                                     </div>
                                     <div class="text-end">
                                         <div class="small fw-bold text-dark">
-                                            @DateTimeHelper.ToCentral(game.StartTime).ToString("MMM d, h:mm tt") CT
+                                            @DateTimeHelper.ToCentralLabel(game.StartTime, "MMM d, h:mm tt")
                                         </div>
                                         <div class="small text-muted" style="font-size: 0.85em;">
                                             @game.Location 
@@ -141,27 +155,33 @@
                                 
                                 <div class="row g-2">
                                     <div class="col">
-                                        <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_home")" 
-                                               checked="@(pick == slots.Home && slots.Home != "TBD")" 
-                                               @onchange="@(() => UpdatePick(game.Id, slots.Home))" autocomplete="off">
-                                        
-                                        <label class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center h-100 @(pick == slots.Home && slots.Home != "TBD" ? "active fw-bold" : "")" 
+                                        <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_home")"
+                                               checked="@(slots.Home != null && pick == slots.Home)"
+                                               disabled="@(slots.Home == null)"
+                                               @onchange="@(() => UpdatePick(game.Id, slots.Home ?? ""))" autocomplete="off">
+
+                                        <label class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center h-100 @(slots.Home != null && pick == slots.Home ? "active fw-bold" : "") @(slots.Home == null ? "disabled opacity-50" : "")"
                                                for="@($"{game.Id}_home")">
-                                            @slots.Home
+                                            @slots.HomeLabel
                                         </label>
                                     </div>
 
                                     <div class="col">
-                                        <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_away")" 
-                                               checked="@(pick == slots.Away && slots.Away != "TBD")" 
-                                               @onchange="@(() => UpdatePick(game.Id, slots.Away))" autocomplete="off">
-                                        
-                                        <label class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center h-100 @(pick == slots.Away && slots.Away != "TBD" ? "active fw-bold" : "")" 
+                                        <input type="radio" class="btn-check" name="@game.Id" id="@($"{game.Id}_away")"
+                                               checked="@(slots.Away != null && pick == slots.Away)"
+                                               disabled="@(slots.Away == null)"
+                                               @onchange="@(() => UpdatePick(game.Id, slots.Away ?? ""))" autocomplete="off">
+
+                                        <label class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center h-100 @(slots.Away != null && pick == slots.Away ? "active fw-bold" : "") @(slots.Away == null ? "disabled opacity-50" : "")"
                                                for="@($"{game.Id}_away")">
-                                            @slots.Away
+                                            @slots.AwayLabel
                                         </label>
                                     </div>
                                 </div>
+                                @if (waiting.Any())
+                                {
+                                    <div class="small text-muted fst-italic mt-2"><i class="bi bi-info-circle me-1"></i>Pick @string.Join(" and ", waiting) first.</div>
+                                }
                             </li>
                         }
                     </ul>
@@ -226,21 +246,44 @@
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title">Move Entry to Pool</h5>
-                            <button type="button" class="btn-close" @onclick="() => showMoveModal = false"></button>
+                            <button type="button" class="btn-close" @onclick="CloseMoveModal"></button>
                         </div>
                         <div class="modal-body">
-                            <p>Select the new pool for <strong>@entry.PlayerName</strong>:</p>
-                            <select class="form-select" @bind="targetPoolId">
-                                <option value="">-- Select Target Pool --</option>
-                                @foreach (var p in pools.Where(p => p.Id != entry.PoolId))
-                                {
-                                    <option value="@p.Id">@p.Name</option>
-                                }
-                            </select>
+                            <p>Select the new pool for <strong>@entry.PlayerName</strong> (pools of the same season only):</p>
+                            @if (!MoveTargets.Any())
+                            {
+                                <div class="alert alert-secondary mb-0">There is no other open pool in this season to move the entry to.</div>
+                            }
+                            else
+                            {
+                                <select class="form-select" value="@targetPoolId" @onchange="OnTargetPoolChanged">
+                                    <option value="">-- Select Target Pool --</option>
+                                    @foreach (var p in MoveTargets)
+                                    {
+                                        <option value="@p.Id">@p.Name</option>
+                                    }
+                                </select>
+                            }
+
+                            @if (!string.IsNullOrEmpty(targetPoolId) && targetMissingPicks > 0)
+                            {
+                                <div class="alert alert-warning mt-3 mb-0">
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                    @(targetMissingPicks == 1 ? "1 game in that pool has" : $"{targetMissingPicks} games in that pool have") no pick from this entry.
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrEmpty(moveError))
+                            {
+                                <div class="alert alert-danger mt-3 mb-0">@moveError</div>
+                            }
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" @onclick="() => showMoveModal = false">Cancel</button>
-                            <button type="button" class="btn btn-warning" @onclick="ExecuteMove">Confirm Move</button>
+                            <button type="button" class="btn btn-secondary" @onclick="CloseMoveModal" disabled="@isMoving">Cancel</button>
+                            <button type="button" class="btn btn-warning" @onclick="ExecuteMove" disabled="@(isMoving || string.IsNullOrEmpty(targetPoolId))">
+                                @if (isMoving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                                Confirm Move
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -360,83 +403,115 @@
         }
     }
 
-    private void UpdatePick(string gameId, string selection) 
-    { 
-        if (entry.Picks == null) entry.Picks = new Dictionary<string, string>(); 
-        if (string.IsNullOrEmpty(selection)) 
-        { 
-            if (entry.Picks.ContainsKey(gameId)) entry.Picks.Remove(gameId); 
-        } 
-        else 
-        { 
-            entry.Picks[gameId] = selection; 
-        } 
-        StateHasChanged(); 
-    }
+    // Cleared-pick notice (issue 128)
+    private string clearNotice = "";
+    private HashSet<string> clearedGameIds = new();
 
-    private (string Home, string Away) GetMatchupSlots(BowlGame game)
+    private int PickedCount(List<BowlGame> poolGames) =>
+        EntryPickRules.CountValid(allGames, poolGames.Select(g => g.Id), entry.Picks);
+
+    private string GameNames(IEnumerable<string> gameIds) =>
+        string.Join(", ", gameIds.Select(id => allGames.FirstOrDefault(g => g.Id == id)?.BowlName ?? "a game"));
+
+    private void UpdatePick(string gameId, string selection)
     {
-        string home = game.TeamHome;
-        string away = game.TeamAway;
-
-        if (game.IsPlayoff)
+        if (entry.Picks == null) entry.Picks = new Dictionary<string, string>();
+        if (string.IsNullOrEmpty(selection))
         {
-             var feeders = allGames.Where(g => g.NextGameId == game.Id).OrderBy(g => g.StartTime).ToList();
-             var feederQueue = new Queue<BowlGame>(feeders);
-
-             if (string.IsNullOrWhiteSpace(home) || home.Equals("TBD", StringComparison.OrdinalIgnoreCase))
-             {
-                 if (feederQueue.TryDequeue(out var f1))
-                 {
-                     if (entry.Picks != null && entry.Picks.TryGetValue(f1.Id, out var w1)) home = w1;
-                     else home = $"Winner of {f1.BowlName}";
-                 }
-                 else home = "TBD";
-             }
-
-             if (string.IsNullOrWhiteSpace(away) || away.Equals("TBD", StringComparison.OrdinalIgnoreCase))
-             {
-                 if (feederQueue.TryDequeue(out var f2))
-                 {
-                     if (entry.Picks != null && entry.Picks.TryGetValue(f2.Id, out var w2)) away = w2;
-                     else away = $"Winner of {f2.BowlName}";
-                 }
-                 else away = "TBD";
-             }
+            if (entry.Picks.ContainsKey(gameId)) entry.Picks.Remove(gameId);
+        }
+        else
+        {
+            entry.Picks[gameId] = selection;
         }
 
-        if (string.IsNullOrWhiteSpace(home)) home = "TBD";
-        if (string.IsNullOrWhiteSpace(away)) away = "TBD";
-        
-        return (home, away);
+        // A changed pick can break later picks that built on it: clear them and say which.
+        var cleaned = EntryPickRules.ClearInvalid(allGames, entry.Picks);
+        entry.Picks = cleaned.Picks;
+        clearedGameIds.Remove(gameId);
+        if (cleaned.ClearedGameIds.Count > 0)
+        {
+            var gameName = allGames.FirstOrDefault(g => g.Id == gameId)?.BowlName ?? "that game";
+            clearedGameIds = new HashSet<string>(cleaned.ClearedGameIds);
+            clearNotice = $"Changing the pick for {gameName} cleared the pick for {GameNames(cleaned.ClearedGameIds)}. Pick again.";
+        }
+        else if (clearedGameIds.Count == 0)
+        {
+            clearNotice = "";
+        }
+        StateHasChanged();
+    }
+
+    // --- Move Entry (issue 132) ---
+    private bool isMoving = false;
+    private string moveError = "";
+    private int targetMissingPicks = 0;
+
+    // Same season as the entry, not archived, not the pool it is in now.
+    private List<BowlPool> MoveTargets => pools
+        .Where(p => p.Id != entry.PoolId && !p.IsArchived && p.SeasonId == entry.SeasonId)
+        .OrderBy(p => p.Name)
+        .ToList();
+
+    private void OpenMoveModal()
+    {
+        targetPoolId = "";
+        targetMissingPicks = 0;
+        moveError = "";
+        showMoveModal = true;
+    }
+
+    private void CloseMoveModal()
+    {
+        if (isMoving) return;
+        showMoveModal = false;
+    }
+
+    private void OnTargetPoolChanged(ChangeEventArgs e)
+    {
+        targetPoolId = e.Value?.ToString() ?? "";
+        moveError = "";
+
+        // Games in the target pool that this entry has no pick for.
+        var target = pools.FirstOrDefault(p => p.Id == targetPoolId);
+        if (target == null) { targetMissingPicks = 0; return; }
+        var targetGameIds = target.GameIds != null && target.GameIds.Any() ? target.GameIds : allGames.Select(g => g.Id).ToList();
+        targetMissingPicks = targetGameIds.Count(id => entry.Picks == null || !entry.Picks.TryGetValue(id, out var pick) || string.IsNullOrWhiteSpace(pick));
     }
 
     private async Task ExecuteMove()
     {
-        if (string.IsNullOrEmpty(targetPoolId)) return;
-        
+        if (string.IsNullOrEmpty(targetPoolId) || isMoving) return;
+
+        isMoving = true;
+        moveError = "";
         try 
         {
-            var response = await Http.PostAsync($"api/MoveEntry?entryId={entry.Id}&newPoolId={targetPoolId}", null);
+            var response = await Http.PostAsync($"api/MoveEntry?entryId={Uri.EscapeDataString(entry.Id)}&seasonId={Uri.EscapeDataString(entry.SeasonId)}&newPoolId={Uri.EscapeDataString(targetPoolId)}", null);
             if (response.IsSuccessStatusCode)
             {
-                entry.PoolId = targetPoolId; // Update local state
                 showMoveModal = false;
+                // Load the entry again so unsaved picks for the old pool are never posted into the new one.
+                await LoadData();
+                clearNotice = "";
+                clearedGameIds = new HashSet<string>();
                 toastMessage = "Entry moved successfully.";
                 showToast = true;
             }
             else 
             {
-                string msg = await response.Content.ReadAsStringAsync();
-                await JS.InvokeVoidAsync("alert", $"Move Failed: {msg}");
+                moveError = $"Move failed: {await response.Content.ReadAsStringAsync()}";
             }
         }
         catch (Exception ex)
         {
-            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+            moveError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isMoving = false;
         }
     }
-
     private async Task HandleSave()
     {
         if (string.IsNullOrEmpty(entry.PoolId))

@@ -106,7 +106,7 @@
 
     private string GetFormattedTime()
     {
-        return DateTimeHelper.ToCentral(Game.StartTime).ToString("MMM d • h:mm tt");
+        return DateTimeHelper.ToCentralLabel(Game.StartTime, "MMM d • h:mm tt");
     }
 
     private string GetColor(TeamInfo? info, string resolvedName)

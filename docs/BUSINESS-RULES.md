@@ -25,7 +25,7 @@ disagree, this document is the intent and the code is the bug.
 
 - A pool is Active until its lock date, then Locked, then optionally Concluded, then optionally Archived. Locked is derived from the date, not stored.
 - A pool needs a name and an invite code. A new pool's lock date must be in the future.
-- **An invite code identifies a pool.** *(Owner decision)* A player joins a pool by entering its code. The code is not a security measure: it is not secret, it is reused from year to year, and the server does not check it.
+- **An invite code identifies a pool.** *(Owner decision)* A player joins a pool by entering its code. The code is not a security measure: it is not secret, it is reused from year to year, and the server does not check it. When a code matches more than one pool, the current season's pool is used. Football joins only a current-season pool by code; hoops falls back to the first open match, because some hoops pools carry the year text instead of the season's ID (section 6).
 - Concluding is a SuperAdmin toggle and the prerequisite for archiving. Once the pool is past its lock date, a concluded pool refuses all entry changes, including renames. It is reversible. It does not hide the pool and does not affect trophies. *(Owner decision: concluding exists only to enable archiving and to prevent unintended changes to a pool after it has ended.)*
 - Archiving requires a concluded pool. It saves a snapshot of games, final standings and picks, and removes the pool from the main views. It cannot be undone: the snapshot drops entry IDs, owners, payment status and audit history. Football archives do not store playoff rounds; hoops archives store rounds and seeds.
 - Deleting a pool deletes its entries. *(Owner decision)* Football games are shared between pools, so what happens to games when a pool is deleted or archived is undecided and needs a design.
@@ -41,6 +41,9 @@ disagree, this document is the intent and the code is the bug.
 - A player can delete their own entry until lock.
 - **Payment status** is changed only by an Admin or SuperAdmin. A player's save must never set it. *(Owner decision)*
 - Picks may be saved incomplete before lock.
+- **Football picks must be reachable.** A pick in a later round must be one of the two teams the entry's own earlier picks lead to, or a team already placed in that slot. The server refuses a changed pick that is not. A stored pick that is saved again unchanged is left alone, so an old entry can still be renamed. Hoops is not checked this way yet.
+- **Moving an entry.** Only an Admin or SuperAdmin moves an entry to another pool. The target must be in the same season, not archived, and must not already have that bracket name. The move is written to the entry's change history. Payment status stays with the entry; picks for games not in the target pool are kept but do not score. A player's save never moves an entry.
+- **Admin-entered flag.** IsAdminEntered is set when an Admin or SuperAdmin creates an entry for another user. It is kept for audit only, and an existing entry keeps its stored value.
 
 ## 4. Scoring and ranking
 
