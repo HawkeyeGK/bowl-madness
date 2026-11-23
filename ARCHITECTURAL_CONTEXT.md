@@ -161,12 +161,12 @@ Two pure calculation engines live in `BowlPoolManager.Core/Helpers/`:
 
 | Project | Target Framework |
 |---|---|
-| `BowlPoolManager.Core` | `net8.0` |
-| `BowlPoolManager.Api` | `net8.0` |
+| `BowlPoolManager.Core` | `net10.0` |
+| `BowlPoolManager.Api` | `net10.0` |
 | `BowlPoolManager.Client` | `net10.0` |
 | `BowlPoolManager.Tests` | `net10.0` |
 
-The Api project is Azure Functions v4 on the isolated worker (`AzureFunctionsVersion` V4, `OutputType` Exe, `Microsoft.Azure.Functions.Worker` packages). A net10.0 project can reference net8.0 assemblies, so this compiles and runs cleanly.
+The Api project is Azure Functions v4 on the isolated worker (`AzureFunctionsVersion` V4, `OutputType` Exe, `Microsoft.Azure.Functions.Worker` packages, build SDK `Microsoft.Azure.Functions.Worker.Sdk` 2.0.7). All four projects target net10.0. `BowlPoolManager.Client/wwwroot/staticwebapp.config.json` sets `platform.apiRuntime` to `dotnet-isolated:10.0`; keep it matched to the Api target framework. Microsoft's current guide names `Azure.Functions.Sdk` as the .NET 10 build SDK; moving to it is a deferred follow-up.
 
 ## 10. Cross-Sport Archive Conventions
 

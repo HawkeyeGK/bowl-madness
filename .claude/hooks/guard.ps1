@@ -9,9 +9,12 @@
   Scope is sh (the command text), path (file_path of a write tool) or body (the new text of a
   write tool). The loop at the bottom applies every row of that scope to the whole text, as typed
   (matching is case-insensitive; the curl flag letters are the one case-sensitive part). There is
-  no parsing of any kind. Rules match the whole command text. Only A14 and A15 use ~ in their
+  no parsing of any kind. Rules match the whole command text. Only R5c, A14 and A15 use ~ in their
   pattern, meaning "anything up to the next ; | & or newline (a backtick or backslash line
   continuation does not end it)", so there the words have to sit in the same statement.
+  R5c also needs clean to be the git subcommand (after any git options such as -C, -c or
+  --git-dir), and its -f
+  letter is case-sensitive, so a commit message that says "clean" or a PowerShell -Force does not trip it.
 
   Contract with wrapper.src.ps1 (the registered hook command, unchanged):
     refuse          : reason on stderr, exit 2
@@ -35,7 +38,7 @@
       other command that names one, even a harmless cd, a pipe, a ; chain or a commit message, is
       refused. A path split across commands (cd .claude; sc settings.json x) is not seen. The
       read tools are checked for --output and --pre only; rg --hostname-bin is not.
-    - Flag rules (R1, R2, R5, R6, R7, A10, A11) read the whole command text, so a flag later in a
+    - Flag rules (R1, R2, R5a, R5b, R5d, R5e, R6, R7, A10, A11) read the whole command text, so a flag later in a
       compound command ("git push origin x; dotnet build -f net8.0"), or inside quoted text (a commit
       message that says "git reset --hard"), is refused too. -Dir is read as a recursion flag by R7a.
     - A plain git push with no branch named (while on main) is not seen, and neither are
@@ -51,7 +54,7 @@ $opts = [Text.RegularExpressions.RegexOptions]'IgnoreCase, Singleline'
 $limit = [TimeSpan]::FromSeconds(3)   # a regex that runs away throws, and a throw blocks
 
 # ---------- pieces ----------
-$S = '(?:[^;|&\r\n]|[`\\]\r?\n)*'   # what ~ stands for in A14 and A15
+$S = '(?:[^;|&\r\n]|[`\\]\r?\n)*'   # what ~ stands for in R5c, A14 and A15
 $web = '\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod)\b'
 $live = 'bowl-madness\.com|hoops-madness\.com|polite-glacier-059273d10'
 $local = 'localhost|127\.0\.0\.1|\[::1\]'
@@ -83,7 +86,7 @@ $Rules = @(
     @('R4', 'refuse', 'sh', (All $web $live $nonget), 'non-GET web request to the live site.'),
     @('R5a', 'refuse', 'sh', '\bgit\b.*\bpush\b.*(?:\s--(?:force|mirror|delete|prune)\b|\s-[a-z]*[fd][a-z]*\b|\s["'']?\+\S|\s\S*:\+|\s["'']?:[\w./-])', 'git push that forces, mirrors, prunes, deletes or uses a + or : refspec.'),
     @('R5b', 'refuse', 'sh', '\bgit\b.*\breset\b.*--hard', 'git reset --hard.'),
-    @('R5c', 'refuse', 'sh', '\bgit\b.*\bclean\b.*(?:\s-[a-z]*f|\s--force)', 'git clean with force.'),
+    @('R5c', 'refuse', 'sh', '\bgit(?:\s+(?:-[cC]|--(?:git-dir|work-tree|namespace|config-env))\s+\S+|\s+--?[\w-]+(?:=\S+)?)*\s+clean\b~(?:(?-i:\s-[a-zA-Z]*f[a-zA-Z]*)(?![\w-])|\s--force\b)', 'git clean with force.'),
     @('R5d', 'refuse', 'sh', '\bgit\b.*(?:\b(?:filter-branch|filter-repo)\b|\breflog\s+expire\b|\bgc\b.*--prune|\bupdate-ref\b.*\s-d\b)', 'git history rewrite or object pruning.'),
     @('R5e', 'refuse', 'sh', '\bgit\b.*\bcommit\b.*(?:\s--no-verify\b|\s-[a-z]*n[a-z]*\b)', 'git commit that skips the commit hooks (-n or --no-verify).'),
     @('R6a', 'refuse', 'sh', '\bgh\b.*(?:\brepo\s+(?:delete|archive|rename|transfer)\b|\brepo\s+edit\b.*--visibility|\brelease\s+delete\b|\b(?:secret|variable)\s+(?:set|delete)\b|\bworkflow\s+disable\b|\bpr\s+merge\b.*--admin)', 'destructive or settings-changing gh command.'),
@@ -115,7 +118,7 @@ $Rules = @(
     @('A14', 'ask', 'sh', '\bgh\b~\bpr(?:\s|[`\\]\r?\n)+merge\b', 'merging a pull request (a merge to main deploys to production).'),
     @('A15', 'ask', 'sh', '\bgit\b~\bpush\b~[\s:/''"](?:main|master)(?![\w.-])', 'git push that names main or master (a push to main deploys to production).')
 )
-foreach ($r in $Rules) { if ($r[0] -in 'A14', 'A15') { $r[3] = $r[3].Replace('~', $S) } }
+foreach ($r in $Rules) { if ($r[0] -in 'R5c', 'A14', 'A15') { $r[3] = $r[3].Replace('~', $S) } }
 
 # ---------- main ----------
 function Invoke-Main {

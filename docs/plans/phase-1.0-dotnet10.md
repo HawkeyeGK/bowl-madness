@@ -1,6 +1,6 @@
 # Phase 1.0: .NET 10 upgrade
 
-Status: waits for Phase 0. Written 2026-10-29. Part of docs/UPGRADE-PLAN-2026.md (section 3, Release 1.0).
+Status: done 2026-11-22. Written 2026-10-29. Part of docs/UPGRADE-PLAN-2026.md (section 3, Release 1.0).
 
 ## Start here (for a new session)
 1. Read CLAUDE.md, docs/UPGRADE-PLAN-2026.md section 3, docs/plans/phase-0-test-environment.md ("Done when" and "Progress"), then this file.
@@ -46,12 +46,12 @@ Core and Api on net10.0; `apiRuntime` set; tests pass (known failures labelled);
 ## Progress
 - [x] 1 Baseline (2026-11-22: 745 pass with KnownFailure excluded; 745 pass + 30 KnownFailure fail with filter off; 0 warnings)
 - [x] 2 Retarget (2026-11-22)
-- [x] 3 Packages (2026-11-22: no package changes; open question on Azure.Functions.Sdk, see PR)
+- [x] 3 Packages (2026-11-22: no package changes; the owner deferred the Azure.Functions.Sdk switch to a separate follow-up on 2026-11-22)
 - [x] 4 Runtime setting (2026-11-22)
 - [x] 5 Warnings (2026-11-22: 0 before, 0 after)
 - [x] 6 Tests (2026-11-22: same counts as baseline)
 - [x] 7 Review (2026-11-22: code-review agent, 0 critical or high)
 - [x] 8 Test site (2026-11-22: PR 149 preview; deploy log shows dotnetisolated 10.0; hand checks passed, see PR)
-- [ ] 9 Release
-- [ ] 10 Production check
-- [ ] 11 Docs
+- [x] 9 Release (2026-11-22: PR 149 to staging, PR 151 to main, merge 0017134)
+- [x] 10 Production check (2026-11-22: deploy log shows dotnetisolated 10.0; read-only smoke test passed; 2026-11-23 log check from the 23:54 UTC release to 00:32: 43 requests, none failed, no exceptions, only warnings that predate the release, #117, #120 and the AzureWebJobsStorage health message)
+- [x] 11 Docs (2026-11-22)
