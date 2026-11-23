@@ -6,6 +6,8 @@ using Microsoft.Extensions.Logging;
 using BowlPoolManager.Api.Helpers;
 using BowlPoolManager.Api.Repositories;
 using BowlPoolManager.Api.Services;
+using BowlPoolManager.Api.Services.ScoreFeed;
+using BowlPoolManager.Core.ScoreFeed;
 using BowlPoolManager.Core;
 
 namespace BowlPoolManager.Api.Functions
@@ -28,19 +30,22 @@ namespace BowlPoolManager.Api.Functions
         private readonly ITestEnvironment _testEnvironment;
         private readonly ITestDataRepository _testData;
         private readonly ITestScenarioProvider _scenarios;
+        private readonly IScoreFeedSettingsStore _feedSettings;
 
         public TestDataFunctions(
             ILoggerFactory loggerFactory,
             IUserRepository userRepo,
             ITestEnvironment testEnvironment,
             ITestDataRepository testData,
-            ITestScenarioProvider scenarios)
+            ITestScenarioProvider scenarios,
+            IScoreFeedSettingsStore feedSettings)
         {
             _logger = loggerFactory.CreateLogger<TestDataFunctions>();
             _userRepo = userRepo;
             _testEnvironment = testEnvironment;
             _testData = testData;
             _scenarios = scenarios;
+            _feedSettings = feedSettings;
         }
 
         [Function("GetTestEnvironmentStatus")]
@@ -96,6 +101,9 @@ namespace BowlPoolManager.Api.Functions
                 await _testData.UpsertAsync(doc.Container, doc.PartitionKey, doc.Body);
                 loaded[doc.Container] = loaded.GetValueOrDefault(doc.Container) + 1;
             }
+
+            // A reset starts from a known state: the score feed goes back to Live (the mock's own games were just cleared too).
+            await _feedSettings.SetModeAsync(ScoreFeedMode.Live);
 
             _logger.LogInformation("ResetTestData loaded scenario {Scenario}.", data.Name);
             return await JsonResponseAsync(req, new { scenario = data.Name, deleted, loaded });

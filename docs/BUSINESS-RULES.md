@@ -65,6 +65,9 @@ The same rules apply to football and hoops.
 
 - Scores refresh lazily when games are read; games not linked to the feed are updated by hand.
 - When a game goes final, its winner fills the next game's slot and cascades; a game that is no longer final resets that slot.
+- **Mock score feed.** A SuperAdmin can switch football scores between Live (College Football Data) and Mock (games edited on the Score Feed page). It works on the test site and on production. While Mock is on, the site shows and scores the mock's results for linked games, for every visitor, and real scores are not applied. The Score Feed page shows a warning while Mock is on; no other page does. There is no automatic block (for example after a pool locks). The default, when nothing is stored, is Live. The test-data reset sets it back to Live.
+- **Switching back to Live** asks whether to reset the current season's football games. A reset is only possible as part of switching from Mock to Live. "Switch and reset" lists the games first, with a warning that every result on them is cleared whatever its source (real and hand-entered results too). It then clears the scores of linked games that have a result, sets them to Scheduled, and returns the later-round teams that those results had advanced to "Winner of ...". Pools, entries and picks are not changed, so standings return to zero. "Switch only" leaves results as they are. Slots edited by hand, and later games whose result was entered by hand, are left alone and listed.
+- **Before the first reset on production**, run the `/data-change` procedure (confirms continuous backup is on and records the restore point).
 
 ## 6. Seasons and IDs
 

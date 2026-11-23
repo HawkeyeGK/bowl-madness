@@ -48,7 +48,7 @@ Read by the code:
 | SiteEnvironment | `Test` on the test site only. Turns on test-only features (ResetTestData). Production never sets it. The features also require the Cosmos account to be the test account. |
 | APPLICATIONINSIGHTS_CONNECTION_STRING | Read by the Application Insights SDK (not by app code directly) |
 
-On the test site CfbdApiKey is not set (a mock feed comes in Phase 1.1) and BootstrapAdminEmail makes the owner SuperAdmin there. Which of these are set in Azure is unverified. Locally they come from BowlPoolManager.Api/local.settings.json, which is git-ignored.
+On the test site CfbdApiKey is not set; use the Score Feed page's Mock mode there and BootstrapAdminEmail makes the owner SuperAdmin there. Which of these are set in Azure is unverified. Locally they come from BowlPoolManager.Api/local.settings.json, which is git-ignored.
 The browser Application Insights snippet in wwwroot/index.html carries its own connection string; it is public by design and is not repeated here.
 
 ## Application Insights

@@ -301,17 +301,9 @@
         {
             pool.LockDate = DateTime.UtcNow.AddDays(7);
             // Default to current season
-            var current = seasons.FirstOrDefault(s => s.IsCurrent);
-            if (current != null)
-            {
-                pool.SeasonId = current.Id;
-                pool.Season = int.Parse(current.Id);
-            }
-            else 
-            {
-                pool.Season = DateTime.Now.Year;
-                pool.SeasonId = pool.Season.ToString();
-            }
+            var (newSeasonId, newYear) = NewPoolSeason.For(seasons, DateTime.Now.Year);
+            pool.SeasonId = newSeasonId;
+            pool.Season = newYear;
             // Initialize GameIds
             pool.GameIds = new List<string>();
         }
