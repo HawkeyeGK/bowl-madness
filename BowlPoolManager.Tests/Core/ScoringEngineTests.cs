@@ -449,7 +449,7 @@ namespace BowlPoolManager.Tests.Core
             var g2 = new BowlGame { Id = "g2", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10, Round = TournamentRound.Standard };
             var g3 = new BowlGame { Id = "g3", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10, Round = TournamentRound.Standard };
 
-            var tb = new BowlGame { Id = "tb", TeamHomeScore = 10, TeamAwayScore = 10, Status = GameStatus.Final }; // Total 20
+            var tb = new BowlGame { Id = "tb", TeamHomeScore = 12, TeamAwayScore = 8, Status = GameStatus.Final }; // Total 20 (games cannot end tied, so not 10-10)
 
             var games = new List<BowlGame> { g1, g2, g3, tb };
 
@@ -496,7 +496,7 @@ namespace BowlPoolManager.Tests.Core
             var g2 = new BowlGame { Id = "g2", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10, Round = TournamentRound.Standard };
             var g3 = new BowlGame { Id = "g3", TeamHome = "H", TeamAway = "A", TeamHomeScore = 1, TeamAwayScore = 0, Status = GameStatus.Final, PointValue = 10, Round = TournamentRound.Standard };
 
-            var tb = new BowlGame { Id = "tb", TeamHomeScore = 10, TeamAwayScore = 10, Status = GameStatus.Final }; // Total 20
+            var tb = new BowlGame { Id = "tb", TeamHomeScore = 12, TeamAwayScore = 8, Status = GameStatus.Final }; // Total 20
             var games = new List<BowlGame> { g1, g2, g3, tb };
 
             var entryA = new BracketEntry 
@@ -531,7 +531,7 @@ namespace BowlPoolManager.Tests.Core
         public void Calculate_ShouldAssignRanksCorrectly_WithTiesOnAllMetrics()
         {
              var g1 = new BowlGame { Id = "g1", TeamHome = "H", TeamAway = "A", TeamHomeScore = 10, TeamAwayScore = 5, Status = GameStatus.Final, PointValue = 10, Round = TournamentRound.Standard };
-             var tb = new BowlGame { Id = "tb", TeamHomeScore = 10, TeamAwayScore = 10, Status = GameStatus.Final }; // Total 20
+             var tb = new BowlGame { Id = "tb", TeamHomeScore = 12, TeamAwayScore = 8, Status = GameStatus.Final }; // Total 20
              var games = new List<BowlGame> { g1, tb };
 
              var e1 = new BracketEntry { PlayerName = "1", Picks = new Dictionary<string,string>{{"g1","H"}}, TieBreakerPoints=20 }; // Sc:10, P:1, D:0

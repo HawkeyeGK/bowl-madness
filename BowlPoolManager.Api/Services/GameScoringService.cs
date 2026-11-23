@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using BowlPoolManager.Core.Domain;
+using BowlPoolManager.Core.Helpers;
 using BowlPoolManager.Core.Dtos;
 using BowlPoolManager.Api.Repositories; // NEW
 using BowlPoolManager.Api.Services.ScoreFeed;
@@ -181,7 +182,7 @@ namespace BowlPoolManager.Api.Services
             if (feeders.Count > 0)
             {
                 // Check each feeder and apply propagated values if the client is sending stale placeholders
-                foreach (var (feeder, index) in feeders.Select((f, i) => (f, i)))
+                foreach (var feeder in feeders)
                 {
                     if (feeder.Status == GameStatus.Final && !string.IsNullOrEmpty(feeder.WinningTeamName))
                     {
@@ -194,7 +195,7 @@ namespace BowlPoolManager.Api.Services
                             : feeder.TeamAwaySeed;
                         
                         // Determine which slot this feeder should populate
-                        bool isHomeSlot = (feeders.Count > 1) ? (index == 0) : DetermineSlotForSingleFeeder(game, winnerName);
+                        bool isHomeSlot = BracketSlots.IsHomeSlot(feeder, game, allGames);
                         
                         if (isHomeSlot && IsPlaceholder(game.TeamHome))
                         {
@@ -238,23 +239,6 @@ namespace BowlPoolManager.Api.Services
         }
         
         /// <summary>
-        /// Helper to determine slot for a single-feeder scenario during preservation check.
-        /// </summary>
-        private bool DetermineSlotForSingleFeeder(BowlGame targetGame, string winnerName)
-        {
-            // Check if winner already exists in one slot
-            if (string.Equals(targetGame.TeamHome, winnerName, StringComparison.OrdinalIgnoreCase)) return true;
-            if (string.Equals(targetGame.TeamAway, winnerName, StringComparison.OrdinalIgnoreCase)) return false;
-            
-            // Fallback to placeholder heuristic
-            bool homeIsPlaceholder = IsPlaceholder(targetGame.TeamHome);
-            bool awayIsPlaceholder = IsPlaceholder(targetGame.TeamAway);
-            
-            if (!homeIsPlaceholder && awayIsPlaceholder) return false; // Away slot
-            return true; // Default to Home
-        }
-
-        /// <summary>
         /// Forces propagation of all completed games in a season.
         /// This method fetches games once, then iterates through them in chronological order,
         /// ensuring that each propagation uses the same in-memory list to avoid stale data issues.
@@ -294,175 +278,10 @@ namespace BowlPoolManager.Api.Services
 
         private void PropagateWinner(BowlGame completedGame, List<BowlGame> context, List<BowlGame> pendingUpdates)
         {
-            if (string.IsNullOrEmpty(completedGame.NextGameId)) return;
-
-            // Important: Always look in pendingUpdates first for the latest version of the game
-            var nextGame = pendingUpdates.FirstOrDefault(g => string.Equals(g.Id, completedGame.NextGameId, StringComparison.OrdinalIgnoreCase))
-                           ?? context.FirstOrDefault(g => string.Equals(g.Id, completedGame.NextGameId, StringComparison.OrdinalIgnoreCase));
-
-            if (nextGame == null)
-            {
-                _logger.LogWarning($"PropagateWinner: Could not find NextGame with Id '{completedGame.NextGameId}' for CompletedGame '{completedGame.BowlName}'");
-                return;
-            }
-
-            // Identify feeders to determine slot
-            var feeders = context
-                .Where(g => string.Equals(g.NextGameId, nextGame.Id, StringComparison.OrdinalIgnoreCase))
-                .OrderBy(g => g.StartTime)
-                .ToList();
-
-            bool isHomeSlot = true; // Default to Home (earlier game logic)
-
-            // Determine slot based on feed index
-            var myIndex = feeders.FindIndex(f => string.Equals(f.Id, completedGame.Id, StringComparison.OrdinalIgnoreCase));
-            
-            if (myIndex >= 0)
-            {
-                // Found myself in the feeders list
-                if (feeders.Count > 1)
-                {
-                    // If multiple feeders: 0 -> Home, 1 -> Away
-                    isHomeSlot = (myIndex == 0);
-                }
-                else
-                {
-                    // Single feeder in list (myself)
-                    // First, check if the winner already exists in one of the slots
-                    // This prevents double-propagation on subsequent runs
-                    var winnerName = completedGame.WinningTeamName;
-                    
-                    if (!string.IsNullOrEmpty(winnerName))
-                    {
-                        bool homeHasWinner = string.Equals(nextGame.TeamHome, winnerName, StringComparison.OrdinalIgnoreCase);
-                        bool awayHasWinner = string.Equals(nextGame.TeamAway, winnerName, StringComparison.OrdinalIgnoreCase);
-                        
-                        if (homeHasWinner && !awayHasWinner)
-                        {
-                            // Winner already in Home, stay with Home
-                            isHomeSlot = true;
-                            _logger.LogInformation($"PropagateWinner: Single feeder '{completedGame.BowlName}'. Winner '{winnerName}' already in Home slot.");
-                        }
-                        else if (awayHasWinner && !homeHasWinner)
-                        {
-                            // Winner already in Away, stay with Away
-                            isHomeSlot = false;
-                            _logger.LogInformation($"PropagateWinner: Single feeder '{completedGame.BowlName}'. Winner '{winnerName}' already in Away slot.");
-                        }
-                        else
-                        {
-                            // Winner not found in either slot (or somehow in both), use placeholder heuristic
-                            bool homeIsPlaceholder = IsPlaceholder(nextGame.TeamHome);
-                            bool awayIsPlaceholder = IsPlaceholder(nextGame.TeamAway);
-
-                            if (!homeIsPlaceholder && awayIsPlaceholder) 
-                            {
-                                isHomeSlot = false;
-                            }
-                            _logger.LogInformation($"PropagateWinner: Single feeder '{completedGame.BowlName}'. Slot guessed as: {(isHomeSlot ? "Home" : "Away")} (Home placeholder: {homeIsPlaceholder}, Away placeholder: {awayIsPlaceholder})");
-                        }
-                    }
-                    else
-                    {
-                        // No winner yet, use placeholder heuristic
-                        bool homeIsPlaceholder = IsPlaceholder(nextGame.TeamHome);
-                        bool awayIsPlaceholder = IsPlaceholder(nextGame.TeamAway);
-
-                        if (!homeIsPlaceholder && awayIsPlaceholder) isHomeSlot = false;
-                        _logger.LogInformation($"PropagateWinner: Single feeder '{completedGame.BowlName}' (no winner). Slot guessed as: {(isHomeSlot ? "Home" : "Away")}");
-                    }
-                }
-            }
-            else
-            {
-                // Should not happen if data is consistent, but safeguard
-                _logger.LogWarning($"PropagateWinner: CompletedGame '{completedGame.BowlName}' not found in feeders list for NextGame '{nextGame.BowlName}'.");
-            }
-            
-            bool changed = false;
-
-            if (completedGame.Status == GameStatus.Final && !string.IsNullOrEmpty(completedGame.WinningTeamName))
-            {
-                // PROPAGATE WINNER
-                var winnerName = completedGame.WinningTeamName;
-                var winnerInfo = (string.Equals(winnerName, completedGame.TeamHome, StringComparison.OrdinalIgnoreCase)) 
-                    ? completedGame.HomeTeamInfo 
-                    : completedGame.AwayTeamInfo;
-                
-                var winnerSeed = (string.Equals(winnerName, completedGame.TeamHome, StringComparison.OrdinalIgnoreCase))
-                    ? completedGame.TeamHomeSeed
-                    : completedGame.TeamAwaySeed;
-
-                if (isHomeSlot)
-                {
-                    if (nextGame.TeamHome != winnerName)
-                    {
-                        nextGame.TeamHome = winnerName;
-                        nextGame.HomeTeamInfo = winnerInfo;
-                        nextGame.TeamHomeSeed = winnerSeed;
-                        changed = true;
-                    }
-                }
-                else
-                {
-                    if (nextGame.TeamAway != winnerName)
-                    {
-                        nextGame.TeamAway = winnerName;
-                        nextGame.AwayTeamInfo = winnerInfo;
-                        nextGame.TeamAwaySeed = winnerSeed;
-                        changed = true;
-                    }
-                }
-            }
-            else
-            {
-                // REVERT / RESET (if game became non-final or we need to reset downstream)
-                // Note: This is aggressive, but ensures consistency.
-                string placeholder = $"Winner of {completedGame.BowlName}";
-                
-                if (isHomeSlot)
-                {
-                    if (nextGame.TeamHome != placeholder)
-                    {
-                        nextGame.TeamHome = placeholder;
-                        nextGame.HomeTeamInfo = null;
-                        nextGame.TeamHomeSeed = null;
-                        changed = true;
-                    }
-                }
-                else
-                {
-                    if (nextGame.TeamAway != placeholder)
-                    {
-                        nextGame.TeamAway = placeholder;
-                        nextGame.AwayTeamInfo = null;
-                        nextGame.TeamAwaySeed = null;
-                        changed = true;
-                    }
-                }
-            }
-
-            if (changed)
-            {
-                // Add to pending updates if not already there
-                if (!pendingUpdates.Contains(nextGame))
-                {
-                    pendingUpdates.Add(nextGame);
-                }
-                
-                _logger.LogInformation($"PropagateWinner: Updated NextGame '{nextGame.BowlName}' {nextGame.TeamHome} vs {nextGame.TeamAway}");
-                
-                // Recursive propagation!
-                PropagateWinner(nextGame, context, pendingUpdates);
-            }
+            // The slot rule and the copy live in Core so the server, the pages and the simulator agree.
+            BracketPropagation.Propagate(completedGame, context, pendingUpdates, message => _logger.LogWarning($"PropagateWinner: {message}"));
         }
 
-        private bool IsPlaceholder(string name)
-        {
-            if (string.IsNullOrEmpty(name)) return true;
-            if (name.StartsWith("Winner of", StringComparison.OrdinalIgnoreCase)) return true;
-            if (name.Equals("TBD", StringComparison.OrdinalIgnoreCase)) return true;
-            return false;
-        }
+        private static bool IsPlaceholder(string name) => BracketSlots.IsPlaceholder(name);
     }
 }

@@ -420,17 +420,19 @@ else
         
         if (topNeedsFill || bottomNeedsFill)
         {
-            var feeders = games!.Where(g => g.NextGameId == game.Id).OrderBy(g => g.StartTime).ToList();
-            var feederQueue = new Queue<BowlGame>(feeders);
+            // The shared slot rule (BracketSlots): each feeder belongs to one slot.
+            var feeders = BracketSlots.FeedersOf(game, games!);
 
-            if (topNeedsFill && feederQueue.Count > 0)
+            if (topNeedsFill)
             {
-                top = GetWinnerOf(feederQueue.Dequeue());
+                var feeder = feeders.FirstOrDefault(f => BracketSlots.IsHomeSlot(f, game, games!));
+                if (feeder != null) top = GetWinnerOf(feeder);
             }
 
-            if (bottomNeedsFill && feederQueue.Count > 0)
+            if (bottomNeedsFill)
             {
-                bottom = GetWinnerOf(feederQueue.Dequeue());
+                var feeder = feeders.FirstOrDefault(f => !BracketSlots.IsHomeSlot(f, game, games!));
+                if (feeder != null) bottom = GetWinnerOf(feeder);
             }
         }
         return (top, bottom);

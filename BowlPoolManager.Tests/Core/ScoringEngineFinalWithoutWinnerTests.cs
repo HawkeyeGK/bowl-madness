@@ -59,5 +59,35 @@ namespace BowlPoolManager.Tests.Core
             rows.Single(r => r.Entry.PlayerName == "Away").Score.Should().Be(10);
             rows.Single(r => r.Entry.PlayerName == "Home").Score.Should().Be(0);
         }
+
+        // Issue 163: a Final tiebreaker game with a missing score used to be measured as a total of 0.
+        [Theory]
+        [InlineData(null, null)]
+        [InlineData(null, 30)]
+        [InlineData(30, null)]
+        [InlineData(24, 24)]
+        public void Calculate_ShouldLeaveTieBreakerDeltaNull_WhenTieBreakerGameIsFinalWithoutAWinner(int? home, int? away)
+        {
+            var game = Final(home, away);
+            var pool = new BowlPool { TieBreakerGameId = "g1" };
+            var entry = Pick("Home");
+            entry.TieBreakerPoints = 50;
+
+            var rows = ScoringEngine.Calculate(new List<BowlGame> { game }, new List<BracketEntry> { entry }, pool);
+
+            rows[0].TieBreakerDelta.Should().BeNull();
+        }
+
+        [Fact]
+        public void Calculate_ShouldMeasureTieBreakerDelta_WhenTieBreakerGameIsFinalWithBothScores()
+        {
+            var pool = new BowlPool { TieBreakerGameId = "g1" };
+            var entry = Pick("Home");
+            entry.TieBreakerPoints = 50;
+
+            var rows = ScoringEngine.Calculate(new List<BowlGame> { Final(30, 21) }, new List<BracketEntry> { entry }, pool);
+
+            rows[0].TieBreakerDelta.Should().Be(1);
+        }
     }
 }
