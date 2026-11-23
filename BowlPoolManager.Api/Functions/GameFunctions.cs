@@ -3,6 +3,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using BowlPoolManager.Api.Services;
+using BowlPoolManager.Api.Services.ScoreFeed;
 using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Api.Helpers;
 using System.Text.Json;
@@ -18,19 +19,22 @@ namespace BowlPoolManager.Api.Functions
         private readonly IGameRepository _gameRepo;
         private readonly IUserRepository _userRepo;
         
-        private readonly ICfbdService _cfbdService;
+        private readonly IScoreFeed _scoreFeed;
+        private readonly ISeasonRepository _seasonRepo;
         private readonly IGameScoringService _scoringService;
 
         public GameFunctions(ILoggerFactory loggerFactory, 
                              IGameRepository gameRepo, // Injected
                              IUserRepository userRepo, // Injected
-                             ICfbdService cfbdService,
+                             IScoreFeed scoreFeed,
+                             ISeasonRepository seasonRepo,
                              IGameScoringService scoringService)
         {
             _logger = loggerFactory.CreateLogger<GameFunctions>();
             _gameRepo = gameRepo;
             _userRepo = userRepo;
-            _cfbdService = cfbdService;
+            _scoreFeed = scoreFeed;
+            _seasonRepo = seasonRepo;
             _scoringService = scoringService;
         }
 
@@ -66,9 +70,28 @@ namespace BowlPoolManager.Api.Functions
             var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
             if (!authResult.IsValid) return authResult.ErrorResponse!;
 
-            var games = await _cfbdService.GetPostseasonGamesAsync(2025);
+            var year = await GetCurrentSeasonYearAsync();
+            if (year == null) return await NoCurrentSeasonAsync(req);
+
+            var games = (await _scoreFeed.GetPostseasonGamesAsync(year.Value))
+                .Select(CfbdFeedMapping.ToCfbdDto).ToList();
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(games);
+            return response;
+        }
+
+        // The feed year is the current season's SeasonId ("2025"), never a literal (issue 102).
+        private async Task<int?> GetCurrentSeasonYearAsync()
+        {
+            var seasons = await _seasonRepo.GetSeasonsAsync();
+            var current = seasons.FirstOrDefault(s => s.IsCurrent);
+            return current != null && int.TryParse(current.SeasonId, out var year) ? year : null;
+        }
+
+        private static async Task<HttpResponseData> NoCurrentSeasonAsync(HttpRequestData req)
+        {
+            var response = req.CreateResponse(HttpStatusCode.BadRequest);
+            await response.WriteStringAsync("No current season is set.");
             return response;
         }
         
@@ -86,12 +109,20 @@ namespace BowlPoolManager.Api.Functions
             {
                 // Fix: Use the Typed service method to ensure our manual mapping (Notes, etc.) is applied,
                 // then re-serialize to send to client.
-                var games = await _cfbdService.GetScoreboardGamesAsync();
+                var games = (await _scoreFeed.GetScoreboardAsync())
+                    .Select(CfbdFeedMapping.ToCfbdDto).ToList();
                 json = JsonSerializer.Serialize(games);
             }
             else
             {
-                json = await _cfbdService.GetRawPostseasonGamesJsonAsync(2025);
+                var year = await GetCurrentSeasonYearAsync();
+                if (year == null) return await NoCurrentSeasonAsync(req);
+
+                // CFBD: the provider's own JSON. Mock: the mock's games in the same shape.
+                json = _scoreFeed is IRawPostseasonJsonSource raw
+                    ? await raw.GetRawPostseasonJsonAsync(year.Value)
+                    : JsonSerializer.Serialize((await _scoreFeed.GetPostseasonGamesAsync(year.Value))
+                        .Select(CfbdFeedMapping.ToCfbdDto).ToList());
             }
             
             var response = req.CreateResponse(HttpStatusCode.OK);

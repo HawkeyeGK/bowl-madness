@@ -2,6 +2,8 @@ using Microsoft.Extensions.Logging;
 using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Core.Dtos;
 using BowlPoolManager.Api.Repositories; // NEW
+using BowlPoolManager.Api.Services.ScoreFeed;
+using BowlPoolManager.Core.ScoreFeed;
 
 namespace BowlPoolManager.Api.Services
 {
@@ -9,7 +11,7 @@ namespace BowlPoolManager.Api.Services
     {
         private readonly ILogger<GameScoringService> _logger;
         private readonly IGameRepository _gameRepo; // Changed from ICosmosDbService
-        private readonly ICfbdService _cfbdService;
+        private readonly IScoreFeed _scoreFeed;
 
         // Throttling State
         private static DateTime _lastRefresh = DateTime.MinValue;
@@ -17,11 +19,11 @@ namespace BowlPoolManager.Api.Services
         private const int RefreshIntervalMinutes = 2;
 
         // Update Constructor Injection
-        public GameScoringService(ILogger<GameScoringService> logger, IGameRepository gameRepo, ICfbdService cfbdService)
+        public GameScoringService(ILogger<GameScoringService> logger, IGameRepository gameRepo, IScoreFeed scoreFeed)
         {
             _logger = logger;
             _gameRepo = gameRepo;
-            _cfbdService = cfbdService;
+            _scoreFeed = scoreFeed;
         }
 
         public DateTime GetLastRefreshTime()
@@ -62,13 +64,13 @@ namespace BowlPoolManager.Api.Services
 
             if (!linkedGames.Any()) return;
 
-            var apiGames = await _cfbdService.GetScoreboardGamesAsync();
+            var apiGames = await _scoreFeed.GetScoreboardAsync();
             var batchUpdates = new List<BowlGame>(); // Collect all updates here
             string? seasonId = linkedGames.FirstOrDefault()?.SeasonId; // Assumes all games in list share seasonId
 
             foreach (var localGame in linkedGames)
             {
-                var apiGame = apiGames.FirstOrDefault(x => x.Id.ToString() == localGame.ExternalId);
+                var apiGame = apiGames.FirstOrDefault(x => x.ExternalId == localGame.ExternalId);
                 if (apiGame == null) continue;
 
                 bool gameChanged = false;
@@ -77,10 +79,10 @@ namespace BowlPoolManager.Api.Services
                 int? homeScore = null;
                 if (!string.IsNullOrEmpty(localGame.ApiHomeTeam))
                 {
-                    if (string.Equals(apiGame.HomeTeam, localGame.ApiHomeTeam, StringComparison.OrdinalIgnoreCase))
-                        homeScore = apiGame.HomePoints;
-                    else if (string.Equals(apiGame.AwayTeam, localGame.ApiHomeTeam, StringComparison.OrdinalIgnoreCase))
-                        homeScore = apiGame.AwayPoints;
+                    if (string.Equals(apiGame.Home.Name, localGame.ApiHomeTeam, StringComparison.OrdinalIgnoreCase))
+                        homeScore = apiGame.Home.Points;
+                    else if (string.Equals(apiGame.Away.Name, localGame.ApiHomeTeam, StringComparison.OrdinalIgnoreCase))
+                        homeScore = apiGame.Away.Points;
                 }
 
                 if (homeScore.HasValue && homeScore != localGame.TeamHomeScore)
@@ -93,10 +95,10 @@ namespace BowlPoolManager.Api.Services
                 int? awayScore = null;
                 if (!string.IsNullOrEmpty(localGame.ApiAwayTeam))
                 {
-                    if (string.Equals(apiGame.HomeTeam, localGame.ApiAwayTeam, StringComparison.OrdinalIgnoreCase))
-                        awayScore = apiGame.HomePoints;
-                    else if (string.Equals(apiGame.AwayTeam, localGame.ApiAwayTeam, StringComparison.OrdinalIgnoreCase))
-                        awayScore = apiGame.AwayPoints;
+                    if (string.Equals(apiGame.Home.Name, localGame.ApiAwayTeam, StringComparison.OrdinalIgnoreCase))
+                        awayScore = apiGame.Home.Points;
+                    else if (string.Equals(apiGame.Away.Name, localGame.ApiAwayTeam, StringComparison.OrdinalIgnoreCase))
+                        awayScore = apiGame.Away.Points;
                 }
 
                 if (awayScore.HasValue && awayScore != localGame.TeamAwayScore)
@@ -109,13 +111,13 @@ namespace BowlPoolManager.Api.Services
                 var oldStatus = localGame.Status;
                 var oldDetail = localGame.GameDetail;
 
-                if (apiGame.Completed || string.Equals(apiGame.StatusRaw, "completed", StringComparison.OrdinalIgnoreCase))
+                if (apiGame.Status == FeedGameStatus.Final)
                 {
                     localGame.Status = GameStatus.Final;
                     localGame.GameDetail = "Final";
                 }
-                else if (string.Equals(apiGame.StatusRaw, "in_progress", StringComparison.OrdinalIgnoreCase) || 
-                        (DateTime.UtcNow >= localGame.StartTime.AddMinutes(-15) && !apiGame.Completed))
+                else if (apiGame.Status == FeedGameStatus.InProgress || 
+                        (DateTime.UtcNow >= localGame.StartTime.AddMinutes(-15)))
                 {
                     localGame.Status = GameStatus.InProgress;
 

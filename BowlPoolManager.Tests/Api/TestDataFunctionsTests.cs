@@ -11,6 +11,8 @@ using BowlPoolManager.Api.Functions;
 using BowlPoolManager.Api.Helpers;
 using BowlPoolManager.Api.Repositories;
 using BowlPoolManager.Api.Services;
+using BowlPoolManager.Api.Services.ScoreFeed;
+using BowlPoolManager.Core.ScoreFeed;
 using BowlPoolManager.Core;
 using BowlPoolManager.Core.Domain;
 
@@ -29,6 +31,7 @@ namespace BowlPoolManager.Tests.Api
             public Mock<ITestEnvironment> Env = new();
             public Mock<ITestDataRepository> Data = new();
             public Mock<ITestScenarioProvider> Scenarios = new();
+            public Mock<IScoreFeedSettingsStore> FeedSettings = new();
 
             public Fixture(bool testEnvironment)
             {
@@ -49,7 +52,7 @@ namespace BowlPoolManager.Tests.Api
             }
 
             public TestDataFunctions Build() => new(
-                new NullLoggerFactory(), Users.Object, Env.Object, Data.Object, Scenarios.Object);
+                new NullLoggerFactory(), Users.Object, Env.Object, Data.Object, Scenarios.Object, FeedSettings.Object);
 
             public void SuperAdmin(string id) => Users
                 .Setup(u => u.GetUserAsync(It.IsAny<string>()))
@@ -59,6 +62,7 @@ namespace BowlPoolManager.Tests.Api
             {
                 Data.Verify(d => d.DeleteAllAsync(It.IsAny<string>()), Times.Never);
                 Data.Verify(d => d.UpsertAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<JObject>()), Times.Never);
+                FeedSettings.Verify(s => s.SetModeAsync(It.IsAny<ScoreFeedMode>()), Times.Never);
             }
         }
 
@@ -191,7 +195,7 @@ namespace BowlPoolManager.Tests.Api
             var f = new Fixture(testEnvironment: true);
             f.SuperAdmin("owner");
             var sut = new TestDataFunctions(
-                new NullLoggerFactory(), f.Users.Object, new TestEnvironment(siteEnvironment, endpoint), f.Data.Object, f.Scenarios.Object);
+                new NullLoggerFactory(), f.Users.Object, new TestEnvironment(siteEnvironment, endpoint), f.Data.Object, f.Scenarios.Object, f.FeedSettings.Object);
             var (req, _) = BuildRequest(Principal("owner"));
 
             var result = await sut.ResetTestData(req, "entry-window");
@@ -254,6 +258,36 @@ namespace BowlPoolManager.Tests.Api
             calls.Should().HaveCount(6);
             calls.Take(3).Should().OnlyContain(c => c.StartsWith("delete:"));
             calls.Skip(3).Should().OnlyContain(c => c.StartsWith("upsert:"));
+        }
+
+        [Fact]
+        public async Task ResetTestData_ShouldSetTheScoreFeedBackToLiveAfterLoading_WhenSuperAdminOnTestSite()
+        {
+            var f = new Fixture(testEnvironment: true);
+            f.SuperAdmin("owner");
+            var calls = new List<string>();
+            f.Data.Setup(d => d.UpsertAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<JObject>()))
+                .Callback<string, string, JObject>((_, _, _) => calls.Add("upsert")).Returns(Task.CompletedTask);
+            f.FeedSettings.Setup(s => s.SetModeAsync(ScoreFeedMode.Live)).Callback(() => calls.Add("live")).Returns(Task.CompletedTask);
+            var (req, _) = BuildRequest(Principal("owner"));
+
+            await f.Build().ResetTestData(req, "entry-window");
+
+            f.FeedSettings.Verify(s => s.SetModeAsync(ScoreFeedMode.Live), Times.Once);
+            calls.Last().Should().Be("live");
+        }
+
+        [Fact]
+        public async Task ResetTestData_ShouldNotChangeTheScoreFeed_WhenScenarioIsUnknown()
+        {
+            var f = new Fixture(testEnvironment: true);
+            f.SuperAdmin("owner");
+            f.Scenarios.Setup(s => s.Get(It.IsAny<string>())).Returns((TestScenario?)null);
+            var (req, _) = BuildRequest(Principal("owner"));
+
+            await f.Build().ResetTestData(req, "nope");
+
+            f.FeedSettings.Verify(s => s.SetModeAsync(It.IsAny<ScoreFeedMode>()), Times.Never);
         }
 
         [Fact]

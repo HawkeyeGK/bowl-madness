@@ -4,6 +4,7 @@ using Moq;
 using BowlPoolManager.Api.Functions;
 using BowlPoolManager.Api.Repositories;
 using BowlPoolManager.Api.Services;
+using BowlPoolManager.Api.Services.ScoreFeed;
 using BowlPoolManager.Core;
 using BowlPoolManager.Core.Domain;
 
@@ -237,10 +238,11 @@ namespace BowlPoolManager.Tests.Api
         {
             public Mock<IGameRepository> Games = new();
             public Mock<IUserRepository> Users = EndpointKit.Users();
-            public Mock<ICfbdService> Cfbd = new();
+            public Mock<IScoreFeed> Feed = new();
+            public Mock<ISeasonRepository> Seasons = new();
             public Mock<IGameScoringService> Scoring = new();
 
-            public GameFunctions Build() => new(new NullLoggerFactory(), Games.Object, Users.Object, Cfbd.Object, Scoring.Object);
+            public GameFunctions Build() => new(new NullLoggerFactory(), Games.Object, Users.Object, Feed.Object, Seasons.Object, Scoring.Object);
         }
 
         private static BowlGame NewGame() => new() { Id = "game-1", SeasonId = "season-1", BowlName = "Test Bowl" };

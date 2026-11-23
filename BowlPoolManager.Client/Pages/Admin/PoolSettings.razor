@@ -20,7 +20,7 @@
                 <h1 class="h3 fw-bold mb-0"><i class="bi bi-collection-play text-primary"></i> Pool Settings</h1>
             </div>
         </div>
-        <button class="btn btn-primary" @onclick="() => EditPool(new BowlPool())">
+        <button class="btn btn-primary" @onclick="NewPool">
             <i class="bi bi-plus-lg"></i> New Pool
         </button>
     </div>
@@ -258,6 +258,7 @@
     private BowlPool? editingPool;
     private bool isLoading = true;
     private bool showModal = false;
+    private bool isNewPool = false;
     private string lockDateString = "";
 
     protected override async Task OnInitializedAsync()
@@ -295,23 +296,21 @@
         }
     }
 
-    private void EditPool(BowlPool pool)
+    // `new BowlPool()` already has a GUID Id, so EditPool cannot tell a new pool by an empty Id. The season default is
+    // applied here instead, so the Season dropdown opens on the current season.
+    private void NewPool()
     {
+        var pool = new BowlPool();
+        NewPoolSeason.Apply(pool, seasons, DateTime.Now.Year);
+        EditPool(pool, isNew: true);
+    }
+
+    private void EditPool(BowlPool pool, bool isNew = false)
+    {
+        isNewPool = isNew;
         if (string.IsNullOrEmpty(pool.Id))
         {
             pool.LockDate = DateTime.UtcNow.AddDays(7);
-            // Default to current season
-            var current = seasons.FirstOrDefault(s => s.IsCurrent);
-            if (current != null)
-            {
-                pool.SeasonId = current.Id;
-                pool.Season = int.Parse(current.Id);
-            }
-            else 
-            {
-                pool.Season = DateTime.Now.Year;
-                pool.SeasonId = pool.Season.ToString();
-            }
             // Initialize GameIds
             pool.GameIds = new List<string>();
         }
@@ -353,10 +352,10 @@
         {
             seasonGames = await Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={seasonId}") ?? new List<BowlGame>();
             
-            // If NEW pool, auto-select all games by default for convenience
-            if (string.IsNullOrEmpty(editingPool?.Id) && editingPool != null && !editingPool.GameIds.Any())
+            // A NEW pool starts with every game of the season selected.
+            if (isNewPool && editingPool != null)
             {
-               editingPool.GameIds = seasonGames.Select(g => g.Id).ToList();
+               NewPoolSeason.SelectAllGames(editingPool, seasonGames);
             }
         }
         catch (Exception ex)

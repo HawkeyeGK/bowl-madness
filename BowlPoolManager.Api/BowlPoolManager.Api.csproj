@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Scenarios\*.json" />
+    <EmbeddedResource Include="MockFeed\*.json" />
   </ItemGroup>
 
   <ItemGroup>
