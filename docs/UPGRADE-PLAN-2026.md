@@ -48,6 +48,14 @@ Test environment and score feed mock: decided, see section 13. Execution plan: d
 
 **Phase 1.0 done 2026-11-22:** Core and Api on net10.0, `platform.apiRuntime` set to `dotnet-isolated:10.0`, in production on `main` (PRs 149 and 151). No package changes; the `Azure.Functions.Sdk` switch is a separate follow-up. It reached production after the planned 2026-11-10 date; .NET 8 deploys were still accepted.
 
+**Phase 1.1 done 2026-11-23:** all four groups in production on `main` (group A in PR 158; groups B, C and D in PR 167, merge `bd7c70c`).
+- Group A: the score feed interface and the in-app mock switch.
+- Group B: security and data fixes.
+- Group C: the shared slot rule and the Path to Victory simulator.
+- Group D: entry-window fixes.
+
+Releases go through `staging`: feature PRs deploy the test site, and a release PR ships production. The `last-season-replay` test-site scenario was not built; a fixture test compares last season's archive instead. Left open: #130 (no hoops regression test), #153 (the only test still labelled KnownFailure), and the hoops twins #162 and #164 (Release 3).
+
 ### Release 1: platform and fixes, current UI
 Purpose: a supported, correct site that can carry the bowl season by itself if Release 2 slips. Two releases, approved 2026-10-28; 1.1 is not split further.
 
