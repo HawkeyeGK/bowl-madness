@@ -122,6 +122,22 @@ C 'R5e-am-near' ALLOW 'git commit -am x'
 C 'R5e-amend-near' ALLOW 'git commit --amend --no-edit'
 C 'R5b-reset' REFUSE 'git reset --hard HEAD~1'
 C 'R5c-clean' REFUSE 'git clean -fd'
+C 'R5c-cluster-xdf' REFUSE 'git clean -xdf'
+C 'R5c-separate-flags' REFUSE 'git clean -d -f'
+C 'R5c-long-force' REFUSE 'git clean -d --force'
+C 'R5c-dash-C' REFUSE 'git -C repo clean -fdx'
+C 'R5c-dash-c-config' REFUSE 'git -c core.quotepath=off clean -f'
+C 'R5c-git-dir' REFUSE 'git --git-dir .git --work-tree . clean -fd'
+C 'R5c-git-dir-equals' REFUSE 'git --git-dir=.git clean -fd'
+C 'R5c-second-statement' REFUSE 'git status; git clean -fd' PowerShell
+C "R5c-continued-bt" REFUSE "git clean ``$nl-fd"
+C "R5c-continued-bs" REFUSE "git clean \$nl-fd"
+# near-misses: the old rule refused all of these
+C 'R5c-word-in-message-near' ALLOW 'git commit -m "Production logs clean for an hour" -F msg.txt'
+C 'R5c-message-then-force-near' ALLOW 'git commit -m "Logs clean"; Remove-Item msg.txt -Force' PowerShell
+C 'R5c-dotnet-clean-near' ALLOW 'git status; dotnet clean -f net10.0' PowerShell
+C 'R5c-dry-run-near' ALLOW 'git clean -n -d'
+C 'R5c-other-statement-near' ALLOW 'git clean -n; Remove-Item x.txt -Force' PowerShell
 C 'R5d-reflog' REFUSE 'git reflog expire --expire=now --all'
 C 'R6a-repo-delete' REFUSE 'gh repo delete owner/repo --yes'
 C 'R6a-admin' REFUSE 'gh pr merge 5 --squash --admin'

@@ -53,5 +53,5 @@ Core and Api on net10.0; `apiRuntime` set; tests pass (known failures labelled);
 - [x] 7 Review (2026-11-22: code-review agent, 0 critical or high)
 - [x] 8 Test site (2026-11-22: PR 149 preview; deploy log shows dotnetisolated 10.0; hand checks passed, see PR)
 - [x] 9 Release (2026-11-22: PR 149 to staging, PR 151 to main, merge 0017134)
-- [x] 10 Production check (2026-11-22: deploy log shows dotnetisolated 10.0; read-only smoke test passed; logs clean for the first minutes only, one-hour log check still to do)
+- [x] 10 Production check (2026-11-22: deploy log shows dotnetisolated 10.0; read-only smoke test passed; 2026-11-23 log check from the 23:54 UTC release to 00:32: 43 requests, none failed, no exceptions, only warnings that predate the release, #117, #120 and the AzureWebJobsStorage health message)
 - [x] 11 Docs (2026-11-22)
