@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
+using BowlPoolManager.Api.Helpers;
 using BowlPoolManager.Api.Repositories;
 using BowlPoolManager.Core.Domain;
 using System.Text.Json;
@@ -12,11 +13,13 @@ namespace BowlPoolManager.Api.Functions
     {
         private readonly ISeasonRepository _seasonRepository;
         private readonly ILogger<SeasonFunctions> _logger;
+        private readonly IUserRepository _userRepo;
 
-        public SeasonFunctions(ISeasonRepository seasonRepository, ILogger<SeasonFunctions> logger)
+        public SeasonFunctions(ISeasonRepository seasonRepository, ILogger<SeasonFunctions> logger, IUserRepository userRepo)
         {
             _seasonRepository = seasonRepository;
             _logger = logger;
+            _userRepo = userRepo;
         }
 
         [Function("GetSeasons")]
@@ -30,6 +33,9 @@ namespace BowlPoolManager.Api.Functions
         [Function("SaveSeason")]
         public async Task<IActionResult> SaveSeason([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "Seasons")] HttpRequest req)
         {
+            var refused = await SecurityHelper.RefuseUnlessSuperAdminAsync(req, _userRepo);
+            if (refused != null) return refused;
+
             _logger.LogInformation("Saving season.");
             
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();

@@ -316,7 +316,7 @@
             if (activePool != null)
             {
                 var gamesTask = GameService.GetGamesAsync(activePool.Id);
-                var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetHoopsEntries?poolId={activePool.Id}");
+                var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetHoopsEntries?poolId={activePool.Id}&seasonId={activePool.SeasonId}");
                 var myEntriesTask = FetchMyEntriesSafe(activePool.SeasonId);
                 await Task.WhenAll(gamesTask, entriesTask, myEntriesTask);
                 _games = await gamesTask;

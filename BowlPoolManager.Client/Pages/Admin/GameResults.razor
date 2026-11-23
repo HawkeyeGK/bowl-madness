@@ -277,6 +277,11 @@
             else
             {
                 Console.WriteLine($"Save failed: {response.StatusCode}");
+                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+                {
+                    statusMessage = $"Not saved: {await response.Content.ReadAsStringAsync()}";
+                    StateHasChanged();
+                }
             }
         }
         catch (Exception ex)

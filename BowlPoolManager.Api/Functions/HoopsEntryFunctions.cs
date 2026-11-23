@@ -41,7 +41,35 @@ namespace BowlPoolManager.Api.Functions
             var poolId = req.Query["poolId"];
             var seasonId = req.Query["seasonId"];
 
+            var caller = await SecurityHelper.GetCallerAsync(req, _userRepo);
+
+            // Only an Admin may list across seasons or pools; everyone else names both (issue 97).
+            if (caller?.IsAdmin != true && (string.IsNullOrEmpty(seasonId) || string.IsNullOrEmpty(poolId)))
+            {
+                var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badReq.WriteStringAsync("Both seasonId and poolId are required.");
+                return badReq;
+            }
+
             var entries = await _entryRepo.GetEntriesAsync(seasonId, poolId);
+
+            if (caller?.IsAdmin != true)
+            {
+                // Each entry is judged against its own pool's lock date.
+                var lockedByPool = new Dictionary<string, bool>();
+                var visible = new List<BracketEntry>();
+                foreach (var entry in entries)
+                {
+                    if (!lockedByPool.TryGetValue(entry.PoolId, out var locked))
+                    {
+                        var pool = await _poolRepo.GetPoolAsync(entry.PoolId);
+                        locked = pool != null && EntryVisibility.IsLocked(pool.LockDate);
+                        lockedByPool[entry.PoolId] = locked;
+                    }
+                    visible.Add(EntryVisibility.ForViewer(entry, locked, caller));
+                }
+                entries = visible;
+            }
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(entries);
@@ -52,13 +80,13 @@ namespace BowlPoolManager.Api.Functions
         public async Task<HttpResponseData> GetMyHoopsEntries(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
-            var principal = SecurityHelper.ParseSwaHeader(req);
-            if (principal == null) return req.CreateResponse(HttpStatusCode.Unauthorized);
+            var caller = await SecurityHelper.GetCallerAsync(req, _userRepo);
+            if (caller == null) return req.CreateResponse(HttpStatusCode.Unauthorized);
 
             var poolId = req.Query["poolId"] ?? "";
             var seasonId = req.Query["seasonId"];
 
-            var entries = await _entryRepo.GetEntriesForUserAsync(principal.UserId, seasonId, poolId);
+            var entries = await _entryRepo.GetEntriesForUserAsync(caller.UserId, seasonId, poolId);
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(entries);
@@ -77,6 +105,14 @@ namespace BowlPoolManager.Api.Functions
             var entry = await _entryRepo.GetEntryAsync(id, seasonId);
             if (entry == null) return req.CreateResponse(HttpStatusCode.NotFound);
 
+            var caller = await SecurityHelper.GetCallerAsync(req, _userRepo);
+            if (caller?.IsAdmin != true)
+            {
+                var pool = await _poolRepo.GetPoolAsync(entry.PoolId);
+                var locked = pool != null && EntryVisibility.IsLocked(pool.LockDate);
+                entry = EntryVisibility.ForViewer(entry, locked, caller);
+            }
+
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(entry);
             return response;
@@ -90,29 +126,29 @@ namespace BowlPoolManager.Api.Functions
             {
                 _logger.LogInformation("Creating/Updating Hoops Entry.");
 
-                var principal = SecurityHelper.ParseSwaHeader(req);
-                if (principal == null)
+                var caller = await SecurityHelper.GetCallerAsync(req, _userRepo);
+                if (caller == null)
                 {
                     var unauth = req.CreateResponse(HttpStatusCode.Unauthorized);
                     await unauth.WriteStringAsync("User is not authenticated.");
                     return unauth;
                 }
 
-                var userProfile = await _userRepo.GetUserAsync(principal.UserId);
-                bool isAdmin = SecurityHelper.IsAdmin(userProfile);
+                var userProfile = caller.Profile;
+                bool isAdmin = caller.IsAdmin;
 
-                BracketEntry? entry = null;
-                try { entry = await JsonSerializer.DeserializeAsync<BracketEntry>(req.Body); }
-                catch { /* entry remains null */ }
+                BracketEntry? submitted = null;
+                try { submitted = await JsonSerializer.DeserializeAsync<BracketEntry>(req.Body); }
+                catch { /* submitted remains null */ }
 
-                if (entry == null)
+                if (submitted == null)
                 {
                     var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
                     await badReq.WriteStringAsync("Invalid entry data.");
                     return badReq;
                 }
 
-                var pool = await _poolRepo.GetPoolAsync(entry.PoolId);
+                var pool = await _poolRepo.GetPoolAsync(submitted.PoolId);
                 if (pool == null)
                 {
                     var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
@@ -121,24 +157,54 @@ namespace BowlPoolManager.Api.Functions
                 }
 
                 BracketEntry? existingEntry = null;
-                if (!string.IsNullOrEmpty(entry.Id))
+                if (!string.IsNullOrEmpty(submitted.Id))
                 {
-                    existingEntry = await _entryRepo.GetEntryAsync(entry.Id, pool.SeasonId);
-                    if (existingEntry != null && existingEntry.UserId != principal.UserId && !isAdmin)
+                    existingEntry = await _entryRepo.GetEntryAsync(submitted.Id, pool.SeasonId);
+                    if (existingEntry != null && existingEntry.UserId != caller.UserId && !isAdmin)
                     {
                         var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
                         await forbidden.WriteStringAsync("You do not have permission to modify this entry.");
                         return forbidden;
                     }
+
+                    // A player's save never moves an entry to another pool; the lock check would run against the wrong
+                    // pool (issue 131). An Admin moves entries on purpose.
+                    if (existingEntry != null && !isAdmin && existingEntry.PoolId != submitted.PoolId)
+                    {
+                        var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                        await badReq.WriteStringAsync("An entry cannot be moved to another pool.");
+                        return badReq;
+                    }
                 }
 
-                var validationResult = HoopsEntryUpdateValidator.ValidateUpdate(pool, existingEntry, entry, isAdmin);
+                var validationResult = HoopsEntryUpdateValidator.ValidateUpdate(pool, existingEntry, submitted, isAdmin);
                 if (!validationResult.IsValid)
                 {
                     var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
                     await badReq.WriteStringAsync(validationResult.ErrorMessage);
                     return badReq;
                 }
+
+                // Games this pool uses: its own list, or every game of the season when it has none.
+                var allGames = await _gameRepo.GetGamesAsync(pool.SeasonId);
+                var poolGameIds = pool.GameIds != null && pool.GameIds.Any()
+                    ? pool.GameIds
+                    : allGames.Select(g => g.Id).ToList();
+
+                var fieldResult = EntrySubmission.Validate(submitted, existingEntry, poolGameIds);
+                if (!fieldResult.IsValid)
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync(fieldResult.ErrorMessage);
+                    return badReq;
+                }
+
+                var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+                bool assignToMe = string.Equals(queryParams["assignToMe"], "true", StringComparison.OrdinalIgnoreCase);
+
+                // Only the name, picks and tiebreaker come from the browser; the rest is the stored entry or the server.
+                var entry = EntrySubmission.Build(submitted, existingEntry, pool.Id, pool.SeasonId,
+                    Constants.DocumentTypes.HoopsBracketEntry, caller.UserId, isAdmin, assignToMe);
 
                 // Build audit log
                 string userEmail = userProfile?.Email ?? "Unknown User";
@@ -153,13 +219,11 @@ namespace BowlPoolManager.Api.Functions
                 }
                 else
                 {
-                    entry.AuditLog = existingEntry.AuditLog ?? new List<string>();
                     var changes = new List<string>();
 
                     if (!string.Equals(existingEntry.PlayerName, entry.PlayerName, StringComparison.Ordinal))
                         changes.Add($"Changed Bracket Name: {existingEntry.PlayerName} -> {entry.PlayerName}");
 
-                    var allGames = await _gameRepo.GetGamesAsync(pool.SeasonId);
                     var oldPicks = existingEntry.Picks ?? new Dictionary<string, string>();
                     var newPicks = entry.Picks ?? new Dictionary<string, string>();
                     var allKeys = oldPicks.Keys.Union(newPicks.Keys).Distinct();
@@ -187,18 +251,6 @@ namespace BowlPoolManager.Api.Functions
                         entry.AuditLog.AddRange(changes);
                     }
                 }
-
-                var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
-                bool assignToMe = string.Equals(queryParams["assignToMe"], "true", StringComparison.OrdinalIgnoreCase);
-
-                if (!isAdmin || assignToMe)
-                    entry.UserId = principal.UserId;
-
-                if (string.IsNullOrEmpty(entry.Id)) entry.Id = Guid.NewGuid().ToString();
-
-                // Force correct type and season
-                entry.Type = Constants.DocumentTypes.HoopsBracketEntry;
-                entry.SeasonId = pool.SeasonId;
 
                 bool isTaken = await _entryRepo.IsBracketNameTakenAsync(entry.PoolId, entry.PlayerName, entry.Id);
                 if (isTaken)
@@ -230,8 +282,8 @@ namespace BowlPoolManager.Api.Functions
         {
             try
             {
-                var principal = SecurityHelper.ParseSwaHeader(req);
-                if (principal == null)
+                var caller = await SecurityHelper.GetCallerAsync(req, _userRepo);
+                if (caller == null)
                 {
                     var unauth = req.CreateResponse(HttpStatusCode.Unauthorized);
                     await unauth.WriteStringAsync("User is not authenticated.");
@@ -261,10 +313,9 @@ namespace BowlPoolManager.Api.Functions
                     return notFound;
                 }
 
-                if (entry.UserId != principal.UserId)
+                if (entry.UserId != caller.UserId)
                 {
-                    var user = await _userRepo.GetUserAsync(principal.UserId);
-                    if (!SecurityHelper.IsAdmin(user))
+                    if (!caller.IsAdmin)
                     {
                         var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
                         await forbidden.WriteStringAsync("You do not have permission to delete this entry.");
@@ -275,8 +326,7 @@ namespace BowlPoolManager.Api.Functions
                 var pool = await _poolRepo.GetPoolAsync(entry.PoolId);
                 if (pool != null && DateTime.UtcNow > pool.LockDate)
                 {
-                    var user = await _userRepo.GetUserAsync(principal.UserId);
-                    if (!SecurityHelper.IsAdmin(user))
+                    if (!caller.IsAdmin)
                     {
                         var lockedResp = req.CreateResponse(HttpStatusCode.BadRequest);
                         await lockedResp.WriteStringAsync("Cannot delete entry after pool is locked.");
@@ -302,16 +352,15 @@ namespace BowlPoolManager.Api.Functions
         {
             try
             {
-                var principal = SecurityHelper.ParseSwaHeader(req);
-                if (principal == null)
+                var caller = await SecurityHelper.GetCallerAsync(req, _userRepo);
+                if (caller == null)
                 {
                     var unauth = req.CreateResponse(HttpStatusCode.Unauthorized);
                     await unauth.WriteStringAsync("User is not authenticated.");
                     return unauth;
                 }
 
-                var userProfile = await _userRepo.GetUserAsync(principal.UserId);
-                if (!SecurityHelper.IsAdmin(userProfile))
+                if (!caller.IsAdmin)
                 {
                     var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
                     await forbidden.WriteStringAsync("You must be an admin to update payment status.");

@@ -126,17 +126,16 @@
             currentSeasonId = currentSeason?.Id ?? "";
 
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={currentSeasonId}");
-            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetEntries?seasonId={currentSeasonId}");
+            var entryTask = FetchEntryAsync();
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");
-            await Task.WhenAll(gamesTask, entriesTask, poolsTask);
+            await Task.WhenAll(gamesTask, entryTask, poolsTask);
 
             // 1. Get All Data
             var allGames = await gamesTask ?? new();
-            var allEntries = await entriesTask ?? new();
             var allPools = await poolsTask ?? new();
 
-            // 2. Find Entry
-            entry = allEntries.FirstOrDefault(e => e.Id == EntryId);
+            // 2. The entry (the server hides other players' picks until the pool locks)
+            entry = await entryTask;
             
             if (entry != null)
             {
@@ -175,6 +174,13 @@
             Console.WriteLine($"Error loading entry: {ex.Message}");
         }
         finally { isLoading = false; }
+    }
+
+    // One entry by id. A missing entry (404) leaves the page on its "not found" view.
+    private async Task<BracketEntry?> FetchEntryAsync()
+    {
+        var response = await Http.GetAsync($"api/GetEntry?id={Uri.EscapeDataString(EntryId)}&seasonId={currentSeasonId}");
+        return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<BracketEntry>() : null;
     }
 
 

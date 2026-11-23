@@ -169,68 +169,135 @@ namespace BowlPoolManager.Tests.Api
             EndpointKit.Status(result).Should().Be(200);
         }
 
-        // ── Known gaps: #93 (no caller check at all) ──────────────────────────────
-        // These functions take no user repository today, so only the anonymous tier can be driven.
-        // The fix adds a SuperAdmin check; these tests then also need the constructor change.
+        // ── #93: SyncTeams, InitializeDatabase, GetBackupData and SaveSeason are SuperAdmin only ─────
 
-        // Known failure: #93. SyncTeams spends the paid CFBD quota and replaces the team list for anyone.
-        [Fact]
-        [Trait("Category", "KnownFailure")]
-        public async Task SyncTeams_ShouldReturn401AndCallNothing_WhenAnonymous()
+        [Theory]
+        [InlineData(Tier.Anonymous, 401)]
+        [InlineData(Tier.Player, 403)]
+        [InlineData(Tier.Admin, 403)]
+        public async Task SyncTeams_ShouldRefuseAndCallNothing_WhenCallerIsNotSuperAdmin(Tier tier, int expected)
         {
             var cfbd = new Mock<ICfbdService>();
             cfbd.Setup(c => c.GetFbsTeamsAsync()).ReturnsAsync(new List<TeamInfo> { new() { School = "Test U", Conference = "Test" } });
             var cosmos = new Mock<CosmosClient> { DefaultValue = DefaultValue.Mock };
-            var sut = new SyncTeams(cfbd.Object, cosmos.Object, NullLogger<SyncTeams>.Instance);
+            var sut = new SyncTeams(cfbd.Object, cosmos.Object, NullLogger<SyncTeams>.Instance, EndpointKit.Users().Object);
 
-            var result = await sut.Run(EndpointKit.AspRequest(Tier.Anonymous));
+            var result = await sut.Run(EndpointKit.AspRequest(tier));
 
-            EndpointKit.StatusOf(result).Should().Be(401);
+            EndpointKit.StatusOf(result).Should().Be(expected);
             cfbd.Verify(c => c.GetFbsTeamsAsync(), Times.Never);
         }
 
-        // Known failure: #93 (the route also never registers, see #120). Anyone could create containers.
         [Fact]
-        [Trait("Category", "KnownFailure")]
-        public async Task InitializeDatabase_ShouldReturn401AndTouchNothing_WhenAnonymous()
+        public async Task SyncTeams_ShouldCallTheTeamService_WhenSuperAdmin()
+        {
+            var cfbd = new Mock<ICfbdService>();
+            cfbd.Setup(c => c.GetFbsTeamsAsync()).ReturnsAsync(new List<TeamInfo> { new() { School = "Test U", Conference = "Test" } });
+            var cosmos = new Mock<CosmosClient> { DefaultValue = DefaultValue.Mock };
+            var sut = new SyncTeams(cfbd.Object, cosmos.Object, NullLogger<SyncTeams>.Instance, EndpointKit.Users().Object);
+
+            await sut.Run(EndpointKit.AspRequest(Tier.SuperAdmin));
+
+            cfbd.Verify(c => c.GetFbsTeamsAsync(), Times.Once);
+        }
+
+        // The route also never registers today (#120), so this guards the day it is repaired.
+        [Theory]
+        [InlineData(Tier.Anonymous, 401)]
+        [InlineData(Tier.Player, 403)]
+        [InlineData(Tier.Admin, 403)]
+        public async Task InitializeDatabase_ShouldRefuseAndTouchNothing_WhenCallerIsNotSuperAdmin(Tier tier, int expected)
         {
             var cosmos = new Mock<CosmosClient> { DefaultValue = DefaultValue.Mock };
-            var sut = new InfrastructureFunctions(cosmos.Object, NullLogger<InfrastructureFunctions>.Instance);
+            var sut = new InfrastructureFunctions(cosmos.Object, NullLogger<InfrastructureFunctions>.Instance, EndpointKit.Users().Object);
 
-            var result = await sut.InitializeDatabase(EndpointKit.Request(Tier.Anonymous));
+            var result = await sut.InitializeDatabase(EndpointKit.Request(tier));
 
-            EndpointKit.Status(result).Should().Be(401);
+            EndpointKit.Status(result).Should().Be(expected);
             cosmos.Invocations.Should().BeEmpty("a refused caller must not reach the database");
         }
 
-        // Known failure: #93. The backup download returns every football entry's picks and user ids to anyone.
         [Fact]
-        [Trait("Category", "KnownFailure")]
-        public async Task GetBackupData_ShouldReturn401AndReadNothing_WhenAnonymous()
+        public async Task InitializeDatabase_ShouldReachTheDatabase_WhenSuperAdmin()
         {
-            // A plain mock: the function's private DTO types cannot be proxied, so today's code
-            // throws once it reaches the database. That is captured so the assertions below decide.
+            var cosmos = new Mock<CosmosClient> { DefaultValue = DefaultValue.Mock };
+            var sut = new InfrastructureFunctions(cosmos.Object, NullLogger<InfrastructureFunctions>.Instance, EndpointKit.Users().Object);
+
+            await sut.InitializeDatabase(EndpointKit.Request(Tier.SuperAdmin));
+
+            cosmos.Invocations.Should().NotBeEmpty();
+        }
+
+        // The backup holds every football entry's picks and user ids.
+        [Theory]
+        [InlineData(Tier.Anonymous, 401)]
+        [InlineData(Tier.Player, 403)]
+        [InlineData(Tier.Admin, 403)]
+        public async Task GetBackupData_ShouldRefuseAndReadNothing_WhenCallerIsNotSuperAdmin(Tier tier, int expected)
+        {
+            // A plain mock: the private DTO types of the function cannot be proxied, so a call that got past the check
+            // would throw once it reached the database. That is captured so the assertions below decide.
             var cosmos = new Mock<CosmosClient>();
-            var sut = new BackupFunctions(cosmos.Object, NullLogger<BackupFunctions>.Instance);
+            var sut = new BackupFunctions(cosmos.Object, NullLogger<BackupFunctions>.Instance, EndpointKit.Users().Object);
             Microsoft.AspNetCore.Mvc.IActionResult? result = null;
 
-            await Record.ExceptionAsync(async () => result = await sut.Run(EndpointKit.AspRequest(Tier.Anonymous)));
+            await Record.ExceptionAsync(async () => result = await sut.Run(EndpointKit.AspRequest(tier)));
 
             cosmos.Invocations.Should().BeEmpty("a refused caller must not reach the database");
             result.Should().NotBeNull();
-            EndpointKit.StatusOf(result!).Should().Be(401);
+            EndpointKit.StatusOf(result!).Should().Be(expected);
         }
 
-        // Known failure: #93. Anyone can switch the current season for everyone.
         [Fact]
-        [Trait("Category", "KnownFailure")]
-        public async Task SaveSeason_ShouldReturn401AndSaveNothing_WhenAnonymous()
+        public async Task GetBackupData_ShouldReachTheDatabase_WhenSuperAdmin()
+        {
+            var cosmos = new Mock<CosmosClient>();
+            var sut = new BackupFunctions(cosmos.Object, NullLogger<BackupFunctions>.Instance, EndpointKit.Users().Object);
+
+            await Record.ExceptionAsync(async () => await sut.Run(EndpointKit.AspRequest(Tier.SuperAdmin)));
+
+            cosmos.Invocations.Should().NotBeEmpty();
+        }
+
+        // Anyone could switch the current season for everyone.
+        [Theory]
+        [InlineData(Tier.Anonymous, 401)]
+        [InlineData(Tier.Player, 403)]
+        [InlineData(Tier.Admin, 403)]
+        public async Task SaveSeason_ShouldRefuseAndSaveNothing_WhenCallerIsNotSuperAdmin(Tier tier, int expected)
         {
             var seasons = new Mock<ISeasonRepository>();
-            var sut = new SeasonFunctions(seasons.Object, NullLogger<SeasonFunctions>.Instance);
+            var sut = new SeasonFunctions(seasons.Object, NullLogger<SeasonFunctions>.Instance, EndpointKit.Users().Object);
             var body = new Season { SeasonId = "2026", Name = "2026 Season", IsCurrent = true };
 
-            var result = await sut.SaveSeason(EndpointKit.AspRequest(Tier.Anonymous, body));
+            var result = await sut.SaveSeason(EndpointKit.AspRequest(tier, body));
+
+            EndpointKit.StatusOf(result).Should().Be(expected);
+            seasons.Verify(s => s.UpsertSeasonAsync(It.IsAny<Season>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task SaveSeason_ShouldSaveSeason_WhenSuperAdmin()
+        {
+            var seasons = new Mock<ISeasonRepository>();
+            var sut = new SeasonFunctions(seasons.Object, NullLogger<SeasonFunctions>.Instance, EndpointKit.Users().Object);
+            var body = new Season { SeasonId = "2026", Name = "2026 Season", IsCurrent = true };
+
+            var result = await sut.SaveSeason(EndpointKit.AspRequest(Tier.SuperAdmin, body));
+
+            EndpointKit.StatusOf(result).Should().Be(200);
+            seasons.Verify(s => s.UpsertSeasonAsync(It.IsAny<Season>()), Times.Once);
+        }
+
+        // A disabled SuperAdmin is refused like an anonymous caller, on the ASP.NET-style functions too (#98).
+        [Fact]
+        public async Task SaveSeason_ShouldReturn401_WhenSuperAdminIsDisabled()
+        {
+            var seasons = new Mock<ISeasonRepository>();
+            var sut = new SeasonFunctions(seasons.Object, NullLogger<SeasonFunctions>.Instance, EndpointKit.Users().Object);
+            var body = new Season { SeasonId = "2026", Name = "2026 Season", IsCurrent = true };
+
+            var result = await sut.SaveSeason(EndpointKit.AspRequest(EndpointKit.DisabledSuperAdminId, body));
 
             EndpointKit.StatusOf(result).Should().Be(401);
             seasons.Verify(s => s.UpsertSeasonAsync(It.IsAny<Season>()), Times.Never);

@@ -475,20 +475,23 @@
             currentSeasonId = currentSeason?.Id ?? "";
 
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={currentSeasonId}");
-            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetEntries?seasonId={currentSeasonId}");
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");
             var myEntriesTask = FetchMyEntriesSafe();
 
-            await Task.WhenAll(gamesTask, entriesTask, poolsTask, myEntriesTask);
+            await Task.WhenAll(gamesTask, poolsTask, myEntriesTask);
 
             allGames = (await gamesTask ?? new()).OrderBy(g => g.StartTime).ToList();
             games = allGames.ToList();
-            allEntries = await entriesTask ?? new();
             var allPools = await poolsTask ?? new();
             var myEntries = await myEntriesTask;
 
             // 1. Filter Pools (Active Season Only AND Open)
             poolList = allPools.Where(p => !p.IsArchived && DateTime.UtcNow >= p.LockDate).ToList();
+
+            // The entries endpoint wants a season and a pool, so ask once per open pool.
+            var entryLists = await Task.WhenAll(poolList.Select(p =>
+                Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetEntries?seasonId={currentSeasonId}&poolId={p.Id}")));
+            allEntries = entryLists.SelectMany(l => l ?? new()).ToList();
 
             // 2. Build lookup structures
             _gameById = allGames.ToDictionary(g => g.Id);

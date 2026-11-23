@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using BowlPoolManager.Core.Domain;
 using BowlPoolManager.Core.Dtos;
 using BowlPoolManager.Core.Helpers;
+using BowlPoolManager.Api.Helpers;
 using BowlPoolManager.Api.Repositories;
 
 namespace BowlPoolManager.Api.Functions
@@ -76,6 +77,9 @@ namespace BowlPoolManager.Api.Functions
             int totalFinalGames = games.Count(g => g.Status == GameStatus.Final);
 
             // 7. Map LeaderboardRow -> LeaderboardDto
+            // The leaderboard shows names and scores only until the pool locks, so tiebreaker guesses stay hidden (issue 97).
+            bool tieBreakersVisible = EntryVisibility.IsLocked(pool.LockDate);
+
             var leaderboardDtos = leaderboardRows.Select(row => new LeaderboardDto
             {
                 Id = row.Entry.Id,
@@ -84,8 +88,8 @@ namespace BowlPoolManager.Api.Functions
                 Score = row.Score,
                 MaxPossible = row.MaxPossible,
                 CorrectPicks = row.CorrectPicks,
-                TieBreakerPoints = row.Entry.TieBreakerPoints,
-                TieBreakerDelta = row.TieBreakerDelta,
+                TieBreakerPoints = tieBreakersVisible ? row.Entry.TieBreakerPoints : 0,
+                TieBreakerDelta = tieBreakersVisible ? row.TieBreakerDelta : null,
                 IsPaid = row.Entry.IsPaid,
                 RoundScores = row.RoundScores
             }).ToList();

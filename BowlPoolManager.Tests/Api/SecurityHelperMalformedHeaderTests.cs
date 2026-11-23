@@ -32,11 +32,10 @@ namespace BowlPoolManager.Tests.Api
 
         private static string Encode(string text) => Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
 
-        [Trait("Category", "KnownFailure")] // No issue yet: a malformed header throws (500) instead of counting as not signed in.
         [Theory]
         [InlineData("not base64 at all!")]
         [InlineData("====")]
-        [InlineData("YWJj\u0000")]
+        [InlineData("YWJj=")]
         public void ParseSwaHeader_ShouldReturnNull_WhenHeaderIsNotBase64(string header)
         {
             var act = () => SecurityHelper.ParseSwaHeader(RequestWithHeader(header));
@@ -45,7 +44,6 @@ namespace BowlPoolManager.Tests.Api
             act().Should().BeNull();
         }
 
-        [Trait("Category", "KnownFailure")] // No issue yet: a malformed header throws (500) instead of counting as not signed in.
         [Theory]
         [InlineData("not json")]
         [InlineData("[1,2,3]")]
@@ -58,7 +56,6 @@ namespace BowlPoolManager.Tests.Api
             act().Should().BeNull();
         }
 
-        [Trait("Category", "KnownFailure")] // No issue yet: a malformed header throws (500) instead of counting as not signed in.
         [Fact]
         public async Task ValidateSuperAdminAsync_ShouldReturn401_WhenHeaderIsNotBase64()
         {

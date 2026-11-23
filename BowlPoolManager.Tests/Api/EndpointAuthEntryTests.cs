@@ -11,8 +11,8 @@ namespace BowlPoolManager.Tests.Api
     /// Sign-in, owner and role tests for the football entry endpoints, against BUSINESS-RULES
     /// sections 1 and 3: an owner changes or deletes their own entry until lock, an Admin or
     /// SuperAdmin ignores every lock, payment status is Admin only, and nobody but the owner and
-    /// Admins sees picks before lock. Tests marked KnownFailure describe the correct behavior that
-    /// today's code does not have; each names its open issue.
+    /// Admins sees picks before lock. Tests that name an issue describe the correct behavior that
+    /// the code once lacked.
     /// </summary>
     public class EndpointAuthFootballEntryTests
     {
@@ -32,7 +32,7 @@ namespace BowlPoolManager.Tests.Api
             {
                 Pools.Setup(p => p.GetPoolAsync("pool-open")).ReturnsAsync(OpenPool);
                 Pools.Setup(p => p.GetPoolAsync("pool-locked")).ReturnsAsync(LockedPool);
-                Games.Setup(g => g.GetGamesAsync(It.IsAny<string?>())).ReturnsAsync(new List<BowlGame>());
+                Games.Setup(g => g.GetGamesAsync(It.IsAny<string?>())).ReturnsAsync(new List<BowlGame> { new() { Id = "game-1" } });
                 Entries.Setup(e => e.IsBracketNameTakenAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>())).ReturnsAsync(false);
                 Entries.Setup(e => e.AddEntryAsync(It.IsAny<BracketEntry>()))
                     .Callback<BracketEntry>(e => Saved = e)
@@ -170,9 +170,8 @@ namespace BowlPoolManager.Tests.Api
             f.Saved.Should().NotBeNull();
         }
 
-        // Known failure: #99. A player's save must never set payment status.
+        // #99. A player's save must never set payment status.
         [Fact]
-        [Trait("Category", "KnownFailure")]
         public async Task CreateEntry_ShouldStoreUnpaid_WhenPlayerSendsPaidOnNewEntry()
         {
             var f = new Fixture();
@@ -185,9 +184,8 @@ namespace BowlPoolManager.Tests.Api
             f.Saved!.IsPaid.Should().BeFalse("only an Admin or SuperAdmin changes payment status");
         }
 
-        // Known failure: #99. A normal edit must leave a paid entry paid.
+        // #99. A normal edit must leave a paid entry paid.
         [Fact]
-        [Trait("Category", "KnownFailure")]
         public async Task CreateEntry_ShouldKeepEntryPaid_WhenPlayerEditsPaidEntryWithoutPaidFlag()
         {
             var f = new Fixture();
@@ -202,9 +200,8 @@ namespace BowlPoolManager.Tests.Api
             f.Saved!.IsPaid.Should().BeTrue("the player's save must not change payment status");
         }
 
-        // Known failure: #131. An entry in an open pool must not be re-saved into a locked pool.
+        // #131. An entry in an open pool must not be re-saved into a locked pool.
         [Fact]
-        [Trait("Category", "KnownFailure")]
         public async Task CreateEntry_ShouldRefuseMove_WhenPlayerMovesEntryFromOpenPoolToLockedPool()
         {
             var f = new Fixture();
@@ -216,9 +213,8 @@ namespace BowlPoolManager.Tests.Api
             f.NothingSaved();
         }
 
-        // Known failure: #131. An entry in a locked pool must not be moved into an open pool to change picks.
+        // #131. An entry in a locked pool must not be moved into an open pool to change picks.
         [Fact]
-        [Trait("Category", "KnownFailure")]
         public async Task CreateEntry_ShouldRefuseMove_WhenPlayerMovesEntryFromLockedPoolToOpenPool()
         {
             var f = new Fixture();
@@ -353,9 +349,8 @@ namespace BowlPoolManager.Tests.Api
             return f;
         }
 
-        // Known failure: #97. Before lock, an anonymous caller must not see another player's picks.
+        // #97. Before lock, an anonymous caller must not see another player's picks.
         [Fact]
-        [Trait("Category", "KnownFailure")]
         public async Task GetEntry_ShouldNotReturnPicks_WhenAnonymousAndPoolNotLocked()
         {
             var f = ReadFixture(poolLocked: false, out _);
@@ -365,9 +360,8 @@ namespace BowlPoolManager.Tests.Api
             EndpointKit.BodyText(result).Should().NotContain(SecretPick);
         }
 
-        // Known failure: #97. Before lock, another signed-in player must not see the picks either.
+        // #97. Before lock, another signed-in player must not see the picks either.
         [Fact]
-        [Trait("Category", "KnownFailure")]
         public async Task GetEntry_ShouldNotReturnPicks_WhenCallerIsAnotherPlayerAndPoolNotLocked()
         {
             var f = ReadFixture(poolLocked: false, out _);
@@ -377,9 +371,8 @@ namespace BowlPoolManager.Tests.Api
             EndpointKit.BodyText(result).Should().NotContain(SecretPick);
         }
 
-        // Known failure: #97. The list endpoint leaks picks before lock in the same way.
+        // #97. The list endpoint leaks picks before lock in the same way.
         [Fact]
-        [Trait("Category", "KnownFailure")]
         public async Task GetEntries_ShouldNotReturnPicks_WhenAnonymousAndPoolNotLocked()
         {
             var f = ReadFixture(poolLocked: false, out _);

@@ -111,12 +111,22 @@ namespace BowlPoolManager.Api.Services
                 var oldStatus = localGame.Status;
                 var oldDetail = localGame.GameDetail;
 
-                if (apiGame.Status == FeedGameStatus.Final)
+                // Final needs both scores matched to this game's teams and a winner (issue 133). Otherwise a feed whose team
+                // names differ from the link would mark the game Final with no scores and the away team would win.
+                bool feedFinalIsUsable = homeScore.HasValue && awayScore.HasValue && homeScore != awayScore;
+                if (apiGame.Status == FeedGameStatus.Final && !feedFinalIsUsable)
+                {
+                    _logger.LogWarning(
+                        "Feed game {ExternalId} is Final but its team names ('{FeedHome}', '{FeedAway}') do not match the link for '{Bowl}' (home '{ApiHome}', away '{ApiAway}'), or it has no winner. Not marked Final; fix the link.",
+                        apiGame.ExternalId, apiGame.Home.Name, apiGame.Away.Name, localGame.BowlName, localGame.ApiHomeTeam, localGame.ApiAwayTeam);
+                }
+
+                if (apiGame.Status == FeedGameStatus.Final && feedFinalIsUsable)
                 {
                     localGame.Status = GameStatus.Final;
                     localGame.GameDetail = "Final";
                 }
-                else if (apiGame.Status == FeedGameStatus.InProgress || 
+                else if (apiGame.Status == FeedGameStatus.InProgress || apiGame.Status == FeedGameStatus.Final || 
                         (DateTime.UtcNow >= localGame.StartTime.AddMinutes(-15)))
                 {
                     localGame.Status = GameStatus.InProgress;

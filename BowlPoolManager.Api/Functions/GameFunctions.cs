@@ -139,6 +139,16 @@ namespace BowlPoolManager.Api.Functions
              if (!authResult.IsValid) return authResult.ErrorResponse!;
 
              var game = await JsonSerializer.DeserializeAsync<BowlGame>(req.Body);
+
+             // A game cannot be Final without two scores and a winner: games cannot end tied (issue 133).
+             if (game != null && game.Status == GameStatus.Final
+                 && (game.TeamHomeScore == null || game.TeamAwayScore == null || game.TeamHomeScore == game.TeamAwayScore))
+             {
+                 var badRequest = req.CreateResponse(HttpStatusCode.BadRequest);
+                 await badRequest.WriteStringAsync("A Final game needs both scores and a winner. Games cannot end tied.");
+                 return badRequest;
+             }
+
              if (game != null) await _scoringService.ProcessGameUpdateAsync(game);
              
              return req.CreateResponse(HttpStatusCode.OK);
