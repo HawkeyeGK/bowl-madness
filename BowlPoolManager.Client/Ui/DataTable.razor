@@ -1,0 +1,12 @@
+<div class="bm-table" role="table" aria-label="@Label">
+    <div class="bm-table-inner">
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    /// <summary>What the table is, for screen readers ("Leaderboard").</summary>
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    /// <summary>A <see cref="TableHeader"/> then <see cref="TableRow"/>s.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

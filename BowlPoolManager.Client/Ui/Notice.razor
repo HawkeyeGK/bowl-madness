@@ -1,0 +1,29 @@
+<div class="bm-notice @ToneClass" role="@Role">
+    <MudIcon Icon="@IconFor" />
+    <div>
+        @if (!string.IsNullOrEmpty(Title))
+        {
+            <span class="bm-notice-title">@Title</span>
+        }
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    [Parameter] public NoticeTone Tone { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string Role => Tone is NoticeTone.Error or NoticeTone.Warning ? "alert" : "status";
+
+    private string ToneClass => "bm-notice--" + Tone.ToString().ToLowerInvariant();
+
+    private string IconFor => Tone switch
+    {
+        NoticeTone.Tip => Icons.Material.Outlined.Lightbulb,
+        NoticeTone.Success => Icons.Material.Outlined.CheckCircle,
+        NoticeTone.Warning => Icons.Material.Outlined.WarningAmber,
+        NoticeTone.Error => Icons.Material.Outlined.ErrorOutline,
+        _ => Icons.Material.Outlined.Info
+    };
+}

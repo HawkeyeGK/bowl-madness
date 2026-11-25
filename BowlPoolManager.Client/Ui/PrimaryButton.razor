@@ -1,0 +1,15 @@
+@inherits AppButtonBase
+
+@* The one main action on a screen (orange). *@
+<MudButton Class="@CssFor("primary")" Variant="Variant.Filled" Href="@Href" OnClick="OnClick" Disabled="Disabled"
+           FullWidth="FullWidth" ButtonType="ButtonType" StartIcon="@(IconOnly ? null : Icon)" aria-label="@AriaLabel">
+    @if (IconOnly && !string.IsNullOrEmpty(Icon))
+    {
+        <MudIcon Icon="@Icon" />
+        <span class="bm-sr-only">@ChildContent</span>
+    }
+    else
+    {
+        @ChildContent
+    }
+</MudButton>

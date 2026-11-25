@@ -1,0 +1,38 @@
+@implements IDisposable
+@inject PoolSelection Pools
+
+@* Shown only when there is more than one pool. A page tells PoolSelection which pools it has (Show) and
+   listens for Changed; this component only draws the choice and reports taps. *@
+@if (Pools.CanSwitch)
+{
+    @if (Mode == PoolSwitcherMode.HeaderTabs)
+    {
+        <div class="bm-pooltabs bm-only-phone no-print" role="group" aria-label="Pool">
+            @foreach (var pool in Pools.Pools)
+            {
+                var id = pool.Id;
+                <button type="button" aria-pressed="@(id == Pools.CurrentId ? "true" : "false")" @onclick="() => Pools.SelectAsync(id)">@pool.Name</button>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="bm-segmented bm-only-wide no-print" role="group" aria-label="Pool">
+            @foreach (var pool in Pools.Pools)
+            {
+                var id = pool.Id;
+                <button type="button" aria-pressed="@(id == Pools.CurrentId ? "true" : "false")" @onclick="() => Pools.SelectAsync(id)">@pool.Name</button>
+            }
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public PoolSwitcherMode Mode { get; set; } = PoolSwitcherMode.Segmented;
+
+    protected override void OnInitialized() => Pools.Changed += OnChanged;
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Pools.Changed -= OnChanged;
+}

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using BowlPoolManager.Client;
 using BowlPoolManager.Client.Security;
 using BowlPoolManager.Client.Services;
+using MudBlazor.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -17,6 +18,10 @@ builder.Services.AddScoped<AuthenticationStateProvider, StaticWebAppsAuthenticat
 
 // SITE CONTEXT
 builder.Services.AddScoped<ISiteContext, SiteContext>();
+
+// COMPONENT LIBRARY (MudBlazor ships with the app: no CDN) AND THE HEADER POOL SWITCHER'S STATE
+builder.Services.AddMudServices();
+builder.Services.AddScoped<PoolSelection>();
 
 // DOMAIN SERVICES
 builder.Services.AddScoped<IPoolService, PoolService>();

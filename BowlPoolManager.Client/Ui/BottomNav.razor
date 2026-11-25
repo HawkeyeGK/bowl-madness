@@ -1,0 +1,21 @@
+<nav class="bm-bottomnav no-print" aria-label="Main">
+    @foreach (var item in Items)
+    {
+        <NavLink href="@item.Href" Match="@(item.MatchExact ? NavLinkMatch.All : NavLinkMatch.Prefix)">
+            <MudIcon Icon="@NavIcons.For(item.Key)" Style="font-size: 26px" />
+            @item.Label
+            @if (LiveKeys != null && LiveKeys.Contains(item.Key))
+            {
+                <span class="bm-live-dot" title="A game is live"></span>
+                <span class="bm-sr-only">(a game is live)</span>
+            }
+        </NavLink>
+    }
+</nav>
+
+@code {
+    /// <summary>The four tabs from <c>SiteNavigation.Tabs</c>. Exactly four fit a 390 px phone.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<NavItem> Items { get; set; } = Array.Empty<NavItem>();
+    /// <summary>Keys that get a red "live" dot (the Scores tab while a game is being played).</summary>
+    [Parameter] public ISet<string>? LiveKeys { get; set; }
+}

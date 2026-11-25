@@ -2,12 +2,27 @@
     <Router AppAssembly="@typeof(App).Assembly">
         <Found Context="routeData">
             <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
-                <NotAuthorized>
-                    <div class="alert alert-warning text-center mt-5">
-                        <h3>Login Required</h3>
-                        <p>You must be signed in to view this content.</p>
-                        <a href="/.auth/login/google?post_login_redirect_uri=/" class="btn btn-primary">Login with Google</a>
-                    </div>
+                <NotAuthorized Context="auth">
+                    <PageContainer Narrow="true">
+                        @if (auth.User.Identity?.IsAuthenticated == true)
+                        {
+                            <EmptyState Title="You don't have access to this page" Icon="@MudBlazor.Icons.Material.Outlined.Lock">
+                                <ChildContent>This page is for the pool's administrators.</ChildContent>
+                                <Action>
+                                    <SecondaryButton Href="/">Back to the Leaderboard</SecondaryButton>
+                                </Action>
+                            </EmptyState>
+                        }
+                        else
+                        {
+                            <EmptyState Title="Please sign in" Icon="@MudBlazor.Icons.Material.Outlined.Lock">
+                                <ChildContent>You need to sign in to see this page.</ChildContent>
+                                <Action>
+                                    <PrimaryButton Href="login">Sign in</PrimaryButton>
+                                </Action>
+                            </EmptyState>
+                        }
+                    </PageContainer>
                 </NotAuthorized>
             </AuthorizeRouteView>
             <FocusOnNavigate RouteData="@routeData" Selector="h1" />
@@ -15,7 +30,14 @@
         <NotFound>
             <PageTitle>Not found</PageTitle>
             <LayoutView Layout="@typeof(MainLayout)">
-                <p role="alert">Sorry, there's nothing at this address.</p>
+                <PageContainer Narrow="true">
+                    <EmptyState Title="Page not found" Icon="@MudBlazor.Icons.Material.Outlined.SearchOff">
+                        <ChildContent>There is nothing at this address.</ChildContent>
+                        <Action>
+                            <SecondaryButton Href="/">Back to the Leaderboard</SecondaryButton>
+                        </Action>
+                    </EmptyState>
+                </PageContainer>
             </LayoutView>
         </NotFound>
     </Router>

@@ -1,0 +1,10 @@
+<div class="bm-page @(Narrow ? "bm-page--narrow" : null) @Class">
+    @ChildContent
+</div>
+
+@code {
+    /// <summary>Centered, at most 640 px wide: forms, sign-in, messages.</summary>
+    [Parameter] public bool Narrow { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

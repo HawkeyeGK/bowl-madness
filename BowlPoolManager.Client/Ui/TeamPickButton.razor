@@ -1,0 +1,66 @@
+<button type="button" class="bm-pick @StateClass"
+        aria-pressed="@(State == PickButtonState.Selected ? "true" : "false")"
+        disabled="@(State == PickButtonState.Disabled)"
+        @onclick="OnClick">
+    @if (Team != null || ShowLogo)
+    {
+        <TeamLogo Team="Team" SizePx="40px" />
+    }
+    <span class="bm-pick-name">
+        @if (ApRank is > 0)
+        {
+            <span class="bm-pick-rank"><span class="bm-sr-only">Ranked </span>#@ApRank</span>
+        }
+        @Name
+        @if (Seed is > 0)
+        {
+            <span class="bm-pick-sub"> (@Seed)</span>
+        }
+    </span>
+    @if (!string.IsNullOrEmpty(SubText))
+    {
+        <span class="bm-pick-sub">@SubText</span>
+    }
+    @if (State == PickButtonState.Correct)
+    {
+        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="bm-pick-mark" Style="color: #15803D" />
+        <span class="bm-sr-only">Correct pick</span>
+    }
+    else if (State == PickButtonState.Wrong)
+    {
+        <MudIcon Icon="@Icons.Material.Filled.Cancel" Class="bm-pick-mark" Style="color: #B91C1C" />
+        <span class="bm-sr-only">Wrong pick</span>
+    }
+    else if (State == PickButtonState.Error)
+    {
+        <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Class="bm-pick-mark" Style="color: #B91C1C" />
+        <span class="bm-sr-only">Needs a pick</span>
+    }
+</button>
+
+@code {
+    /// <summary>The team, for its logo. Leave empty for a slot that is not decided yet.</summary>
+    [Parameter] public TeamInfo? Team { get; set; }
+    /// <summary>Draw the empty logo tile even without a team (a slot waiting for "Winner of ...").</summary>
+    [Parameter] public bool ShowLogo { get; set; }
+    /// <summary>The words on the button: the team name, or "Winner of Rose Bowl".</summary>
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+    /// <summary>AP rank, shown as "#15" before the name.</summary>
+    [Parameter] public int? ApRank { get; set; }
+    /// <summary>Playoff seed, shown as "(7)" after the name.</summary>
+    [Parameter] public int? Seed { get; set; }
+    /// <summary>A small line under the name, for example "Texas" is the home team.</summary>
+    [Parameter] public string? SubText { get; set; }
+    [Parameter] public PickButtonState State { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    private string StateClass => State switch
+    {
+        PickButtonState.Selected => "bm-pick--selected",
+        PickButtonState.Disabled => "bm-pick--disabled",
+        PickButtonState.Error => "bm-pick--error",
+        PickButtonState.Correct => "bm-pick--correct",
+        PickButtonState.Wrong => "bm-pick--wrong",
+        _ => ""
+    };
+}
