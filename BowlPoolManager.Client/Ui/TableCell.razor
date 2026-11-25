@@ -1,0 +1,19 @@
+<div role="cell" class="bm-cell @KindClass @(End ? "bm-cell--end" : null) @(HidePhone ? "bm-hide-phone" : null)">@ChildContent</div>
+
+@code {
+    [Parameter] public CellKind Kind { get; set; }
+    /// <summary>Right-align (number columns). Points cells are right-aligned already.</summary>
+    [Parameter] public bool End { get; set; }
+    /// <summary>Not shown below 900 px. The phone <c>Columns</c> must leave this column out.</summary>
+    [Parameter] public bool HidePhone { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string? KindClass => Kind switch
+    {
+        CellKind.Rank => "bm-cell--rank",
+        CellKind.Name => "bm-cell--name",
+        CellKind.Points => "bm-cell--points",
+        CellKind.Muted => "bm-cell--muted",
+        _ => null
+    };
+}

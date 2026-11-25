@@ -1,21 +1,33 @@
 @page "/login"
+@using MudBlazor
 
-<PageTitle>Log In</PageTitle>
+<PageTitle>Sign in</PageTitle>
 
-<div class="container mt-5" style="max-width: 500px;">
-    <div class="card shadow-sm border-0">
-        <div class="card-body text-center p-5">
-            <h1 class="fw-bold text-primary mb-4">Welcome</h1>
-            <p class="text-muted mb-4">Please sign in to access your bracket.</p>
-
-            <div class="d-grid gap-3">
-                <a href="/.auth/login/aad?post_login_redirect_uri=/" class="btn btn-dark btn-lg shadow-sm">
-                    <i class="bi bi-microsoft me-2"></i> Sign in with Microsoft
-                </a>
-                <a href="/.auth/login/google?post_login_redirect_uri=/" class="btn btn-outline-danger btn-lg shadow-sm">
-                    <i class="bi bi-google me-2"></i> Sign in with Google
-                </a>
-            </div>
+<PageContainer Narrow="true">
+    <div class="bm-pageheader">
+        <div class="bm-pageheader-text">
+            <h1 class="bm-h1" tabindex="-1">Sign in</h1>
+            <div class="bm-subtitle">Choose the kind of email account you already have.</div>
         </div>
     </div>
-</div>
+
+    <Card>
+        <div style="display: flex; flex-direction: column; gap: 12px">
+            <SecondaryButton Href="/.auth/login/google?post_login_redirect_uri=/" Icon="@Icons.Custom.Brands.Google" Large="true" FullWidth="true">
+                Sign in with your Gmail account
+            </SecondaryButton>
+            <SecondaryButton Href="/.auth/login/aad?post_login_redirect_uri=/" Icon="@Icons.Custom.Brands.Microsoft" Large="true" FullWidth="true">
+                Sign in with your Outlook, Hotmail or Live account
+            </SecondaryButton>
+        </div>
+        <p class="bm-note" style="margin: 8px 0 0">
+            This site never sees your password. You type it on Google's or Microsoft's own page, and they tell us only who you are.
+        </p>
+    </Card>
+
+    <Notice Tone="NoticeTone.Tip" Title="Use the same account every time">
+        A different account is a different player on this site, so your picks would not be there.
+    </Notice>
+
+    <p class="bm-note">You do not need to sign in to follow the standings. You only sign in to enter your own picks.</p>
+</PageContainer>

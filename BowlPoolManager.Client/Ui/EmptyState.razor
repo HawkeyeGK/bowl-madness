@@ -1,0 +1,19 @@
+<div class="bm-empty">
+    <MudIcon Icon="@(Icon ?? Icons.Material.Outlined.Inbox)" />
+    <h2 class="bm-empty-title">@Title</h2>
+    @if (ChildContent != null)
+    {
+        <p class="bm-empty-text">@ChildContent</p>
+    }
+    @Action
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    /// <summary>A MudBlazor icon. Defaults to an empty tray.</summary>
+    [Parameter] public string? Icon { get; set; }
+    /// <summary>One or two plain sentences: what is missing and what to do.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    /// <summary>The next step, usually a <see cref="PrimaryButton"/> or <see cref="SecondaryButton"/>.</summary>
+    [Parameter] public RenderFragment? Action { get; set; }
+}

@@ -1,0 +1,24 @@
+@if (!string.IsNullOrWhiteSpace(Text))
+{
+    <div class="bm-status @ToneClass">
+        @if (!string.IsNullOrEmpty(Icon))
+        {
+            <MudIcon Icon="@Icon" Size="Size.Small" />
+        }
+        <span>@Text</span>
+    </div>
+}
+
+@code {
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public StatusTone Tone { get; set; }
+    /// <summary>A MudBlazor icon, for example <c>Icons.Material.Outlined.Schedule</c>.</summary>
+    [Parameter] public string? Icon { get; set; }
+
+    private string? ToneClass => Tone switch
+    {
+        StatusTone.Live => "bm-status--live",
+        StatusTone.Alert => "bm-status--alert",
+        _ => null
+    };
+}

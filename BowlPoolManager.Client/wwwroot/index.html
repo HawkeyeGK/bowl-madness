@@ -14,22 +14,53 @@
     </script>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BowlPoolManager</title>
+    <title>Bowl Madness</title>
     <base href="/" />
+    <meta name="theme-color" content="#0F2747" />
+    <!-- Bootstrap stays until each page is moved to the new components (Release 2 groups B to D, Release 3 for hoops). -->
     <link href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/flatly/bootstrap.min.css" rel="stylesheet" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />
+    <link href="css/theme.css" rel="stylesheet" />
+    <link href="css/ui.css" rel="stylesheet" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="BowlPoolManager.Client.styles.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- Loading screen (shown until Blazor starts, #117). Self-contained so it paints before any other file arrives. -->
+    <style>
+        @font-face { font-family: 'Barlow Condensed'; font-weight: 700; font-display: swap; src: url('fonts/barlow-condensed-latin-700-normal.woff2') format('woff2'); }
+        @font-face { font-family: 'Atkinson Hyperlegible'; font-weight: 400; font-display: swap; src: url('fonts/atkinson-hyperlegible-latin-400-normal.woff2') format('woff2'); }
+        .bm-loading { position: fixed; inset: 0; background: #0F2747; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px; text-align: center; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; z-index: 3000; }
+        .bm-loading-name { font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 44px; letter-spacing: 1px; text-transform: uppercase; }
+        .bm-loading-bar { width: min(280px, 70vw); height: 8px; border-radius: 4px; background: rgba(255,255,255,.2); overflow: hidden; }
+        .bm-loading-bar > div { height: 100%; width: var(--blazor-load-percentage, 8%); background: #F59E0B; border-radius: 4px; transition: width .2s ease-out; }
+        .bm-loading-text { font-size: 18px; }
+        .bm-loading-slow { font-size: 16px; max-width: 360px; opacity: 0; transition: opacity .6s; min-height: 3em; }
+        .bm-loading-slow.show { opacity: .9; }
+        @media (prefers-reduced-motion: reduce) { .bm-loading-bar > div { transition: none; } }
+    </style>
 </head>
 
 <body>
     <div id="app">
-        <svg class="loading-progress">
-            <circle r="40%" cx="50%" cy="50%" />
-            <circle r="40%" cx="50%" cy="50%" />
-        </svg>
-        <div class="loading-progress-text"></div>
+        <div class="bm-loading" role="status" aria-live="polite">
+            <div class="bm-loading-name" id="bm-loading-name">Bowl Madness</div>
+            <div class="bm-loading-bar" aria-hidden="true"><div></div></div>
+            <div class="bm-loading-text">Loading the standings&hellip;</div>
+            <div class="bm-loading-slow" id="bm-loading-slow">Still starting up. After a quiet spell the first visit can take up to 20 seconds. Thanks for waiting.</div>
+        </div>
+        <script>
+            (function () {
+                if (location.hostname.indexOf('hoops-madness') > -1) {
+                    document.getElementById('bm-loading-name').textContent = 'Hoops Madness';
+                    document.title = 'Hoops Madness';
+                }
+                setTimeout(function () {
+                    var el = document.getElementById('bm-loading-slow');
+                    if (el) el.className += ' show';
+                }, 6000);
+            })();
+        </script>
     </div>
 
     <div id="blazor-error-ui">
@@ -38,6 +69,7 @@
         <a class="dismiss">🗙</a>
     </div>
     <script src="_framework/blazor.webassembly.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 

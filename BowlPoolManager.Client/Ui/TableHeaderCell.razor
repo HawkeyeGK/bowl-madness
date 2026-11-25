@@ -1,0 +1,32 @@
+<div role="columnheader" class="bm-cell @(End ? "bm-cell--end" : null) @(HidePhone ? "bm-hide-phone" : null)" aria-sort="@AriaSort">
+    @if (OnSort.HasDelegate)
+    {
+        <button type="button" class="bm-sort" title="@Hint" @onclick="OnSort">
+            <span>@Text</span>
+            @if (SortActive)
+            {
+                <MudIcon Icon="@(Ascending ? Icons.Material.Filled.ArrowDropUp : Icons.Material.Filled.ArrowDropDown)" Size="Size.Small" />
+            }
+        </button>
+    }
+    else
+    {
+        <span title="@Hint">@Text</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+    /// <summary>Right-align (number columns).</summary>
+    [Parameter] public bool End { get; set; }
+    /// <summary>Not shown below 900 px.</summary>
+    [Parameter] public bool HidePhone { get; set; }
+    /// <summary>A longer explanation shown on hover ("Maximum possible score").</summary>
+    [Parameter] public string? Hint { get; set; }
+    /// <summary>Makes the heading a button that sorts by this column.</summary>
+    [Parameter] public EventCallback OnSort { get; set; }
+    [Parameter] public bool SortActive { get; set; }
+    [Parameter] public bool Ascending { get; set; }
+
+    private string? AriaSort => !OnSort.HasDelegate ? null : !SortActive ? "none" : Ascending ? "ascending" : "descending";
+}

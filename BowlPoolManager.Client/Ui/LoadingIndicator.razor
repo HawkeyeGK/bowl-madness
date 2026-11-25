@@ -1,0 +1,9 @@
+<div class="bm-empty" role="status" aria-live="polite">
+    <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Medium" />
+    <p class="bm-empty-text">@(Text ?? "Loading...")</p>
+</div>
+
+@code {
+    /// <summary>What is loading ("Loading the standings..."). Keep it short.</summary>
+    [Parameter] public string? Text { get; set; }
+}

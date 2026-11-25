@@ -1,0 +1,37 @@
+@if (!string.IsNullOrEmpty(Href) && State != RowState.Disabled)
+{
+    <a role="row" class="@RowClass" style="@GridStyle" href="@Href" aria-label="@AriaLabel">@ChildContent</a>
+}
+else if (OnClick.HasDelegate && State != RowState.Disabled)
+{
+    <button type="button" role="row" class="@RowClass" style="@GridStyle" aria-label="@AriaLabel" @onclick="OnClick">@ChildContent</button>
+}
+else
+{
+    <div role="row" class="@RowClass" style="@GridStyle" aria-label="@AriaLabel" aria-disabled="@(State == RowState.Disabled ? "true" : null)">@ChildContent</div>
+}
+
+@code {
+    /// <summary>Same value as the <see cref="TableHeader"/>.</summary>
+    [Parameter, EditorRequired] public string Columns { get; set; } = "";
+    [Parameter] public string? ColumnsWide { get; set; }
+    [Parameter] public RowState State { get; set; }
+    /// <summary>Makes the row a link.</summary>
+    [Parameter] public string? Href { get; set; }
+    /// <summary>Makes the row a button (when there is no <see cref="Href"/>).</summary>
+    [Parameter] public EventCallback OnClick { get; set; }
+    /// <summary>Read instead of the cells when the row is a link or button ("Sally, 3rd, 13 points").</summary>
+    [Parameter] public string? AriaLabel { get; set; }
+    /// <summary>Put <see cref="TableCell"/>s here, as many as the columns.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string GridStyle => $"--bm-cols: {Columns}; --bm-cols-wide: {ColumnsWide ?? Columns}";
+
+    private string RowClass => "bm-grid-row bm-row " + State switch
+    {
+        RowState.Selected => "bm-row--selected",
+        RowState.Pending => "bm-row--pending",
+        RowState.Disabled => "bm-row--disabled",
+        _ => ""
+    };
+}
