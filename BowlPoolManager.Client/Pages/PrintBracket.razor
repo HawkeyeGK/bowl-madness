@@ -1,9 +1,9 @@
-@page "/print-bracket"
 @page "/print-bracket/{EntryId}"
 @layout BowlPoolManager.Client.Layout.PrintLayout
 @inject ISeasonService SeasonService
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
+@using BowlPoolManager.Core.Helpers
 @using BowlPoolManager.Client.Services
 
 @inject HttpClient Http
@@ -50,7 +50,7 @@ else
                  </div>
             </div>
             <div class="title-area">
-                <h1 class="m-0">BOWL MADNESS @DateTime.Now.Year</h1>
+                <h1 class="m-0">@PrintFormText.Title("BOWL MADNESS", currentPool, currentSeason)</h1>
                 <div class="url-text">Bowl-Madness.com</div>
             </div>
         </div>
@@ -165,12 +165,15 @@ else
                 Championship: @GetPointValue(true, TournamentRound.Championship) pts.
             </div>
             
-            <div class="tiebreaker-row">
-                <span class="fw-bold">Tiebreaker: Total points in the ReliaQuest Bowl (Iowa vs Vanderbilt)</span>
-                <div class="line" style="width: 80px; text-align: center;">
-                     @if(userEntry != null) { <span class="handwritten">@userEntry.TieBreakerPoints</span> }
-                 </div>
-            </div>
+            @if (PrintFormText.TieBreakerLine(currentPool, games) is { } tieBreakerLine)
+            {
+                <div class="tiebreaker-row">
+                    <span class="fw-bold">@tieBreakerLine</span>
+                    <div class="line" style="width: 80px; text-align: center;">
+                         @if(userEntry != null) { <span class="handwritten">@userEntry.TieBreakerPoints</span> }
+                     </div>
+                </div>
+            }
         </div>
     </div>
 }
@@ -251,13 +254,14 @@ else
     
     // NEW
     private string currentSeasonId = "";
+    private Season? currentSeason;
 
     protected override async Task OnInitializedAsync()
     {
         try 
         {
             // 0. Fetch Current Season
-            var currentSeason = await SeasonService.GetCurrentSeasonAsync();
+            currentSeason = await SeasonService.GetCurrentSeasonAsync();
             currentSeasonId = currentSeason?.Id ?? "";
 
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");

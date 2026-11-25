@@ -1,0 +1,46 @@
+/* Blank entry form: letter landscape, black and white, one page. Sizes are in inches so the page does not depend on the screen. */
+.blank-loading { padding: 2rem; text-align: center; font-size: 1.1rem; }
+.blank-toolbar { display: flex; gap: .75rem; justify-content: center; align-items: center; flex-wrap: wrap; margin: 0 0 .75rem; }
+.blank-select { min-height: 48px; font-size: 1rem; padding: 0 .75rem; }
+
+.sheet { width: 10.5in; height: 8in; margin: 0 auto; background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif;
+         display: flex; flex-direction: column; gap: .08in; overflow: hidden; border: 1px solid #ccc; box-sizing: border-box; padding: .05in; }
+
+.sheet-head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: .05in; flex: 0 0 auto; }
+.fill-ins { display: flex; gap: .25in; flex: 1; }
+.fill { display: flex; align-items: flex-end; gap: .06in; font-size: 11px; font-weight: 700; flex: 1; }
+.fill.short { flex: .6; }
+.fill i, .tiebreak i, .champion i { flex: 1; border-bottom: 1px solid #000; height: 16px; min-width: .5in; }
+.title { text-align: right; line-height: 1.1; font-size: 10px; }
+.title h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: .5px; }
+
+.bowls { flex: 1 1 0; min-height: 0; display: grid; grid-auto-flow: column; grid-template-columns: repeat(3, 1fr);
+         grid-template-rows: repeat(var(--bowl-rows), 1fr); gap: 3px .1in; }
+.bowl { border: 1px solid #000; padding: 1px 4px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; min-height: 0; }
+.bowl-top { display: flex; justify-content: space-between; gap: 4px; font-size: calc(var(--bowl-font, 11px) - 2px); line-height: 1.15; white-space: nowrap; }
+.bowl-top b { text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; }
+.bowl-top span { font-weight: 400; font-size: calc(var(--bowl-font, 11px) - 3px); flex: 0 0 auto; }
+.side { font-size: var(--bowl-font, 11px); font-weight: 700; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side u { text-decoration: none; display: inline-block; }
+.side u:not(.blank) { width: 8px; height: 8px; border: 1px solid #000; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+.side u.blank { width: 100%; border-bottom: 1px solid #000; height: 12px; }
+
+.tree { flex: 0 0 2.9in; display: grid; grid-template-columns: repeat(4, 1fr); gap: .15in; border-top: 2px solid #000; padding-top: .05in; min-height: 0; }
+.col { display: flex; flex-direction: column; min-height: 0; }
+.col h2 { margin: 0 0 3px; font-size: 10px; text-transform: uppercase; text-align: center; border: 1px solid #000; padding: 1px 0; }
+.col-games { flex: 1; display: flex; flex-direction: column; justify-content: space-around; min-height: 0; }
+.card { border: 1px solid #000; padding: 1px 4px 2px; }
+.card .side { height: 15px; font-size: 11px; }
+.card .bowl-top { font-size: 9px; }
+.card .bowl-top span { font-size: 8px; }
+.champion { display: flex; align-items: flex-end; gap: 4px; margin-top: 10px; font-size: 11px; }
+
+.sheet-foot { flex: 0 0 auto; border-top: 1px solid #000; padding-top: .04in; font-size: 9.5px; line-height: 1.3; }
+.tiebreak { display: flex; align-items: flex-end; gap: 8px; margin-top: 3px; font-size: 11px; }
+.tiebreak i { flex: 0 0 .9in; }
+
+@media print {
+    @page { size: letter landscape; margin: .25in; }
+    .blank-toolbar { display: none !important; }
+    .sheet { border: 0; margin: 0; width: 10.5in; height: 8in; padding: 0; }
+}
