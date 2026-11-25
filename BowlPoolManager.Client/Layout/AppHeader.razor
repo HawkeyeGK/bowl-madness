@@ -2,6 +2,7 @@
 @using BowlPoolManager.Core.Domain
 @using MudBlazor
 @using BowlPoolManager.Client.Ui
+@inject NavigationManager Nav
 
 <header class="bm-header no-print">
     <div class="bm-header-bar">
@@ -22,8 +23,9 @@
 
         <AuthorizeView>
             <Authorized>
-                <span class="bm-header-hello bm-only-wide">Hello, <strong>@context.User.Identity?.Name</strong></span>
-                <a class="bm-header-link bm-only-wide" href="/.auth/logout?post_logout_redirect_uri=/">Log out</a>
+                <span class="bm-header-hello bm-only-wide" title="@context.User.Identity?.Name">Hello, <strong>@context.User.Identity?.Name</strong></span>
+                @* Not a plain link: Blazor would route "/.auth/..." inside the app ("Page not found"); the browser must load it. *@
+                <a class="bm-header-link bm-only-wide" href="@LogoutHref" @onclick="LogOut" @onclick:preventDefault="true">Log out</a>
             </Authorized>
             <NotAuthorized>
                 <a class="bm-header-link" href="login">Sign in</a>
@@ -53,7 +55,7 @@
                 <MudDivider />
                 <AuthorizeView>
                     <Authorized>
-                        <MudMenuItem Href="/.auth/logout?post_logout_redirect_uri=/" ForceLoad="true" Icon="@Icons.Material.Outlined.Logout">Log out</MudMenuItem>
+                        <MudMenuItem Href="@LogoutHref" ForceLoad="true" Icon="@Icons.Material.Outlined.Logout">Log out</MudMenuItem>
                     </Authorized>
                     <NotAuthorized>
                         <MudMenuItem Href="login" Icon="@Icons.Material.Outlined.Login">Sign in</MudMenuItem>
@@ -71,6 +73,10 @@
     [Parameter] public Sport Sport { get; set; }
     /// <summary>True when the player has no entry yet: the picks link says "Enter Picks".</summary>
     [Parameter] public bool NeedsPicks { get; set; }
+
+    private const string LogoutHref = "/.auth/logout?post_logout_redirect_uri=/";
+
+    private void LogOut() => Nav.NavigateTo(LogoutHref, forceLoad: true);
 
     private string HomeHref => SiteNavigation.Tabs(Sport)[0].Href;
 }

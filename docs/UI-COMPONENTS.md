@@ -57,7 +57,7 @@ Rows are laid out on a CSS grid so one set of markup serves phone and desktop.
 Small marker: `Neutral` ("out"), `Live`, `Good` ("paid"), `Alert` ("unpaid").
 
 ### PrimaryButton and SecondaryButton
-Orange (the one main action on a screen) and white with a border (everything else). Parameters: `Icon`, `IconOnly` (the words stay as the accessible name), `Href` (makes it a link), `OnClick`, `Disabled`, `FullWidth`, `Large` (56 px, for the action at the bottom of a screen), `ButtonType`, `AriaLabel`.
+Orange (the one main action on a screen) and white with a border (everything else). Parameters: `Icon`, `IconOnly` (the words stay as the accessible name), `Href` (makes it a link; an address under `/.auth/` is loaded by the browser, not routed inside the app, or it ends at "Page not found"), `OnClick`, `Disabled`, `FullWidth`, `Large` (56 px, for the action at the bottom of a screen), `ButtonType`, `AriaLabel`.
 
 ### Notice
 A message box: `Tone` is `Info`, `Tip`, `Success`, `Warning` or `Error`, with an optional `Title`. Errors and warnings are announced to screen readers.

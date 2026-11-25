@@ -51,13 +51,14 @@ a:hover { color: var(--bm-orange); }
 .bm-spacer { flex: 1; }
 
 .bm-topnav { display: none; gap: 4px; font-size: 17px; margin-left: 8px; }
-.bm-topnav a { color: #fff; padding: 10px 14px; border-radius: 8px; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.bm-topnav a { white-space: nowrap; color: #fff; padding: 10px 14px; border-radius: 8px; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
 .bm-topnav a:hover { background: rgba(255,255,255,.12); color: #fff; }
 .bm-topnav a.active { background: #fff; color: var(--bm-navy); font-weight: 700; }
 
 .bm-header-link { color: #fff; font-size: 16px; text-decoration: none; border: 1px solid rgba(255,255,255,.55); border-radius: 8px; padding: 8px 14px; min-height: 44px; display: inline-flex; align-items: center; background: transparent; font-family: inherit; cursor: pointer; }
 .bm-header-link:hover { background: rgba(255,255,255,.12); color: #fff; }
-.bm-header-hello { font-size: 16px; white-space: nowrap; }
+.bm-header-hello { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; min-width: 0; }
+.bm-header-link { white-space: nowrap; flex-shrink: 0; }
 
 .bm-menu-button { min-width: 48px; min-height: 48px; border-radius: 8px; border: 1px solid rgba(255,255,255,.55); background: transparent; color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .bm-menu-button:hover { background: rgba(255,255,255,.12); }
@@ -89,6 +90,16 @@ a:hover { color: var(--bm-orange); }
 }
 @media (max-width: 899.98px) {
     .bm-only-wide { display: none !important; }
+}
+/* The top bar must stay on one line: tighter links below 1100 px, and the "Hello, name" greeting
+   only where there is room (a long email address would otherwise push the links onto two lines). */
+@media (min-width: 900px) and (max-width: 1099.98px) {
+    .bm-brand { font-size: 24px; }
+    .bm-topnav { gap: 0; margin-left: 4px; font-size: 16px; }
+    .bm-topnav a { padding: 10px 9px; }
+}
+@media (min-width: 900px) and (max-width: 1259.98px) {
+    .bm-header-hello { display: none !important; }
 }
 
 /* Phone menu items: big tap targets */

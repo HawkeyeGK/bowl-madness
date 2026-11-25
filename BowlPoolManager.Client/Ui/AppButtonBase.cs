@@ -24,6 +24,20 @@ public abstract class AppButtonBase : ComponentBase
     /// <summary>The accessible name when the words are not enough ("Print the bracket form").</summary>
     [Parameter] public string? AriaLabel { get; set; }
 
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    /// <summary>
+    /// Addresses under "/.auth/" (sign in, sign out) belong to Azure, not to this app. A plain link to one is routed
+    /// inside the app and shows "Page not found", so such a button navigates with a full page load instead.
+    /// </summary>
+    protected bool LoadsOutsideApp => Href != null && Href.StartsWith("/.auth/", StringComparison.OrdinalIgnoreCase);
+
+    protected string? LinkHref => LoadsOutsideApp ? null : Href;
+
+    protected EventCallback<MouseEventArgs> ClickHandler => LoadsOutsideApp
+        ? EventCallback.Factory.Create<MouseEventArgs>(this, () => Nav.NavigateTo(Href!, forceLoad: true))
+        : OnClick;
+
     protected string CssFor(string kind) =>
         $"bm-btn bm-btn--{kind}" + (Large ? " bm-btn--large" : "") + (IconOnly ? " bm-btn--icononly" : "");
 }

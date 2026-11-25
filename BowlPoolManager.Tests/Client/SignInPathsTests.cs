@@ -52,6 +52,31 @@ namespace BowlPoolManager.Tests.Client
                 .Should().NotContain(".auth/login/google");
         }
 
+        // Blazor treats a plain link inside the app as a page of the app: "/.auth/..." would end at "Page not found"
+        // instead of reaching Azure. These addresses must be loaded by the browser (forceLoad).
+        [Fact]
+        public void AuthAddresses_ShouldNotBePlainLinks_InAnyPage()
+        {
+            var root = Path.GetDirectoryName(RepoFile("BowlPoolManager.Client", "App.razor"))!;
+            var plain = Directory.EnumerateFiles(root, "*.razor", SearchOption.AllDirectories)
+                .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                         && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+                .SelectMany(f => File.ReadAllLines(f).Select((l, i) => (f, l, i + 1)))
+                .Where(x => System.Text.RegularExpressions.Regex.IsMatch(x.l, "<a\\b[^>]*href=\"/\\.auth/"))
+                .Select(x => $"{Path.GetFileName(x.f)}:{x.Item3}")
+                .ToList();
+
+            plain.Should().BeEmpty("a plain <a href=\"/.auth/...\"> is routed inside the app (Page not found)");
+        }
+
+        [Theory]
+        [InlineData("PrimaryButton.razor")]
+        [InlineData("SecondaryButton.razor")]
+        public void LinkButtons_ShouldLoadAuthAddressesOutsideTheApp(string file)
+        {
+            File.ReadAllText(RepoFile("BowlPoolManager.Client", "Ui", file)).Should().Contain("ClickHandler").And.Contain("LinkHref");
+        }
+
         [Fact]
         public void Chooser_ShouldOfferGoogleAndMicrosoftInPlainWords()
         {
