@@ -160,6 +160,31 @@
         </Card>
     </div>
 
+    <h2 class="bm-section-title">Matchup card (Scores, Entry details)</h2>
+    <div class="bm-sheet-stack">
+        <MatchupCard BowlName="Alamo Bowl" PointsText="1 pt" Status="MatchupStatus.Scheduled" StatusText="7:30 PM CT"
+                     Away="@(new MatchupTeam("USC", Sample("USC", "USC", "990000"), ApRank: 20))"
+                     Home="@(new MatchupTeam("TCU", Sample("TCU", "TCU", "4D1979")))"
+                     Pick="@(new MatchupPick("Sally picked TCU", PickOutcome.Pending))"
+                     Split="@(new PickSplitResult(Home: 7, Away: 5))" Where="ESPN · San Antonio, TX" />
+        <MatchupCard BowlName="ReliaQuest Bowl" PointsText="1 pt" Status="MatchupStatus.Live" StatusText="Q3 · 4:12"
+                     Away="@(new MatchupTeam("Iowa", Sample("IOWA", "Iowa", "000000"), ApRank: 22, Score: 24))"
+                     Home="@(new MatchupTeam("Vanderbilt", Sample("VAN", "Vanderbilt", "866D4B"), Score: 17))"
+                     Where="ESPN · Tampa, FL" />
+        <MatchupCard BowlName="Holiday Bowl" PointsText="1 pt" Status="MatchupStatus.Final" StatusText="Final"
+                     Away="@(new MatchupTeam("Arizona", Sample("ARIZ", "Arizona", "CC0033"), Score: 31, Won: true))"
+                     Home="@(new MatchupTeam("SMU", Sample("SMU", "SMU", "0033A0"), Score: 27))"
+                     Pick="@(new MatchupPick("Sally picked Arizona ✓ +1", PickOutcome.Correct))" />
+        <MatchupCard BowlName="Rose Bowl" PointsText="4 pts · Quarterfinal" Status="MatchupStatus.Final" StatusText="Final · Thu Jan 1"
+                     Away="@(new MatchupTeam("Georgia", Sample("UGA", "Georgia", "BA0C2F"), ApRank: 2, Seed: 2, Score: 20))"
+                     Home="@(new MatchupTeam("Texas", Sample("TEX", "Texas", "BF5700"), ApRank: 7, Seed: 7, Score: 34, Won: true))"
+                     Pick="@(new MatchupPick("Sally picked Georgia ✗", PickOutcome.Wrong))" />
+        <MatchupCard BowlName="Sugar Bowl" PointsText="4 pts · Quarterfinal" Status="MatchupStatus.Scheduled" StatusText="Thu Jan 1 · 7:00 PM CT"
+                     Away="@(new MatchupTeam("Ohio State", Sample("OSU", "Ohio State", "BB0000"), ApRank: 1, Seed: 1))"
+                     Home="@(new MatchupTeam("Winner of Cotton Bowl", null, Decided: false))"
+                     Pick="@(new MatchupPick("No pick for this game", PickOutcome.NoPick))" />
+    </div>
+
     <h2 class="bm-section-title">Bottom navigation (phones) and header</h2>
     <Notice Tone="NoticeTone.Info">The real header and bottom bar are on every page of this site. Below 900 px wide the four tabs appear at the bottom; at 900 px and wider they move to the top bar.</Notice>
     <Card Tone="CardTone.Outlined">

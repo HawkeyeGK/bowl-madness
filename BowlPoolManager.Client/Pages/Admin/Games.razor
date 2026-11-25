@@ -116,6 +116,20 @@
                     </div>
                 </div>
 
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3">
+                        <label for="homeApRank" class="form-label">Home AP rank (optional)</label>
+                        <InputNumber id="homeApRank" class="form-control" @bind-Value="newGame.HomeApRank" min="1" max="25" placeholder="1 to 25, or blank" />
+                    </div>
+                    <div class="col-md-3">
+                        <label for="awayApRank" class="form-label">Away AP rank (optional)</label>
+                        <InputNumber id="awayApRank" class="form-control" @bind-Value="newGame.AwayApRank" min="1" max="25" placeholder="1 to 25, or blank" />
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <div class="form-text">Typed by hand from the AP poll. Shown as "#15 Utah" on the Scores and Entry pages.</div>
+                    </div>
+                </div>
+
                 <div class="form-check form-switch mb-3">
                     <InputCheckbox id="isPlayoff" class="form-check-input" @bind-Value="newGame.IsPlayoff" />
                     <label class="form-check-label fw-bold" for="isPlayoff">Is Playoff Game?</label>
@@ -165,6 +179,11 @@
                             </div>
                         </div>
                     </div>
+                }
+
+                @if (!string.IsNullOrEmpty(saveError))
+                {
+                    <div class="alert alert-danger mt-3" role="alert">@saveError</div>
                 }
 
                 <div class="mt-3 text-end">
@@ -218,12 +237,12 @@
                             <td>
                                 <div>
                                     @if(game.TeamHomeSeed.HasValue) { <span class="badge bg-secondary me-1">@game.TeamHomeSeed</span> }
-                                    @game.TeamHome
+                                    @ApRank.Label(game.TeamHome, game.HomeApRank)
                                 </div>
                                 <div class="text-muted small">vs</div>
                                 <div>
                                     @if(game.TeamAwaySeed.HasValue) { <span class="badge bg-secondary me-1">@game.TeamAwaySeed</span> }
-                                    @game.TeamAway
+                                    @ApRank.Label(game.TeamAway, game.AwayApRank)
                                 </div>
                             </td>
                             <td>
@@ -278,6 +297,7 @@
     
     // Initialize to tomorrow at noon Central
     private string startTimeString = "";
+    private string? saveError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -414,6 +434,7 @@
         newGame.TeamHome = "";
         newGame.HomeTeamInfo = null;
         newGame.TeamHomeSeed = null;
+        newGame.HomeApRank = null;
     }
 
     private void ClearAwayTeam()
@@ -422,6 +443,7 @@
         newGame.TeamAway = "";
         newGame.AwayTeamInfo = null;
         newGame.TeamAwaySeed = null;
+        newGame.AwayApRank = null;
     }
 
     private async Task EditGame(BowlGame game)
@@ -439,6 +461,13 @@
 
     private async Task HandleSaveGame()
     {
+        saveError = null;
+        if (!ApRank.IsValid(newGame.HomeApRank) || !ApRank.IsValid(newGame.AwayApRank))
+        {
+            saveError = $"An AP rank must be a number from 1 to {ApRank.Max}, or blank.";
+            return;
+        }
+
         // 1. Manually update StartTime from the InputText string
         if (DateTime.TryParse(startTimeString, out DateTime parsedLocal))
         {
@@ -464,6 +493,9 @@
             else
             {
                 Console.WriteLine($"[Game Admin] Game save failed: {response.StatusCode}");
+                saveError = response.StatusCode == System.Net.HttpStatusCode.BadRequest
+                    ? $"The game was not saved. {await response.Content.ReadAsStringAsync()}"
+                    : $"The game was not saved ({(int)response.StatusCode}).";
             }
         }
         catch (Exception ex)

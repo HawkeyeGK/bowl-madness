@@ -22,6 +22,7 @@ builder.Services.AddScoped<ISiteContext, SiteContext>();
 // COMPONENT LIBRARY (MudBlazor ships with the app: no CDN) AND THE HEADER POOL SWITCHER'S STATE
 builder.Services.AddMudServices();
 builder.Services.AddScoped<PoolSelection>();
+builder.Services.AddScoped<MyEntryStore>();
 
 // DOMAIN SERVICES
 builder.Services.AddScoped<IPoolService, PoolService>();

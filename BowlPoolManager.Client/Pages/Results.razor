@@ -1,78 +1,318 @@
 @page "/results"
+@implements IDisposable
 @using BowlPoolManager.Core.Domain
-@using BowlPoolManager.Client.Components
+@using BowlPoolManager.Core.Dtos
 @using BowlPoolManager.Client.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
 @inject IPoolService PoolService
 @inject ISeasonService SeasonService
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+@inject PoolSelection PoolSelection
+@inject MyEntryStore MyEntryStore
 
-<PageTitle>Scoreboard</PageTitle>
+@*
+    Release 2 Scores page (prototypes 7a and 7b): games grouped Today, Coming up, Earlier results, each as a MatchupCard
+    with logos, AP rank, seed, score, live status, points at stake, the remembered entry's pick (right or wrong once
+    final) and, after lock only, how the pool split its picks. Phones show one group at a time, wide screens all three.
+    Logic that is not drawing lives in Core: ScoresGrouping, ScoreGameText, GameSlots, PickOutcomes, PickSplit.
+*@
 
-<div class="container-fluid mt-3 px-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="h3 fw-bold mb-0"><i class="bi bi-display text-primary me-2"></i>Scoreboard</h1>
-            <div class="text-muted small">Live updates and results</div>
-        </div>
-        
-         @if (isLoading)
-         {
-             <div class="spinner-border text-light spinner-border-sm" role="status">
-                 <span class="visually-hidden">Loading...</span>
-             </div>
-         }
-    </div>
+<PageContainer>
+    <PageHeader Title="Scores"
+                DocumentTitle="Scores"
+                Subtitle="@currentPool?.Name"
+                Status="@StatusText"
+                StatusIcon="@Icons.Material.Outlined.Schedule">
+        <Actions>
+            <PoolSwitcher Mode="PoolSwitcherMode.Segmented" />
+        </Actions>
+    </PageHeader>
 
-    @if (Games == null)
+    @if (isLoading)
     {
-        <div class="text-center text-white-50 mt-5">
-            <div class="spinner-border text-primary" role="status"></div>
-            <p class="mt-2">Loading Games...</p>
-        </div>
+        <LoadingIndicator Text="Loading the games..." />
     }
-    else if (!Games.Any())
+    else if (games.Count == 0)
     {
-         <div class="alert alert-info">No games found for the current season.</div>
+        <EmptyState Title="No games yet" Icon="@Icons.Material.Outlined.SportsFootball">
+            <ChildContent>There are no games to show for @(currentPool?.Name ?? "the current season") yet.</ChildContent>
+        </EmptyState>
     }
     else
     {
-        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4 pb-5">
-            @foreach (var game in Games)
-            {
-                <div class="col" @key="game.Id">
-                    <ScoreboardCard Game="@game" AllGames="@Games" />
+        @if (pickEntry != null && picksShown)
+        {
+            <div class="bm-note">Picks shown for <strong>@pickEntry.PlayerName</strong>. @(isRememberedPick ? "Change who you are on the Leaderboard." : "")</div>
+        }
+        else if (currentPool != null && !pickLocked)
+        {
+            <div class="bm-note">Everyone's picks, and how the pool split, show after picks lock.</div>
+        }
+        else
+        {
+            <div class="bm-note">Find yourself on the Leaderboard to see your picks here.</div>
+        }
+
+        @* Phones: one group at a time. *@
+        <div class="bm-only-phone">
+            <MudStack Spacing="3">
+                <div class="bm-segmented" role="group" aria-label="Show">
+                    <button type="button" aria-pressed="@(PhoneTab == "today" ? "true" : "false")" @onclick='() => phoneTab = "today"'>Today</button>
+                    <button type="button" aria-pressed="@(PhoneTab == "coming" ? "true" : "false")" @onclick='() => phoneTab = "coming"'>Coming up</button>
+                    <button type="button" aria-pressed="@(PhoneTab == "earlier" ? "true" : "false")" @onclick='() => phoneTab = "earlier"'>Earlier</button>
                 </div>
-            }
+                @switch (PhoneTab)
+                {
+                    case "today": @GameList(groups.Today, "No games today.") break;
+                    case "coming": @GameList(groups.ComingUp, "No more games coming up.") break;
+                    default: @GameList(groups.Earlier, "No finished games yet.") break;
+                }
+            </MudStack>
+        </div>
+
+        @* Wide screens: all three groups. *@
+        <div class="bm-only-wide">
+            <h2 class="bm-section-title">@TodayTitle</h2>
+            @GameList(groups.Today, "No games today.")
+            <h2 class="bm-section-title">Coming up</h2>
+            @GameList(groups.ComingUp, "No more games coming up.")
+            <h2 class="bm-section-title">Earlier results</h2>
+            @GameList(groups.Earlier, "No finished games yet.")
         </div>
     }
-</div>
+</PageContainer>
 
 @code {
-    private List<BowlGame>? Games;
     private bool isLoading = true;
+    private List<BowlPool> pools = new();
+    private BowlPool? currentPool;
+    private List<BowlGame> allGames = new();
+    private List<BowlGame> games = new();
+    private ScoreGroups groups = new(Array.Empty<BowlGame>(), Array.Empty<BowlGame>(), Array.Empty<BowlGame>());
+    private DateTime lastUpdate = DateTime.MinValue;
+    private string currentSeasonId = "";
+    private DateTime nowUtc = DateTime.UtcNow;
+
+    // The entry whose picks are drawn, and the pool's entries for the split (after lock only).
+    private BracketEntry? pickEntry;
+    private bool isRememberedPick;
+    private List<BracketEntry> poolEntries = new();
+
+    private string? phoneTab;
+
+    [SupplyParameterFromQuery(Name = "poolId")]
+    public string? QueryPoolId { get; set; }
+
+    private bool pickLocked => currentPool != null && nowUtc > currentPool.LockDate;
+    private bool picksShown => pickEntry?.Picks != null;
+
+    private string TodayTitle => "Today · " + DateTimeHelper.ToCentral(nowUtc).ToString("ddd MMM d");
+
+    // Phones start on Today, or on the next group that has games.
+    private string PhoneTab => phoneTab ?? (groups.Today.Count > 0 ? "today" : groups.ComingUp.Count > 0 ? "coming" : "earlier");
+
+    private string? StatusText => currentPool == null
+        ? null
+        : StatusLineText.ForPool(nowUtc, currentPool.LockDate, lastUpdate == DateTime.MinValue ? null : lastUpdate,
+            games.Count(g => g.IsFinal), games.Count);
 
     protected override async Task OnInitializedAsync()
     {
+        PoolSelection.Changed += OnPoolSelectionChanged;
         try
         {
-            isLoading = true;
-            // 1. Get Current Season
-            var seasons = await SeasonService.GetSeasonsAsync();
-            var currentSeason = seasons.FirstOrDefault(s => s.IsCurrent);
-            string? seasonId = currentSeason?.Id;
+            var currentSeason = await SeasonService.GetCurrentSeasonAsync();
+            currentSeasonId = currentSeason?.Id ?? "";
 
-            // 2. Get Games
-            var allGames = await PoolService.GetGamesAsync(seasonId);
-            
-            // 3. Sort
-            Games = allGames.OrderBy(g => g.StartTime).ToList();
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");
+            var gamesTask = PoolService.GetGamesAsync(currentSeasonId);
+            var myEntriesTask = FetchMyEntriesSafe();
+            await Task.WhenAll(poolsTask, gamesTask, myEntriesTask);
+
+            pools = (await poolsTask ?? new()).Where(p => !p.IsArchived).ToList();
+            allGames = await gamesTask;
+            signedInEntries = await myEntriesTask;
+
+            try { lastUpdate = await Http.GetFromJsonAsync<DateTime>("api/GetLastScoreUpdate"); }
+            catch { /* the status line just leaves it out */ }
+
+            var latest = signedInEntries.OrderByDescending(e => e.CreatedOn).FirstOrDefault();
+            var chosenId = PoolPicker.Pick(pools.Select(p => p.Id).ToList(), QueryPoolId,
+                string.IsNullOrEmpty(QueryPoolId) ? await PoolSelection.GetSavedIdAsync() : null, latest?.PoolId);
+            currentPool = pools.FirstOrDefault(p => p.Id == chosenId);
+            PoolSelection.Show(pools.Select(p => new PoolChoice(p.Id, p.Name)).ToList(), currentPool?.Id);
+
+            memory = await MyEntryStore.LoadAsync();
+            await LoadPoolAsync();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading scoreboard: {ex.Message}");
+            Console.WriteLine($"Error loading scores: {ex.Message}");
         }
         finally
         {
             isLoading = false;
         }
+    }
+
+    private List<BracketEntry> signedInEntries = new();
+    private MyEntryMemory memory = new();
+    private int loadVersion;
+
+    private async Task<List<BracketEntry>> FetchMyEntriesSafe()
+    {
+        try
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            if (auth.User.Identity?.IsAuthenticated == true)
+                return await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyEntries?seasonId={currentSeasonId}") ?? new();
+        }
+        catch { /* a public page: no sign-in is fine */ }
+        return new();
+    }
+
+    private void OnPoolSelectionChanged() => _ = InvokeAsync(OnPoolChosenAsync);
+
+    private async Task OnPoolChosenAsync()
+    {
+        var poolId = PoolSelection.CurrentId;
+        if (string.IsNullOrEmpty(poolId) || poolId == currentPool?.Id) return;
+        var chosen = pools.FirstOrDefault(p => p.Id == poolId);
+        if (chosen == null) return;
+
+        currentPool = chosen;
+        isLoading = true;
+        StateHasChanged();
+        await LoadPoolAsync();
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    // The pool's games, grouped; the entry whose picks are drawn; the pool's picks for the split.
+    private async Task LoadPoolAsync()
+    {
+        var version = ++loadVersion;
+        nowUtc = DateTime.UtcNow;
+        phoneTab = null;
+
+        var pool = currentPool;
+        games = pool?.GameIds is { Count: > 0 } ids
+            ? allGames.Where(g => ids.Contains(g.Id)).ToList()
+            : allGames.ToList();
+        groups = ScoresGrouping.Group(games, nowUtc);
+
+        pickEntry = null;
+        isRememberedPick = false;
+        poolEntries = new();
+        if (pool == null) return;
+
+        // Whose picks to draw: the entry this browser remembers, else the signed-in player's own entry in this pool.
+        var rememberedEntry = memory.Get(pool.Id);
+        var ownId = rememberedEntry?.EntryId
+            ?? signedInEntries.Where(e => e.PoolId == pool.Id).OrderByDescending(e => e.CreatedOn).FirstOrDefault()?.Id;
+        isRememberedPick = rememberedEntry != null;
+
+        var entryTask = ownId == null ? Task.FromResult<BracketEntry?>(null) : FetchEntryAsync(ownId);
+        var entriesTask = pickLocked ? FetchPoolEntriesAsync(pool.Id) : Task.FromResult(new List<BracketEntry>());
+        await Task.WhenAll(entryTask, entriesTask);
+
+        if (version != loadVersion) return; // the visitor already moved to another pool
+        pickEntry = await entryTask;
+        poolEntries = await entriesTask;
+    }
+
+    private async Task<BracketEntry?> FetchEntryAsync(string entryId)
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/GetEntry?id={Uri.EscapeDataString(entryId)}&seasonId={currentSeasonId}");
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<BracketEntry>() : null;
+        }
+        catch { return null; }
+    }
+
+    private async Task<List<BracketEntry>> FetchPoolEntriesAsync(string poolId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetEntries?poolId={poolId}&seasonId={currentSeasonId}") ?? new();
+        }
+        catch { return new(); }
+    }
+
+    private RenderFragment GameList(IReadOnlyList<BowlGame> list, string emptyText) => @<div>
+        @if (list.Count == 0)
+        {
+            <div class="bm-note">@emptyText</div>
+        }
+        else
+        {
+            <MudGrid Spacing="2">
+                @foreach (var game in list)
+                {
+                    <MudItem xs="12" md="6" lg="4" @key="game.Id">
+                        <MatchupCard BowlName="@game.BowlName"
+                                     PointsText="@ScoreGameText.PointsText(game)"
+                                     Status="@StatusOf(game)"
+                                     StatusText="@ScoreGameText.StatusText(game, nowUtc)"
+                                     Away="@TeamOf(game, false)"
+                                     Home="@TeamOf(game, true)"
+                                     Pick="@PickOf(game)"
+                                     Split="@PickSplit.ForGame(game, poolEntries, pickLocked)"
+                                     Where="@WhereOf(game)" />
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </div>;
+
+    private static MatchupStatus StatusOf(BowlGame game) => game.Status switch
+    {
+        GameStatus.InProgress => MatchupStatus.Live,
+        GameStatus.Final => MatchupStatus.Final,
+        _ => MatchupStatus.Scheduled
+    };
+
+    private MatchupTeam TeamOf(BowlGame game, bool isHome)
+    {
+        var slot = GameSlots.Resolve(game, isHome, allGames);
+        var storedName = isHome ? game.TeamHome : game.TeamAway;
+        var decidedWinner = game.IsFinal && game.TeamHomeScore is int h && game.TeamAwayScore is int a && h != a
+            ? (h > a ? game.TeamHome : game.TeamAway)
+            : null;
+
+        return new MatchupTeam(
+            slot.Name,
+            slot.Info,
+            ApRank: string.Equals(slot.Name, storedName, StringComparison.OrdinalIgnoreCase) && slot.Decided ? (isHome ? game.HomeApRank : game.AwayApRank) : null,
+            Seed: string.Equals(slot.Name, storedName, StringComparison.OrdinalIgnoreCase) ? (isHome ? game.TeamHomeSeed : game.TeamAwaySeed) : null,
+            Score: isHome ? game.TeamHomeScore : game.TeamAwayScore,
+            Decided: slot.Decided,
+            Won: decidedWinner != null && string.Equals(decidedWinner, slot.Name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    // "Sally picked Iowa", marked right or wrong once the game is final. Nothing when this device has no entry or picks are hidden.
+    private MatchupPick? PickOf(BowlGame game)
+    {
+        if (pickEntry?.Picks == null) return null;
+
+        pickEntry.Picks.TryGetValue(game.Id, out var pick);
+        var line = PickLine.For(game, pick, pickEntry.PlayerName);
+        return new MatchupPick(line.Text, line.Outcome);
+    }
+
+    private static string? WhereOf(BowlGame game)
+    {
+        var parts = new[] { game.Television, game.Location }.Where(p => !string.IsNullOrWhiteSpace(p));
+        var text = string.Join(" · ", parts);
+        return text.Length == 0 ? null : text;
+    }
+
+    public void Dispose()
+    {
+        PoolSelection.Changed -= OnPoolSelectionChanged;
+        PoolSelection.Clear();
     }
 }

@@ -43,7 +43,7 @@ namespace BowlPoolManager.Tests.Core
             TeamAway = "Northgate", TeamAwayId = 12, AwayTeamInfo = Team(12, "Northgate"),
             TeamHomeSeed = 5, TeamAwaySeed = 12, TeamHomeScore = 24, TeamAwayScore = 17,
             PointValue = 3, IsPlayoff = true, Round = TournamentRound.QuarterFinal, NextGameId = "game-2",
-            Location = "Test Stadium", Television = "TestNet"
+            Location = "Test Stadium", Television = "TestNet", HomeApRank = 15, AwayApRank = 4
         };
 
         private static BowlPool SamplePool() => new()
@@ -287,6 +287,22 @@ namespace BowlPoolManager.Tests.Core
                 g.TeamHomeScore.Should().Be(35);
                 g.TeamHomeSeed.Should().BeNull();
                 g.WinningTeamName.Should().Be("A");
+                // Documents saved before AP rank existed carry no rank fields (Release 1.1 data).
+                g.HomeApRank.Should().BeNull();
+                g.AwayApRank.Should().BeNull();
+            });
+        }
+
+        [Fact]
+        public void BowlGame_ShouldLoadApRanks_WhenDocumentHasThem()
+        {
+            var json = "{\"id\":\"g1\",\"seasonId\":\"s1\",\"bowlName\":\"Test Bowl\",\"teamHome\":\"A\",\"teamAway\":\"B\"," +
+                       "\"homeApRank\":15,\"awayApRank\":null,\"type\":\"BowlGame\"," + SystemProps + "}";
+
+            LoadsWithBothLibraries<BowlGame>(json, g =>
+            {
+                g.HomeApRank.Should().Be(15);
+                g.AwayApRank.Should().BeNull();
             });
         }
 
