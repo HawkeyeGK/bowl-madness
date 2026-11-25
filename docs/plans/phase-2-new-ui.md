@@ -73,7 +73,7 @@ If the go/no-go fails, production stays on Phase 1.1 for the bowl season, and Re
 
 **Decided in group A (2026-11-23, owner):** phones: History, Print Bracket, Admin and Log out are in a menu button in the header (the four tabs stay in the bottom bar). The pool switcher is header tabs on phones and a segmented control on wide screens, shown only on pages that use pools (`PoolSelection`). Desktop admins get one "Admin" item that opens the Dashboard, which has a Component Sheet tile. Hoops uses the same four tabs (Scoreboard is "Scores", Path to Victory is "What If" on both sites). Shared components are documented in docs/UI-COMPONENTS.md.
 
-**Progress:** [x] revert tag [x] MudBlazor + theme [x] layout + navigation [x] hoops check [x] loading screen [x] sign-in [x] all pages load [x] shared components [x] reference Leaderboard [x] component sheet [x] reviews [ ] test site check [ ] look signed off by the owner [ ] merged
+**Progress:** [x] revert tag [x] MudBlazor + theme [x] layout + navigation [x] hoops check [x] loading screen [x] sign-in [x] all pages load [x] shared components [x] reference Leaderboard [x] component sheet [x] reviews [x] test site check [x] look signed off by the owner [x] merged
 
 ---
 
