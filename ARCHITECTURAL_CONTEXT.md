@@ -72,7 +72,7 @@ The system heavily limits function triggers to standard HTTP.
 | Admin | `ParseSwaHeader`, `userRepo.GetUserAsync`, then `SecurityHelper.IsAdmin(user)` (true for Admin and SuperAdmin). |
 | SuperAdmin | `SecurityHelper.ValidateSuperAdminAsync(req, _userRepo)`; returns 401 for no login and 403 for the wrong role. |
 
-- `staticwebapp.config.json` protects only the `/admin/*` pages and routes `/login` and `/logout`. It protects nothing under `/api/*`. Every rule is enforced by the function itself.
+- `staticwebapp.config.json` protects only the `/admin/*` pages, routes `/logout`, and sends a 401 to `/login`, the sign-in chooser page of the app (Google and Microsoft side by side; nothing in the routing file names a provider). It protects nothing under `/api/*`. Every rule is enforced by the function itself.
 - The Client uses `StaticWebAppsAuthenticationStateProvider` alongside standard Blazor `AuthorizationCore` to manage identity. This is for display only.
 - Known deviations from the rules (functions with no check, disabled accounts not enforced) are tracked in GitHub Issues, not here.
 
@@ -197,7 +197,7 @@ Any future sport must introduce its own prefix (e.g., `"BaseballArchive_{poolId}
 
 ## 11. Site Selection by Domain
 
-One Blazor build serves both sites. `ISiteContext` / `SiteContext` (Client/Services) exposes `ActiveSport` (`Sport.Football` or `Sport.Basketball`). It is decided from the browser host name: a host containing `hoops-madness` is Basketball, one containing `bowl-madness` is Football. On localhost it falls back to a `/basketball` path prefix, and in the Development environment a value stored in browser local storage (`devSportOverride`) overrides both. `NavMenu` shows sport-specific links and pages (for example `/hoops/leaderboard` versus `/leaderboard`) from `ActiveSport`. Both domains point at the same Static Web App (docs/INFRASTRUCTURE.md).
+One Blazor build serves both sites. `ISiteContext` / `SiteContext` (Client/Services) exposes `ActiveSport` (`Sport.Football` or `Sport.Basketball`). It is decided from the browser host name: a host containing `hoops-madness` is Basketball, one containing `bowl-madness` is Football. On localhost it falls back to a `/basketball` path prefix, and in the Development environment a value stored in browser local storage (`devSportOverride`) overrides both. There is no switch in the UI since Release 2 (owner decision, 2026-11-23); set the value in the browser, or open the site as `hoops-madness.localhost`. The layout (`AppHeader`, `BottomNav`) shows sport-specific links (for example `/hoops/leaderboard` versus `/leaderboard`) from `ActiveSport`, through `SiteNavigation` in Core (section 18). Both domains point at the same Static Web App (docs/INFRASTRUCTURE.md).
 
 ## 12. Hoops (Basketball) Models and Services
 
@@ -254,3 +254,12 @@ Each new season:
 4. Check the lock date, point values and tiebreaker on each new pool.
 5. Make sure the score feed is Live (Score Feed page) before the season starts. On the test site: reset with a scenario, load the starting set, link games, and check scoring before Selection Day.
 6. Still to check by hand: the `DateTime.Now.Year` fallback in `PoolSettings.razor` (#126) and hoops season handling (#95).
+
+## 18. Client UI (Release 2)
+- **Component library:** MudBlazor, pinned to 9.14.0 (MIT). Its CSS and script come with the package (`_content/MudBlazor/...`); no CDN. Bootstrap (Bootswatch Flatly) and Bootstrap Icons are still loaded from a CDN in `index.html` for pages that have not moved to the new components yet (football pages in Release 2 groups B to D, hoops in Release 3); they are removed when the last such page is gone.
+- **Theme and fonts:** `Client/Theme/AppTheme.cs` (MudBlazor theme: navy `#0F2747`, orange `#C2410C`, amber `#F59E0B`, page `#F4F5F7`) and the same values as CSS variables in `wwwroot/css/theme.css`. Atkinson Hyperlegible (body) and Barlow Condensed (headings) are shipped as woff2 files in `wwwroot/fonts` (SIL Open Font License, texts in `LICENSES.txt`).
+- **Frame:** `Layout/MainLayout` (providers, disabled-account check, live dot), `Layout/AppHeader` (header, top navigation at 900 px and wider, phone menu, sign-in) and `Ui/BottomNav` (four tabs below 900 px). `PrintLayout` is unchanged. A loading screen in `index.html` shows until Blazor starts (#117).
+- **Shared components:** `Client/Ui/`, listed and documented in docs/UI-COMPONENTS.md; styles in `wwwroot/css/ui.css`. The admin page `/admin/components` shows each in every state.
+- **Pool switcher state:** `PoolSelection` (scoped service) holds the pools a page offers and the chosen one; the choice is stored in browser local storage under `lastSelectedPoolId`.
+- **Logic in Core, with xUnit tests (no bUnit):** `SiteNavigation` (links per site), `StatusLineText` (status line), `TopThreeRule` (the "out" rule, shared by the leaderboard and `BracketSimulator`), `PoolPicker` (which pool shows first). `SignInPathsTests` checks that every sign-in path goes to the chooser.
+- **Sign-in:** the chooser is `Pages/Login.razor` (`/login`). The routing file's 401 override and the not-authorized message in `App.razor` go to it; no path goes straight to a provider.

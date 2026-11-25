@@ -1,0 +1,32 @@
+<section class="bm-card @ToneClass @(Flush ? "bm-card--flush" : null) @Class" aria-label="@AriaLabel">
+    @if (!string.IsNullOrEmpty(Eyebrow))
+    {
+        <div class="bm-card-eyebrow">@Eyebrow</div>
+    }
+    @if (!string.IsNullOrEmpty(Title))
+    {
+        <h2 class="bm-card-title">@Title</h2>
+    }
+    @ChildContent
+</section>
+
+@code {
+    [Parameter] public CardTone Tone { get; set; }
+    /// <summary>Small orange label above the title ("You on this phone").</summary>
+    [Parameter] public string? Eyebrow { get; set; }
+    [Parameter] public string? Title { get; set; }
+    /// <summary>No padding: the content (a table) runs edge to edge.</summary>
+    [Parameter] public bool Flush { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string? ToneClass => Tone switch
+    {
+        CardTone.Outlined => "bm-card--outlined",
+        CardTone.Highlight => "bm-card--highlight",
+        CardTone.Tint => "bm-card--tint",
+        CardTone.Dark => "bm-card--dark",
+        _ => null
+    };
+}

@@ -1,213 +1,154 @@
 ﻿@page "/"
 @page "/leaderboard"
+@implements IDisposable
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core.Dtos
 @using BowlPoolManager.Core
 @using BowlPoolManager.Client.Services
-@inject ISeasonService SeasonService
-
 @using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
+@inject ISeasonService SeasonService
 @inject HttpClient Http
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Nav
-@inject IJSRuntime JSRuntime
 @inject ISiteContext SiteContext
+@inject PoolSelection PoolSelection
 
-<PageTitle>Leaderboard</PageTitle>
+@*
+    Release 2 reference page: the Leaderboard built only from the shared components in Client/Ui.
+    Later pages copy this pattern. Logic that is not drawing lives in Core: StatusLineText, TopThreeRule, PoolPicker.
+*@
 
-<div class="container-fluid mt-3 px-4">
-    <div class="d-flex justify-content-between align-items-end mb-3">
-        @* LEFT SIDE: Title + Pool Selector *@
-        <div class="d-flex flex-column gap-2">
-            <div class="d-flex align-items-center gap-3">
-                <h1 class="h3 fw-bold mb-0"><i class="bi bi-trophy-fill text-primary"></i> Leaderboard</h1>
-            </div>
-
-        
-
-        
-            <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-                @* POOL SELECTOR *@
-                @if (pools != null && pools.Count > 1)
-                {
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="text-muted small fw-bold">Pool:</span>
-                        <select class="form-select form-select-sm shadow-sm" style="width: auto; min-width: 200px;" @onchange="OnPoolChanged">
-                            @foreach (var pool in pools)
-                            {
-                                <option value="@pool.Id" selected="@(pool.Id == currentPool?.Id)">@pool.Name</option>
-                            }
-                        </select>
-                    </div>
-                }
-                else if (currentPool != null)
-                {
-                    <h2 class="h5 text-secondary mb-0">@currentPool.Name</h2>
-                }
-
-                @* LOCK DATE INFO *@
-                @if (currentPool != null)
-                {
-                    <div class="text-muted small">
-                        @if (DateTime.UtcNow > currentPool.LockDate)
-                        {
-                            <span>Picks Locked: @DateTimeHelper.ToCentral(currentPool.LockDate).ToString("MMM d, h:mm tt") CT</span>
-                        }
-                        else
-                        {
-                            <i class="bi bi-clock-fill text-danger me-1"></i>
-                            <span>Picks Lock: @DateTimeHelper.ToCentral(currentPool.LockDate).ToString("MMM d, h:mm tt") CT</span>
-                        }
-                    </div>
-                }
-                else
-                {
-                    <span class="text-muted small">Loading Pool...</span>
-                }
-            </div>
-        </div>
-
-        @* RIGHT SIDE: Actions *@
-        <div>
-             <a href="print-bracket" class="btn btn-outline-primary btn-sm">
-                <i class="bi bi-printer-fill"></i> Print Bracket
-            </a>
-        </div>
-    </div>
+<PageContainer>
+    <PageHeader Title="Leaderboard"
+                Subtitle="@currentPool?.Name"
+                Status="@StatusText"
+                StatusIcon="@Icons.Material.Outlined.Schedule">
+        <Actions>
+            <PoolSwitcher Mode="PoolSwitcherMode.Segmented" />
+            <span class="bm-only-phone">
+                <SecondaryButton Href="print-bracket" Icon="@Icons.Material.Outlined.Print" IconOnly="true">Print Bracket</SecondaryButton>
+            </span>
+            <span class="bm-only-wide">
+                <SecondaryButton Href="print-bracket" Icon="@Icons.Material.Outlined.Print">Print Bracket</SecondaryButton>
+            </span>
+        </Actions>
+    </PageHeader>
 
     @if (isLoading)
     {
-        <div class="d-flex justify-content-center">
-            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
-        </div>
+        <LoadingIndicator Text="Loading the standings..." />
     }
     else if (leaderboard == null || !leaderboard.Any())
     {
-        <div class="alert alert-info text-center">
-            No entries found for <strong>@(currentPool?.Name ?? "this pool")</strong>.
-        </div>
+        <EmptyState Title="No entries yet" Icon="@Icons.Material.Outlined.EmojiEvents">
+            <ChildContent>No entries found for <strong>@(currentPool?.Name ?? "this pool")</strong>.</ChildContent>
+        </EmptyState>
     }
     else
     {
-        <div class="card shadow-sm border-0">
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover table-striped mb-0 align-middle text-center">
-                        <thead class="bg-primary text-white">
-                            <tr>
-                                <th class="ps-4 text-start cursor-pointer" @onclick='() => Sort("Rank")'><div class="d-flex flex-column align-items-start"><span>Rank</span>@RenderSortIcon("Rank", invertLogic: true)</div></th>
-                                <th class="cursor-pointer" @onclick='() => Sort("Player")'><div class="d-flex flex-column align-items-center"><span>Player</span>@RenderSortIcon("Player")</div></th>
-                                <th class="fw-bold cursor-pointer" @onclick='() => Sort("Score")'><div class="d-flex flex-column align-items-center"><span>Total</span>@RenderSortIcon("Score")</div></th>
-                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Bowls")'><div class="d-flex flex-column align-items-center"><span>Bowls</span>@RenderSortIcon("Bowls")</div></th>
-                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Round1")'><div class="d-flex flex-column align-items-center"><span>1st Rnd</span>@RenderSortIcon("Round1")</div></th>
-                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("QuarterFinal")'><div class="d-flex flex-column align-items-center"><span>Quart</span>@RenderSortIcon("QuarterFinal")</div></th>
-                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("SemiFinal")'><div class="d-flex flex-column align-items-center"><span>Semis</span>@RenderSortIcon("SemiFinal")</div></th>
-                                <th class="d-none d-md-table-cell cursor-pointer" @onclick='() => Sort("Championship")'><div class="d-flex flex-column align-items-center"><span>Champ</span>@RenderSortIcon("Championship")</div></th>
-                                <th title="Maximum Potential Score" class="text-dark cursor-pointer" @onclick='() => Sort("Max")'><div class="d-flex flex-column align-items-center"><span>Max</span>@RenderSortIcon("Max")</div></th>
-                                <th class="d-none d-sm-table-cell cursor-pointer" @onclick='() => Sort("Correct")'><div class="d-flex flex-column align-items-center"><span>Correct</span>@RenderSortIcon("Correct")</div></th>
-                                <th class="d-none d-lg-table-cell cursor-pointer" @onclick='() => Sort("Tiebreaker")'><div class="d-flex flex-column align-items-center"><span>Tiebreaker</span>@RenderSortIcon("Tiebreaker")</div></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var row in leaderboard)
+        <DataTable Label="Leaderboard">
+            <TableHeader Columns="@PhoneColumns" ColumnsWide="@WideColumns">
+                <TableHeaderCell Text="#" OnSort="@(() => Sort("Rank"))" SortActive="@(sortColumn == "Rank")" Ascending="isAscending" Hint="Rank" />
+                <TableHeaderCell Text="Name" OnSort="@(() => Sort("Player"))" SortActive="@(sortColumn == "Player")" Ascending="isAscending" />
+                <TableHeaderCell Text="Points" End="true" OnSort="@(() => Sort("Score"))" SortActive="@(sortColumn == "Score")" Ascending="isAscending" />
+                <TableHeaderCell Text="Max" End="true" Hint="Maximum possible score" OnSort="@(() => Sort("Max"))" SortActive="@(sortColumn == "Max")" Ascending="isAscending" />
+                <TableHeaderCell Text="Correct" End="true" HidePhone="true" OnSort="@(() => Sort("Correct"))" SortActive="@(sortColumn == "Correct")" Ascending="isAscending" />
+                <TableHeaderCell Text="Bowls" End="true" HidePhone="true" OnSort="@(() => Sort("Bowls"))" SortActive="@(sortColumn == "Bowls")" Ascending="isAscending" />
+                <TableHeaderCell Text="1st Rd" End="true" HidePhone="true" OnSort="@(() => Sort("Round1"))" SortActive="@(sortColumn == "Round1")" Ascending="isAscending" />
+                <TableHeaderCell Text="Quarters" End="true" HidePhone="true" OnSort="@(() => Sort("QuarterFinal"))" SortActive="@(sortColumn == "QuarterFinal")" Ascending="isAscending" />
+                <TableHeaderCell Text="Semis" End="true" HidePhone="true" OnSort="@(() => Sort("SemiFinal"))" SortActive="@(sortColumn == "SemiFinal")" Ascending="isAscending" />
+                <TableHeaderCell Text="Final" End="true" HidePhone="true" OnSort="@(() => Sort("Championship"))" SortActive="@(sortColumn == "Championship")" Ascending="isAscending" />
+                <TableHeaderCell Text="Tiebreaker" End="true" HidePhone="true" OnSort="@(() => Sort("Tiebreaker"))" SortActive="@(sortColumn == "Tiebreaker")" Ascending="isAscending" />
+            </TableHeader>
+            @foreach (var row in leaderboard)
+            {
+                <TableRow Columns="@PhoneColumns" ColumnsWide="@WideColumns"
+                          Href="@(picksHidden ? null : $"entry/{row.Id}")"
+                          AriaLabel="@RowLabel(row)">
+                    <TableCell Kind="CellKind.Rank">@row.Rank</TableCell>
+                    <TableCell Kind="CellKind.Name">
+                        @if (picksHidden)
+                        {
+                            <span>
+                                <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Style="vertical-align: -3px" Title="Picks are hidden until the pool locks" />
+                                @row.PlayerName
+                            </span>
+                        }
+                        else
+                        {
+                            <span>@row.PlayerName</span>
+                            @if (isPoolFinal && row.Rank <= 3)
                             {
-                                bool isLocked = currentPool != null && DateTime.UtcNow < currentPool.LockDate;
-                                <tr>
-                                    <td class="ps-4 text-start">@row.Rank</td>
-                                    <td class="fw-bold">
-                                        @if (isLocked)
-                                        {
-                                            <span class="text-secondary" title="Picks Hidden until @currentPool!.LockDate">
-                                                <i class="bi bi-lock-fill text-muted me-1"></i>
-                                                @row.PlayerName
-                                            </span>
-                                        }
-                                        else
-                                        {
-                                            <a href="entry/@row.Id" class="text-decoration-none text-dark">
-                                                @row.PlayerName
-                                                @if (isPoolFinal)
-                                                {
-                                                    @if (row.Rank == 1)
-                                                    {
-                                                        <i class="bi bi-trophy-fill ms-2" style="color: #FFD700;" title="1st Place - Gold"></i>
-                                                    }
-                                                    else if (row.Rank == 2)
-                                                    {
-                                                        <i class="bi bi-trophy-fill ms-2" style="color: #C0C0C0;" title="2nd Place - Silver"></i>
-                                                    }
-                                                    else if (row.Rank == 3)
-                                                    {
-                                                        <i class="bi bi-trophy-fill ms-2" style="color: #CD7F32;" title="3rd Place - Bronze"></i>
-                                                    }
-                                                }
-                                            </a>
-                                        }
-                                    </td>
-                                    <td class="fs-5 text-primary fw-bold">@row.Score</td>
-                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[TournamentRound.Standard]</td>
-                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[TournamentRound.Round1]</td>
-                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[TournamentRound.QuarterFinal]</td>
-                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[TournamentRound.SemiFinal]</td>
-                                    <td class="d-none d-md-table-cell text-muted">@row.RoundScores[TournamentRound.Championship]</td>
-                                    <td class="fw-bold text-muted">@row.MaxPossible</td>
-                                    <td class="d-none d-sm-table-cell text-muted small">@row.CorrectPicks / @totalFinalGames</td>
-                                    <td class="text-muted small d-none d-lg-table-cell">
-                                        @if (isLocked)
-                                        {
-                                            <span title="Hidden until picks lock" class="text-secondary opacity-50">
-                                                <i class="bi bi-eye-slash"></i>
-                                            </span>
-                                        }
-                                        else
-                                        {
-                                            @($"{row.TieBreakerPoints} pts")
-                                        }
-                                    </td>
-                                </tr>
+                                <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Style="@($"color: {TrophyColor(row.Rank)}")" Title="@TrophyTitle(row.Rank)" />
                             }
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-         </div>
-        <div class="mt-3 text-center text-muted small">
-             @if (LastUpdate != DateTime.MinValue)
-             {
-                 <span><i class="bi bi-info-circle"></i> Refresh to update &bull; Last update: @DateTimeHelper.ToCentral(LastUpdate).ToString("MMM d, h:mm tt") CT</span>
-             }
-             else
-             {
-                 <span><i class="bi bi-info-circle"></i> Refresh to update</span>
-             }
-             <div class="mt-1"><i class="bi bi-lock-fill"></i> indicates picks are hidden until the pool unlocks.</div>
+                            @if (outIds.Contains(row.Id))
+                            {
+                                <Badge>out</Badge>
+                            }
+                        }
+                    </TableCell>
+                    <TableCell Kind="CellKind.Points">@row.Score</TableCell>
+                    <TableCell Kind="CellKind.Muted" End="true">@row.MaxPossible</TableCell>
+                    <TableCell Kind="CellKind.Muted" End="true" HidePhone="true">@row.CorrectPicks/@totalFinalGames</TableCell>
+                    <TableCell Kind="CellKind.Muted" End="true" HidePhone="true">@row.RoundScores[TournamentRound.Standard]</TableCell>
+                    <TableCell Kind="CellKind.Muted" End="true" HidePhone="true">@row.RoundScores[TournamentRound.Round1]</TableCell>
+                    <TableCell Kind="CellKind.Muted" End="true" HidePhone="true">@row.RoundScores[TournamentRound.QuarterFinal]</TableCell>
+                    <TableCell Kind="CellKind.Muted" End="true" HidePhone="true">@row.RoundScores[TournamentRound.SemiFinal]</TableCell>
+                    <TableCell Kind="CellKind.Muted" End="true" HidePhone="true">@row.RoundScores[TournamentRound.Championship]</TableCell>
+                    <TableCell Kind="CellKind.Muted" End="true" HidePhone="true">
+                        @if (picksHidden)
+                        {
+                            <MudIcon Icon="@Icons.Material.Outlined.VisibilityOff" Size="Size.Small" Title="Hidden until picks lock" />
+                        }
+                        else
+                        {
+                            @($"{row.TieBreakerPoints} pts")
+                        }
+                    </TableCell>
+                </TableRow>
+            }
+        </DataTable>
+
+        <div class="bm-note">
+            @if (picksHidden)
+            {
+                <div><MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Style="vertical-align: -3px" /> Picks are hidden until the pool locks, so names are not links yet.</div>
+            }
+            <div>Max = the most points still possible. "Out" means no longer able to finish in the top 3. Ties are broken by Max, then the pool's tiebreakers, then name.</div>
         </div>
     }
-
-</div>
-
-<style>
-    .cursor-pointer { cursor: pointer; user-select: none; }
-    .cursor-pointer:hover { background-color: rgba(255,255,255,0.2); }
-</style>
+</PageContainer>
 
 @code {
+    // Phone: rank, name, points, max. Wide screens add the other columns (cells marked HidePhone).
+    private const string PhoneColumns = "44px minmax(0, 1fr) 64px 52px";
+    private const string WideColumns = "56px minmax(160px, 1.6fr) 80px 64px 80px 64px 64px 84px 64px 64px 104px";
+
     private bool isLoading = true;
     private List<BowlPool> pools = new();
     private BowlPool? currentPool;
     private List<LeaderboardDto> leaderboard = new();
+    private HashSet<string> outIds = new();
     private int totalFinalGames = 0;
-    private int totalGames = 0;
     private bool isPoolFinal = false;
     private DateTime LastUpdate = DateTime.MinValue;
     private string currentSeasonId = "";
-    
+
     // Sorting
     private string sortColumn = "Score";
     private bool isAscending = false;
 
     [SupplyParameterFromQuery(Name = "poolId")]
     public string? QueryPoolId { get; set; }
+
+    // Picks stay hidden until the pool locks (BUSINESS-RULES section 3); names are not links before then.
+    private bool picksHidden => currentPool != null && DateTime.UtcNow <= currentPool.LockDate;
+
+    private string? StatusText => currentPool == null
+        ? null
+        : StatusLineText.ForPool(DateTime.UtcNow, currentPool.LockDate,
+            LastUpdate == DateTime.MinValue ? null : LastUpdate, totalFinalGames, currentPool.GameIds?.Count ?? 0);
 
     protected override async Task OnInitializedAsync()
     {
@@ -217,6 +158,8 @@
             Nav.NavigateTo("/hoops/leaderboard", replace: true);
             return;
         }
+
+        PoolSelection.Changed += OnPoolSelectionChanged;
 
         try
         {
@@ -228,10 +171,10 @@
 
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");
             var myEntriesTask = FetchMyEntriesSafe();
-            
+
             await Task.WhenAll(poolsTask, myEntriesTask);
             var allPools = await poolsTask ?? new();
-            
+
             var myEntries = await myEntriesTask;
 
             // Fetch the last update timestamp
@@ -239,7 +182,7 @@
                 LastUpdate = await Http.GetFromJsonAsync<DateTime>("api/GetLastScoreUpdate");
             } catch { /* Ignore if fails */ }
 
-            // 0. CHECK FOR DIRECT LINK TO ARCHIVED POOL
+            // CHECK FOR DIRECT LINK TO ARCHIVED POOL
             if (!string.IsNullOrEmpty(QueryPoolId))
             {
                 var requestedPool = allPools.FirstOrDefault(p => p.Id == QueryPoolId);
@@ -250,41 +193,16 @@
                 }
             }
 
-            // 1. FILTER UI LIST (Only show active pools)
+            // Only show active pools
             pools = allPools.Where(p => !p.IsArchived).ToList();
 
-            // 2. DETERMINE CURRENT POOL
-            if (!string.IsNullOrEmpty(QueryPoolId))
-            {
-                currentPool = pools.FirstOrDefault(p => p.Id == QueryPoolId);
-            }
-            else
-            {
-                // Try from local storage
-                try
-                {
-                    var savedPoolId = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "lastSelectedPoolId");
-                    if (!string.IsNullOrEmpty(savedPoolId))
-                    {
-                        currentPool = pools.FirstOrDefault(p => p.Id == savedPoolId);
-                    }
-                }
-                catch { /* Ignore JS interop errors during prerendering or if disallowed */ }
+            // Which pool first: address, then this browser's last choice, then the newest entry, then the first pool.
+            var latestEntry = myEntries.OrderByDescending(e => e.CreatedOn).FirstOrDefault();
+            var chosenId = PoolPicker.Pick(pools.Select(p => p.Id).ToList(), QueryPoolId,
+                string.IsNullOrEmpty(QueryPoolId) ? await PoolSelection.GetSavedIdAsync() : null, latestEntry?.PoolId);
+            currentPool = pools.FirstOrDefault(p => p.Id == chosenId);
 
-                // If not found in storage, try "My Entries"
-                if (currentPool == null && myEntries.Any())
-                {
-                    var lastEntry = myEntries.OrderByDescending(e => e.CreatedOn).First();
-                    // Only select if it matches an ACTIVE pool
-                    currentPool = pools.FirstOrDefault(p => p.Id == lastEntry.PoolId);
-                }
-            }
-            
-            // 3. FALLBACK
-            if (currentPool == null)
-            {
-                currentPool = pools.FirstOrDefault();
-            }
+            PoolSelection.Show(pools.Select(p => new PoolChoice(p.Id, p.Name)).ToList(), currentPool?.Id);
 
             if (currentPool != null)
             {
@@ -303,7 +221,7 @@
 
     private async Task<List<BracketEntry>> FetchMyEntriesSafe()
     {
-        try 
+        try
         {
             var auth = await AuthStateProvider.GetAuthenticationStateAsync();
             if (auth.User.Identity?.IsAuthenticated == true)
@@ -315,47 +233,58 @@
         return new();
     }
 
-    private async Task OnPoolChanged(ChangeEventArgs e)
-    {
-        var poolId = e.Value?.ToString();
-        if (string.IsNullOrEmpty(poolId)) return;
+    // The visitor tapped a pool in the header or the page switcher.
+    private void OnPoolSelectionChanged() => _ = InvokeAsync(OnPoolChosenAsync);
 
-        currentPool = pools.FirstOrDefault(p => p.Id == poolId);
-        if (currentPool != null)
-        {
-            isLoading = true;
-            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "lastSelectedPoolId", currentPool.Id);
-            await LoadLeaderboardForPool(currentPool.Id);
-            isLoading = false;
-        }
+    private async Task OnPoolChosenAsync()
+    {
+        var poolId = PoolSelection.CurrentId;
+        if (string.IsNullOrEmpty(poolId) || poolId == currentPool?.Id) return;
+
+        var chosen = pools.FirstOrDefault(p => p.Id == poolId);
+        if (chosen == null) return;
+
+        currentPool = chosen;
+        isLoading = true;
+        StateHasChanged();
+        await LoadLeaderboardForPool(chosen.Id);
+        isLoading = false;
+        StateHasChanged();
     }
+
+    // Counts loads so a slow answer for a pool the visitor has already left cannot overwrite the newer one.
+    private int loadVersion;
 
     private async Task LoadLeaderboardForPool(string poolId)
     {
+        var version = ++loadVersion;
         try
         {
             // Call the new server-side GetLeaderboard API
             var response = await Http.GetFromJsonAsync<LeaderboardResponse>(
                 $"api/GetLeaderboard?poolId={poolId}&seasonId={currentSeasonId}"
             );
-            
+
+            if (version != loadVersion) return;
+
             if (response != null)
             {
                 leaderboard = response.Leaderboard ?? new();
                 totalFinalGames = response.TotalFinalGames;
-                totalGames = leaderboard.Count > 0 ? leaderboard.Count : 0;
-                
-                // Determine if pool is final (all games complete)
-                // We can infer this from the data: if any entry has maxPossible == score for top player
-                // Or we need additional metadata - for now, estimate from the pool
+
+                // Determine if pool is final (all games complete): every entry's max equals its score.
                 isPoolFinal = totalFinalGames > 0 && leaderboard.All(r => r.MaxPossible == r.Score);
             }
             else
             {
                 leaderboard = new();
                 totalFinalGames = 0;
+                isPoolFinal = false;
             }
-            
+
+            // "Out" needs scores to mean something, so it shows only after the pool locks.
+            outIds = picksHidden ? new() : TopThreeRule.OutEntryIds(leaderboard);
+
             Sort(sortColumn, forceToggle: false);
         }
         catch (Exception ex)
@@ -363,13 +292,30 @@
             Console.WriteLine($"Error fetching leaderboard: {ex.Message}");
         }
     }
-    
+
     // Response model for the GetLeaderboard API
     private class LeaderboardResponse
     {
         public int TotalFinalGames { get; set; }
         public List<LeaderboardDto>? Leaderboard { get; set; }
     }
+
+    private static readonly Dictionary<string, Func<LeaderboardDto, IComparable>> SortKeys = new()
+    {
+        ["Rank"] = r => r.Rank,
+        ["Player"] = r => r.PlayerName,
+        ["Score"] = r => r.Score,
+        ["Max"] = r => r.MaxPossible,
+        ["Correct"] = r => r.CorrectPicks,
+        ["Tiebreaker"] = r => r.TieBreakerPoints,
+        ["Bowls"] = r => r.RoundScores[TournamentRound.Standard],
+        ["Round1"] = r => r.RoundScores[TournamentRound.Round1],
+        ["QuarterFinal"] = r => r.RoundScores[TournamentRound.QuarterFinal],
+        ["SemiFinal"] = r => r.RoundScores[TournamentRound.SemiFinal],
+        ["Championship"] = r => r.RoundScores[TournamentRound.Championship]
+    };
+
+    private static readonly HashSet<string> BiggestFirst = new() { "Score", "Max", "Correct", "Bowls", "Round1", "QuarterFinal", "SemiFinal", "Championship" };
 
     private void Sort(string column, bool forceToggle = true)
     {
@@ -379,34 +325,25 @@
             else
             {
                 sortColumn = column;
-                isAscending = true; 
-                if (new[]{"Score","Max","Correct","Bowls","Round1","QuarterFinal","SemiFinal","Championship"}.Contains(column))
-                    isAscending = false;
+                isAscending = !BiggestFirst.Contains(column);
             }
         }
 
-        switch (column)
-        {
-            case "Rank": leaderboard = isAscending ? leaderboard.OrderBy(r => r.Rank).ToList() : leaderboard.OrderByDescending(r => r.Rank).ToList(); break;
-            case "Player": leaderboard = isAscending ? leaderboard.OrderBy(r => r.PlayerName).ToList() : leaderboard.OrderByDescending(r => r.PlayerName).ToList(); break;
-            case "Score": leaderboard = isAscending ? leaderboard.OrderBy(r => r.Score).ToList() : leaderboard.OrderByDescending(r => r.Score).ToList(); break;
-            case "Max": leaderboard = isAscending ? leaderboard.OrderBy(r => r.MaxPossible).ToList() : leaderboard.OrderByDescending(r => r.MaxPossible).ToList(); break;
-            case "Correct": leaderboard = isAscending ? leaderboard.OrderBy(r => r.CorrectPicks).ToList() : leaderboard.OrderByDescending(r => r.CorrectPicks).ToList(); break;
-            case "Tiebreaker": leaderboard = isAscending ? leaderboard.OrderBy(r => r.TieBreakerPoints).ToList() : leaderboard.OrderByDescending(r => r.TieBreakerPoints).ToList(); break;
-            case "Bowls": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[TournamentRound.Standard]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[TournamentRound.Standard]).ToList(); break;
-            case "Round1": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[TournamentRound.Round1]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[TournamentRound.Round1]).ToList(); break;
-            case "QuarterFinal": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[TournamentRound.QuarterFinal]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[TournamentRound.QuarterFinal]).ToList(); break;
-            case "SemiFinal": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[TournamentRound.SemiFinal]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[TournamentRound.SemiFinal]).ToList(); break;
-            case "Championship": leaderboard = isAscending ? leaderboard.OrderBy(r => r.RoundScores[TournamentRound.Championship]).ToList() : leaderboard.OrderByDescending(r => r.RoundScores[TournamentRound.Championship]).ToList(); break;
-        }
+        var key = SortKeys[column];
+        leaderboard = isAscending ? leaderboard.OrderBy(key).ToList() : leaderboard.OrderByDescending(key).ToList();
     }
 
-    private RenderFragment RenderSortIcon(string column, bool invertLogic = false)
+    private string RowLabel(LeaderboardDto row) =>
+        picksHidden
+            ? $"{row.PlayerName}, rank {row.Rank}, {row.Score} points"
+            : $"{row.PlayerName}, rank {row.Rank}, {row.Score} points, up to {row.MaxPossible} possible. Open this entry's picks.";
+
+    private static string TrophyColor(int rank) => rank switch { 1 => "#D4A017", 2 => "#8A8F98", _ => "#A9682B" };
+    private static string TrophyTitle(int rank) => rank switch { 1 => "1st place - Gold", 2 => "2nd place - Silver", _ => "3rd place - Bronze" };
+
+    public void Dispose()
     {
-        bool isActive = (sortColumn == column);
-        string visibilityStyle = isActive ? "visibility: visible" : "visibility: hidden";
-        bool effectiveAscending = invertLogic ? !isAscending : isAscending;
-        string iconClass = (isActive && effectiveAscending) ? "bi-caret-up-fill" : "bi-caret-down-fill";
-        return @<i class="@($"bi {iconClass} small")" style="@visibilityStyle"></i>;
+        PoolSelection.Changed -= OnPoolSelectionChanged;
+        PoolSelection.Clear();
     }
 }

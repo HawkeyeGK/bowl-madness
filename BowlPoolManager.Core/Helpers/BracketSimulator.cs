@@ -123,7 +123,7 @@ namespace BowlPoolManager.Core.Helpers
             var ranked = ScoringEngine.Calculate(scoringGames, visible, scoringPool);
 
             // Top 3 pay out: an entry is out when its best score is below the 3rd place score.
-            int? thirdPlaceScore = ranked.Count > 3 ? ranked[2].Score : null;
+            int? thirdPlaceScore = TopThreeRule.ThirdPlaceScore(ranked.Select(r => r.Score).ToList());
 
             foreach (var row in ranked)
             {
@@ -135,7 +135,7 @@ namespace BowlPoolManager.Core.Helpers
                     MaxPossible = row.MaxPossible,
                     CorrectPicks = row.CorrectPicks,
                     TieBreakerDelta = row.TieBreakerDelta,
-                    CanFinishTop3 = thirdPlaceScore == null || row.MaxPossible >= thirdPlaceScore
+                    CanFinishTop3 = TopThreeRule.CanFinishTop3(row.MaxPossible, thirdPlaceScore)
                 };
 
                 foreach (var game in games)

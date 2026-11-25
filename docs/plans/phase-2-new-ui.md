@@ -46,7 +46,7 @@ If the go/no-go fails, production stays on Phase 1.1 for the bowl season, and Re
 ## Rules for every group
 - Pages keep calling the same API endpoints. Server changes only where a group says so, and every write endpoint keeps its caller check first.
 - Logic that isn't drawing (sequence parsing for fast entry, find-my-entry matching, ordering games for print and entry) lives in Core with xUnit tests. Tests first for new logic.
-- Every page works at phone width (390 px) with no sideways scrolling, text at least 16 px, tap targets at least 44 px, and good contrast. Check each changed page at phone and desktop width in the browser pane, and print pages in print preview.
+- Every page works at phone width (390 px) with no sideways scrolling, text at least 16 px (names, numbers and body text; labels such as tab names, column headings, notes and badges may be 14 to 15 px, as in the prototypes, owner decision 2026-11-23), tap targets at least 44 px, and good contrast. Check each changed page at phone and desktop width in the browser pane, and print pages in print preview.
 - Times through the Central-time helper, always with "CT" (#107, #168).
 - Run code-review, and security-data-review when a change touches sign-in, writes, picks visibility or permissions.
 - Verify on the PR's test-site preview before asking to merge. Never write to production.
@@ -71,7 +71,9 @@ If the go/no-go fails, production stays on Phase 1.1 for the bowl season, and Re
 10. **Component sheet:** an Admin-only page that shows every shared component in its states (normal, selected, disabled, error), at phone and desktop width.
 11. **Look checkpoint:** after the PR's checks pass, the owner reviews the reference page and the sheet on the PR preview (on a real phone too) and asks for corrections; the session makes them in the shared components; repeat until the owner signs off. Then merge.
 
-**Progress:** [ ] revert tag [ ] MudBlazor + theme [ ] layout + navigation [ ] hoops check [ ] loading screen [ ] sign-in [ ] all pages load [ ] shared components [ ] reference Leaderboard [ ] component sheet [ ] reviews [ ] test site check [ ] look signed off by the owner [ ] merged
+**Decided in group A (2026-11-23, owner):** phones: History, Print Bracket, Admin and Log out are in a menu button in the header (the four tabs stay in the bottom bar). The pool switcher is header tabs on phones and a segmented control on wide screens, shown only on pages that use pools (`PoolSelection`). Desktop admins get one "Admin" item that opens the Dashboard, which has a Component Sheet tile. Hoops uses the same four tabs (Scoreboard is "Scores", Path to Victory is "What If" on both sites). Shared components are documented in docs/UI-COMPONENTS.md.
+
+**Progress:** [x] revert tag [x] MudBlazor + theme [x] layout + navigation [x] hoops check [x] loading screen [x] sign-in [x] all pages load [x] shared components [x] reference Leaderboard [x] component sheet [x] reviews [x] test site check [x] look signed off by the owner [x] merged
 
 ---
 

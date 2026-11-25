@@ -1,0 +1,184 @@
+@page "/admin/components"
+@using Microsoft.AspNetCore.Authorization
+@using BowlPoolManager.Core.Domain
+@using MudBlazor
+@attribute [Authorize(Roles = "SuperAdmin,Admin")]
+
+@*
+    Admin-only component sheet (Release 2 look checkpoint). Every shared component in Client/Ui in every state.
+    It uses made-up sample data only and reads nothing from the server. Resize the window (or use a phone) to see
+    both layouts: below 900 px wide is the phone layout, at 900 px and wider is the desktop layout.
+*@
+
+<PageContainer>
+    <PageHeader Title="Component sheet" Subtitle="Every shared building block, in every state. Sample data only."
+                Status="Phone layout below 900 px wide, desktop layout at 900 px and wider" />
+
+    <h2 class="bm-section-title">Colors and type</h2>
+    <Card>
+        <div class="bm-sheet-grid">
+            <div class="bm-swatch" style="background: #0F2747; color: #fff">Navy #0F2747<br />header, links</div>
+            <div class="bm-swatch" style="background: #C2410C; color: #fff">Orange #C2410C<br />main action, "you"</div>
+            <div class="bm-swatch" style="background: #F59E0B; color: #14171C">Amber #F59E0B<br />progress, current tab</div>
+            <div class="bm-swatch" style="background: #F4F5F7; color: #14171C; border: 1px solid #C9CED6">Page #F4F5F7<br />background</div>
+        </div>
+        <div style="font-family: var(--bm-font-head); font-size: 40px; font-weight: 700; line-height: 1.1">Headings: Barlow Condensed 40</div>
+        <div style="font-family: var(--bm-font-head); font-size: 30px; font-weight: 700; line-height: 1.1">Phone page title: Barlow Condensed 30</div>
+        <div style="font-size: 19px">Names and body: Atkinson Hyperlegible 19. Big numbers and 0 O l 1 I are easy to tell apart.</div>
+        <div style="font-size: 17px; color: var(--bm-ink-2)">Table text 17, secondary text 15 or 16.</div>
+        <div class="bm-note">Notes are 15: Max = the most points still possible.</div>
+    </Card>
+
+    <h2 class="bm-section-title">Page header and status line</h2>
+    <Card Tone="CardTone.Outlined">
+        <PageHeader Title="Leaderboard" Subtitle="Family Pool" Status="Updated 8:42 PM CT · 9 of 26 games final" StatusIcon="@Icons.Material.Outlined.Schedule" DocumentTitle="Component sheet">
+            <Actions>
+                <SecondaryButton Icon="@Icons.Material.Outlined.Print">Print Bracket</SecondaryButton>
+            </Actions>
+        </PageHeader>
+        <StatusLine Text="Picks lock Sat Dec 12, 11:00 AM CT" Icon="@Icons.Material.Outlined.Schedule" />
+        <StatusLine Text="LIVE · ReliaQuest Bowl, Q3 4:12" Tone="StatusTone.Live" />
+        <StatusLine Text="Picks are locked. Changes are closed." Tone="StatusTone.Alert" Icon="@Icons.Material.Filled.Lock" />
+    </Card>
+
+    <h2 class="bm-section-title">Cards</h2>
+    <div class="bm-sheet-grid">
+        <Card Title="Default"><span>White card, light shadow.</span></Card>
+        <Card Tone="CardTone.Outlined" Title="Outlined"><span>Border, no shadow.</span></Card>
+        <Card Tone="CardTone.Highlight" Eyebrow="You on this phone" Title="Highlight"><span>Orange border.</span></Card>
+        <Card Tone="CardTone.Tint" Title="Tint"><span>Soft orange hint.</span></Card>
+        <Card Tone="CardTone.Dark" Title="Dark"><span>Is <strong>Sally</strong> you?</span></Card>
+    </div>
+
+    <h2 class="bm-section-title">Buttons</h2>
+    <Card>
+        <div class="bm-sheet-label">Primary: the one main action (normal, with icon, disabled, large)</div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <PrimaryButton>Save my picks</PrimaryButton>
+            <PrimaryButton Icon="@Icons.Material.Filled.Save">Save and start next entry</PrimaryButton>
+            <PrimaryButton Disabled="true">Save my picks</PrimaryButton>
+            <PrimaryButton Large="true">Large</PrimaryButton>
+        </div>
+        <div class="bm-sheet-label">Secondary: any other action (normal, with icon, icon only, disabled)</div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <SecondaryButton>Cancel</SecondaryButton>
+            <SecondaryButton Icon="@Icons.Material.Outlined.Print">Print</SecondaryButton>
+            <SecondaryButton Icon="@Icons.Material.Outlined.Print" IconOnly="true">Print the leaderboard</SecondaryButton>
+            <SecondaryButton Disabled="true">Not now</SecondaryButton>
+        </div>
+        <div class="bm-sheet-label">Full width (phone forms)</div>
+        <PrimaryButton FullWidth="true" Large="true">Save my picks</PrimaryButton>
+    </Card>
+
+    <h2 class="bm-section-title">Notices</h2>
+    <div style="display: flex; flex-direction: column; gap: 8px">
+        <Notice Tone="NoticeTone.Info" Title="Information">Scores update every minute while games are on.</Notice>
+        <Notice Tone="NoticeTone.Tip" Title="Tip">Tap your name and this phone will keep you at the top.</Notice>
+        <Notice Tone="NoticeTone.Success" Title="Saved">Your picks are saved. You can change them until the lock time.</Notice>
+        <Notice Tone="NoticeTone.Warning" Title="Heads up">Changing this pick clears your later picks that depended on it.</Notice>
+        <Notice Tone="NoticeTone.Error" Title="Could not save">Your picks were not saved. Check your connection and try again.</Notice>
+    </div>
+
+    <h2 class="bm-section-title">Team pick buttons</h2>
+    <Card>
+        <div class="bm-sheet-label">Normal, selected, disabled (team not decided), error (missing pick)</div>
+        <div class="bm-sheet-grid">
+            <TeamPickButton Name="Mississippi State" Team="@Sample("MSST", "Mississippi State", "660000")" />
+            <TeamPickButton Name="Wake Forest" Team="@Sample("WAKE", "Wake Forest", "9E7E38")" State="PickButtonState.Selected" />
+            <TeamPickButton Name="Winner of Rose Bowl" ShowLogo="true" State="PickButtonState.Disabled" />
+            <TeamPickButton Name="Arizona" Team="@Sample("ARIZ", "Arizona", "CC0033")" State="PickButtonState.Error" />
+        </div>
+        <div class="bm-sheet-label">With AP rank and seed. Final game: right pick, wrong pick</div>
+        <div class="bm-sheet-grid">
+            <TeamPickButton Name="Texas" ApRank="13" Team="@Sample("TEX", "Texas", "BF5700")" />
+            <TeamPickButton Name="Utah" ApRank="15" Seed="10" Team="@Sample("UTAH", "Utah", "CC0000")" State="PickButtonState.Selected" />
+            <TeamPickButton Name="Georgia" ApRank="2" Seed="2" Team="@Sample("UGA", "Georgia", "BA0C2F")" State="PickButtonState.Correct" />
+            <TeamPickButton Name="Nebraska" Team="@Sample("NEB", "Nebraska", "E41C38")" State="PickButtonState.Wrong" />
+        </div>
+    </Card>
+
+    <h2 class="bm-section-title">Table (rows, header, badge, states)</h2>
+    <DataTable Label="Sample table">
+        <TableHeader Columns="44px minmax(0, 1fr) 64px 52px" ColumnsWide="56px minmax(160px, 1.6fr) 80px 64px 104px">
+            <TableHeaderCell Text="#" />
+            <TableHeaderCell Text="Name" />
+            <TableHeaderCell Text="Points" End="true" OnSort="@(() => Task.CompletedTask)" SortActive="true" />
+            <TableHeaderCell Text="Max" End="true" Hint="Maximum possible score" />
+            <TableHeaderCell Text="Tiebreaker" End="true" HidePhone="true" />
+        </TableHeader>
+        <TableRow Columns="44px minmax(0, 1fr) 64px 52px" ColumnsWide="56px minmax(160px, 1.6fr) 80px 64px 104px" Href="admin/components">
+            <TableCell Kind="CellKind.Rank">1</TableCell>
+            <TableCell Kind="CellKind.Name"><span>Grandma Jo (a link)</span></TableCell>
+            <TableCell Kind="CellKind.Points">14</TableCell>
+            <TableCell Kind="CellKind.Muted" End="true">40</TableCell>
+            <TableCell Kind="CellKind.Muted" End="true" HidePhone="true">48 pts</TableCell>
+        </TableRow>
+        <TableRow Columns="44px minmax(0, 1fr) 64px 52px" ColumnsWide="56px minmax(160px, 1.6fr) 80px 64px 104px" State="RowState.Selected" Href="admin/components">
+            <TableCell Kind="CellKind.Rank">3</TableCell>
+            <TableCell Kind="CellKind.Name"><span>Sally (selected: you)</span></TableCell>
+            <TableCell Kind="CellKind.Points">13</TableCell>
+            <TableCell Kind="CellKind.Muted" End="true">38</TableCell>
+            <TableCell Kind="CellKind.Muted" End="true" HidePhone="true">44 pts</TableCell>
+        </TableRow>
+        <TableRow Columns="44px minmax(0, 1fr) 64px 52px" ColumnsWide="56px minmax(160px, 1.6fr) 80px 64px 104px" State="RowState.Pending" OnClick="@(() => Task.CompletedTask)">
+            <TableCell Kind="CellKind.Rank">5</TableCell>
+            <TableCell Kind="CellKind.Name"><span>Dad's Picks (pending)</span></TableCell>
+            <TableCell Kind="CellKind.Points">11</TableCell>
+            <TableCell Kind="CellKind.Muted" End="true">37</TableCell>
+            <TableCell Kind="CellKind.Muted" End="true" HidePhone="true">50 pts</TableCell>
+        </TableRow>
+        <TableRow Columns="44px minmax(0, 1fr) 64px 52px" ColumnsWide="56px minmax(160px, 1.6fr) 80px 64px 104px">
+            <TableCell Kind="CellKind.Rank">10</TableCell>
+            <TableCell Kind="CellKind.Name"><span>Aunt Pat</span><Badge>out</Badge></TableCell>
+            <TableCell Kind="CellKind.Points">8</TableCell>
+            <TableCell Kind="CellKind.Muted" End="true">26</TableCell>
+            <TableCell Kind="CellKind.Muted" End="true" HidePhone="true">45 pts</TableCell>
+        </TableRow>
+        <TableRow Columns="44px minmax(0, 1fr) 64px 52px" ColumnsWide="56px minmax(160px, 1.6fr) 80px 64px 104px" State="RowState.Disabled">
+            <TableCell Kind="CellKind.Rank">11</TableCell>
+            <TableCell Kind="CellKind.Name"><span>The Intern (disabled)</span></TableCell>
+            <TableCell Kind="CellKind.Points">7</TableCell>
+            <TableCell Kind="CellKind.Muted" End="true">24</TableCell>
+            <TableCell Kind="CellKind.Muted" End="true" HidePhone="true">70 pts</TableCell>
+        </TableRow>
+    </DataTable>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+        <span class="bm-note">Badges:</span>
+        <Badge>out</Badge><Badge Tone="BadgeTone.Live">LIVE</Badge><Badge Tone="BadgeTone.Good">paid</Badge><Badge Tone="BadgeTone.Alert">unpaid</Badge>
+    </div>
+
+    <h2 class="bm-section-title">Empty and loading states</h2>
+    <div class="bm-sheet-stack">
+        <Card Tone="CardTone.Outlined">
+            <EmptyState Title="No entries yet" Icon="@Icons.Material.Outlined.EmojiEvents">
+                <ChildContent>No entries found for <strong>Family Pool</strong>.</ChildContent>
+                <Action><SecondaryButton Href="mypicks">Make your picks</SecondaryButton></Action>
+            </EmptyState>
+        </Card>
+        <Card Tone="CardTone.Outlined">
+            <LoadingIndicator Text="Loading the standings..." />
+        </Card>
+    </div>
+
+    <h2 class="bm-section-title">Bottom navigation (phones) and header</h2>
+    <Notice Tone="NoticeTone.Info">The real header and bottom bar are on every page of this site. Below 900 px wide the four tabs appear at the bottom; at 900 px and wider they move to the top bar.</Notice>
+    <Card Tone="CardTone.Outlined">
+        <div style="position: relative; height: 70px; overflow: hidden; border-radius: 8px; border: 1px solid var(--bm-line)">
+            <div class="bm-bottomnav" style="display: grid; position: absolute">
+                @foreach (var item in SiteNavigation.Tabs(Sport.Football))
+                {
+                    <a href="javascript:void(0)" class="@(item.Key == "scores" ? "active" : null)">
+                        <MudIcon Icon="@NavIcons.For(item.Key)" Style="font-size: 26px" />
+                        @item.Label
+                    </a>
+                }
+            </div>
+        </div>
+        <div class="bm-note">Sample: Scores is the current tab (orange). A red dot appears on Scores while a game is live.</div>
+    </Card>
+</PageContainer>
+
+@code {
+    private static TeamInfo Sample(string abbreviation, string name, string color) =>
+        new() { Abbreviation = abbreviation, School = name, Color = color };
+}

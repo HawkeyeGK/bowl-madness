@@ -1,0 +1,11 @@
+<div role="row" class="bm-grid-row bm-grid-head" style="--bm-cols: @Columns; --bm-cols-wide: @(ColumnsWide ?? Columns)">
+    @ChildContent
+</div>
+
+@code {
+    /// <summary>CSS grid columns on a phone, for example <c>44px 1fr 64px 52px</c>. Use the same value in every row.</summary>
+    [Parameter, EditorRequired] public string Columns { get; set; } = "";
+    /// <summary>CSS grid columns at 900 px and wider. Cells marked <c>HidePhone</c> are the extra ones.</summary>
+    [Parameter] public string? ColumnsWide { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}
