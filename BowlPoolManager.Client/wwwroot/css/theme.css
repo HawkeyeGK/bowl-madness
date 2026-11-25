@@ -63,6 +63,12 @@ a:hover { color: var(--bm-orange); }
 .bm-menu-button { min-width: 48px; min-height: 48px; border-radius: 8px; border: 1px solid rgba(255,255,255,.55); background: transparent; color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .bm-menu-button:hover { background: rgba(255,255,255,.12); }
 
+/* One page-width rule: every page is as wide as the header and centered. MainLayout adds bm-article--wide
+   for big grids (What If, admin), which then use the full screen. */
+.bm-article { width: 100%; max-width: 1240px; margin-left: auto; margin-right: auto; }
+.bm-article--wide { max-width: none; }
+/* In full-width mode the What If matrix is centered when it is narrower than the screen, and scrolls when it is wider. */
+@media screen { .bm-article--wide .matrix-container { width: fit-content; max-width: 100%; margin-left: auto; margin-right: auto; scrollbar-gutter: stable; } }
 .bm-main { flex: 1; min-width: 0; padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
 
 /* Bottom bar (phones) */
@@ -109,4 +115,5 @@ a:hover { color: var(--bm-orange); }
 @media print {
     .bm-header, .bm-bottomnav, .bm-pooltabs { display: none !important; }
     .bm-main { padding-bottom: 0 !important; }
+    .bm-article { max-width: none !important; }
 }

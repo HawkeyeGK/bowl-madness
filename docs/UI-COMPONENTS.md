@@ -25,6 +25,14 @@ Where things live:
 - Icons are MudBlazor icons (`Icons.Material.Outlined.*`), not Bootstrap Icons. Bootstrap stays only on pages that have not been moved yet.
 - Do not call MudBlazor components directly for something a shared component already does.
 
+## Page width: one rule for the whole site
+Every page is as wide as the header (1240 px) and centered, so moving between pages never jumps. This includes the old pages that still use `container-fluid` (Scores, My Picks, Entry details, History, the hoops pages): `MainLayout` caps the page area, so they need no change. Only big grids get the full screen: What If (football and hoops) and every page under `/admin`. In full-width mode the football What If matrix is centered when it is narrower than the screen and scrolls inside its box when it is wider. The hoops What If (a leaderboard beside a bracket) simply fills the width.
+
+- The rule lives in one place: `PageWidth.IsWide(path)` in Core (xUnit tests in `Tests/Core/PageWidthTests.cs`) decides, `MainLayout` adds the class `bm-article--wide`, and `theme.css` does the sizing. A page does not set its own page width.
+- To make another page full width, add its address to `PageWidth.IsWide` and its test. Do not add `max-width` or `container-fluid` tricks to the page.
+- `PageContainer` (`.bm-page`, 1240 px) and the layout cap agree, so new pages and old pages line up.
+- Phone view and printing are not affected: the cap only applies above 1240 px, and printing removes it.
+
 ## The page frame (nothing to do in a page)
 `MainLayout` draws the navy header (site name, the main links on wide screens, sign-in or "Hello, name / Log out", the phone menu), the bottom navigation on phones, and the page background. The links come from `SiteNavigation` (Core): one list per site, football and hoops. Hoops pages use the same frame; their content is not restyled yet. The last tab says "Enter Picks" instead of "My Picks" while the player has no entry (or is signed out); `MainLayout` checks `GetMyEntries` / `GetMyHoopsEntries` and re-checks when a picks page raises `AppState.OnChange`.
 
