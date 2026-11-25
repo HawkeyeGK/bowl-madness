@@ -67,8 +67,6 @@ a:hover { color: var(--bm-orange); }
    for big grids (What If, admin), which then use the full screen. */
 .bm-article { width: 100%; max-width: 1240px; margin-left: auto; margin-right: auto; }
 .bm-article--wide { max-width: none; }
-/* In full-width mode the What If matrix is centered when it is narrower than the screen, and scrolls when it is wider. */
-@media screen { .bm-article--wide .matrix-container { width: fit-content; max-width: 100%; margin-left: auto; margin-right: auto; scrollbar-gutter: stable; } }
 .bm-main { flex: 1; min-width: 0; padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
 
 /* Bottom bar (phones) */
