@@ -3,6 +3,8 @@
 @using BowlPoolManager.Core.Domain
 @using Microsoft.AspNetCore.Components.Authorization
 @using MudBlazor
+@using Microsoft.AspNetCore.Components.Routing
+@using BowlPoolManager.Core.Helpers
 @using BowlPoolManager.Client.Theme
 @inject AuthenticationStateProvider AuthStateProvider
 @inject HttpClient Http
@@ -19,7 +21,8 @@
     <AppHeader Sport="SiteContext.ActiveSport" NeedsPicks="needsPicks" />
 
     <main class="bm-main">
-        <article>
+        @* One width rule for the whole site (see PageWidth in Core): header width everywhere, full width only for big grids. *@
+        <article class="@(isWidePage ? "bm-article bm-article--wide" : "bm-article")">
             @Body
         </article>
     </main>
@@ -41,9 +44,14 @@
     private readonly HashSet<string> liveKeys = new();
     // True when the player has no entry yet (or is signed out): the picks tab then says "Enter Picks".
     private bool needsPicks;
+    private bool isWidePage;
 
     protected override async Task OnInitializedAsync()
     {
+        // Width first, before any await, so the first render already has the right width (no jump on a direct load).
+        isWidePage = PageWidth.IsWide(Nav.ToBaseRelativePath(Nav.Uri));
+        Nav.LocationChanged += OnLocationChanged;
+
         await SiteContext.InitializeAsync();
         SiteContext.OnChange += OnSiteContextChanged;
         AppState.OnChange += OnAppStateChanged;
@@ -51,6 +59,12 @@
         await CheckDisabledAccountAsync();
         await CheckLiveStatusAsync();
         await UpdateNeedsPicksAsync();
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        isWidePage = PageWidth.IsWide(Nav.ToBaseRelativePath(e.Location));
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private void OnSiteContextChanged() => _ = InvokeAsync(async () =>
@@ -157,5 +171,6 @@
     {
         SiteContext.OnChange -= OnSiteContextChanged;
         AppState.OnChange -= OnAppStateChanged;
+        Nav.LocationChanged -= OnLocationChanged;
     }
 }
