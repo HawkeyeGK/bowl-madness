@@ -35,8 +35,13 @@
         border-collapse: separate; 
         border-spacing: 0;
         table-layout: fixed; /* Force fixed layout */
-        width: auto; /* Let it grow manually based on columns */
+        width: 100%; /* Fill the page; the game columns share the extra space */
         margin-bottom: 0;
+    }
+    /* Never narrower than the natural size (name column + 70px per game): a narrow screen scrolls sideways.
+       Screen only; printing sizes the table itself. */
+    @@media screen {
+        .matrix-table { min-width: var(--matrix-min-width, 0); }
     }
 
     /* 3. COLUMNS */
@@ -44,12 +49,16 @@
     .matrix-table td {
         vertical-align: middle;
         text-align: center;
-        width: 70px;      /* FIXED WIDTH */
+        width: auto;      /* game columns share the width equally (the name column below is fixed) */
         min-width: 70px;
-        max-width: 70px;
         padding: 4px;
         overflow: hidden;
     }
+
+    /* The on-screen "Printer Friendly View" tables stay compact (fixed 70px columns), not stretched. */
+    .matrix-table.custom-print-table { width: auto; }
+    .matrix-table.custom-print-table th,
+    .matrix-table.custom-print-table td { width: 70px; min-width: 70px; max-width: 70px; }
 
     /* 4. STICKY HEADERS (Top Row) */
     .matrix-table th {
@@ -308,7 +317,7 @@
     else
     {
         <div class="matrix-container shadow-sm">
-            <table class="table mb-0 matrix-table table-bordered">
+            <table class="table mb-0 matrix-table table-bordered" style="--matrix-min-width: @(180 + games.Count * 70)px">
                 <thead>
                     <tr>
                         <th class="sticky-col-header">
