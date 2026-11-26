@@ -38,6 +38,16 @@
             <span class="bm-only-wide">
                 <SecondaryButton Href="@StandingsPrintHref" Icon="@Icons.Material.Outlined.FormatListNumbered">Print standings</SecondaryButton>
             </span>
+            @* Group D's page; shown only after lock (the page and the server also refuse before lock). *@
+            @if (currentPool != null && !picksHidden)
+            {
+                <span class="bm-only-phone">
+                    <SecondaryButton Href="@AllPicksPrintHref" Icon="@Icons.Material.Outlined.GridOn" IconOnly="true">Print all picks</SecondaryButton>
+                </span>
+                <span class="bm-only-wide">
+                    <SecondaryButton Href="@AllPicksPrintHref" Icon="@Icons.Material.Outlined.GridOn">Print all picks</SecondaryButton>
+                </span>
+            }
             <span class="bm-only-phone">
                 <SecondaryButton Href="print-bracket" Icon="@Icons.Material.Outlined.Print" IconOnly="true">Print blank form</SecondaryButton>
             </span>
@@ -409,6 +419,8 @@
     }
 
     private string StandingsPrintHref => currentPool == null ? "print-standings" : $"print-standings?poolId={Uri.EscapeDataString(currentPool.Id)}";
+
+    private string AllPicksPrintHref => $"print-all-picks?poolId={Uri.EscapeDataString(currentPool?.Id ?? "")}";
 
     // ---- Find my entry ----
     private List<BracketEntry> myEntries = new();
