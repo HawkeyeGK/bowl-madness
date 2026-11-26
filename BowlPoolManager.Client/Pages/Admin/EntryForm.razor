@@ -20,7 +20,8 @@
 @*
     Release 2 group C: the admin entry screen and fast paper entry (prototype 4).
     Games are listed in the same order as the printed blank form (GameOrder in Core). The keyer types one digit per
-    game while reading down the paper: 1 = the team listed first (away), 2 = the team listed second (home), 0 = blank.
+    game while reading down the paper: 1 = the team on the form's first line, 2 = the second line, 0 = blank. A regular
+    bowl lists the away team first and a playoff game its home team (BlankFormSlots.HomeOnTop).
     Clicking a team in a row sets or fixes that one game. FastEntry in Core turns the digits into picks; this page only
     draws it. Every save goes through CreateEntry, which checks the caller first and requires an owner for entries an
     Admin keys (an account, or a typed name for someone who never signs in).
@@ -187,8 +188,14 @@
                                 var game = orderedGames[i];
                                 var slots = matchups[game.Id];
                                 string? pick = entry.Picks != null && entry.Picks.TryGetValue(game.Id, out var p) ? p : null;
-                                <TableRow Columns="@PhoneColumns" ColumnsWide="@WideColumns" State="@(i == nextIndex ? RowState.Selected : RowState.Normal)">
-                                    <TableCell Kind="CellKind.Muted">@(i + 1)</TableCell>
+                                // The columns follow the printed form's lines (home on top for a playoff game), so 1 and 2 match the paper.
+                                var homeOnTop = BlankFormSlots.HomeOnTop(game);
+                                var (firstTeam, secondTeam) = FastEntry.Lines(game, slots);
+                                var (firstLabel, secondLabel) = FastEntry.LineLabels(game, slots);
+                                var firstSeed = homeOnTop ? SeedOf(slots.Home, game.TeamHome, game.TeamHomeSeed) : SeedOf(slots.Away, game.TeamAway, game.TeamAwaySeed);
+                                var secondSeed = homeOnTop ? SeedOf(slots.Away, game.TeamAway, game.TeamAwaySeed) : SeedOf(slots.Home, game.TeamHome, game.TeamHomeSeed);
+                                <TableRow Columns="@PhoneColumns" ColumnsWide="@WideColumns" State="@(index == nextIndex ? RowState.Selected : RowState.Normal)">
+                                    <TableCell Kind="CellKind.Muted">@(index + 1)</TableCell>
                                     <TableCell>
                                         <div>@game.BowlName <span class="bm-note">· @game.PointValue @(game.PointValue == 1 ? "pt" : "pts")</span></div>
                                         @if (missing.Contains(game.Id))
@@ -199,23 +206,23 @@
                                         {
                                             <Badge Tone="BadgeTone.Alert">Team not known</Badge>
                                         }
-                                        @if (!string.IsNullOrEmpty(pick) && !IsPick(slots.Away, pick) && !IsPick(slots.Home, pick))
+                                        @if (!string.IsNullOrEmpty(pick) && !IsPick(firstTeam, pick) && !IsPick(secondTeam, pick))
                                         {
                                             <div class="bm-note">Saved pick: @pick</div>
                                         }
                                     </TableCell>
                                     <TableCell>
-                                        <CompactPickButton Name="@slots.AwayLabel" Team="@TeamInfoOf(slots.AwayLabel, game)"
-                                                           Seed="@SeedOf(slots.Away, game.TeamAway, game.TeamAwaySeed)"
-                                                           Selected="@IsPick(slots.Away, pick)" Disabled="@(slots.Away == null)"
-                                                           AriaLabel="@($"{game.BowlName}: {slots.AwayLabel}")"
+                                        <CompactPickButton Name="@firstLabel" Team="@TeamInfoOf(firstLabel, game)"
+                                                           Seed="@firstSeed"
+                                                           Selected="@IsPick(firstTeam, pick)" Disabled="@(firstTeam == null)"
+                                                           AriaLabel="@($"{game.BowlName}: {firstLabel}")"
                                                            OnClick="@(() => SetDigit(index, '1'))" />
                                     </TableCell>
                                     <TableCell>
-                                        <CompactPickButton Name="@slots.HomeLabel" Team="@TeamInfoOf(slots.HomeLabel, game)"
-                                                           Seed="@SeedOf(slots.Home, game.TeamHome, game.TeamHomeSeed)"
-                                                           Selected="@IsPick(slots.Home, pick)" Disabled="@(slots.Home == null)"
-                                                           AriaLabel="@($"{game.BowlName}: {slots.HomeLabel}")"
+                                        <CompactPickButton Name="@secondLabel" Team="@TeamInfoOf(secondLabel, game)"
+                                                           Seed="@secondSeed"
+                                                           Selected="@IsPick(secondTeam, pick)" Disabled="@(secondTeam == null)"
+                                                           AriaLabel="@($"{game.BowlName}: {secondLabel}")"
                                                            OnClick="@(() => SetDigit(index, '2'))" />
                                     </TableCell>
                                 </TableRow>

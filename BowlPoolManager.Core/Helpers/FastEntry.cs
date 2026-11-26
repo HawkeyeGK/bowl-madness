@@ -13,8 +13,9 @@ namespace BowlPoolManager.Core.Helpers
 
     /// <summary>
     /// Fast paper entry (prototype 4, owner decision 2026-11-25): the keyer types one digit per game, reading down the
-    /// printed form, in the order of <see cref="GameOrder"/>. 1 picks the team listed first (the away team), 2 the
-    /// team listed second (the home team), 0 leaves the game blank ("-" and space count as 0). A playoff team is only
+    /// printed form, in the order of <see cref="GameOrder"/>. 1 picks the team on the form's first line, 2 the team on
+    /// its second line, 0 leaves the game blank ("-" and space count as 0). A regular bowl lists the away team first; a
+    /// playoff game lists its home team first (<see cref="BlankFormSlots.HomeOnTop"/>). A playoff team is only
     /// picked when the entry's own picks lead to it (<see cref="EntryPickRules"/>), the same rule the server applies.
     /// </summary>
     public static class FastEntry
@@ -49,7 +50,8 @@ namespace BowlPoolManager.Core.Helpers
                     if (sequence[i] == '0' || keyed.Contains(game.Id)) continue;
 
                     var matchup = EntryPickRules.Resolve(allGames, picks)[game.Id];
-                    var team = sequence[i] == '1' ? matchup.Away : matchup.Home;
+                    var (first, second) = Lines(game, matchup);
+                    var team = sequence[i] == '1' ? first : second;
                     if (team == null) continue;
 
                     picks[game.Id] = team;
@@ -143,13 +145,22 @@ namespace BowlPoolManager.Core.Helpers
             var digits = ordered.Select(g =>
             {
                 if (!picks.TryGetValue(g.Id, out var pick) || !matchups.TryGetValue(g.Id, out var m)) return '0';
-                if (m.Away != null && string.Equals(m.Away, pick, StringComparison.OrdinalIgnoreCase)) return '1';
-                if (m.Home != null && string.Equals(m.Home, pick, StringComparison.OrdinalIgnoreCase)) return '2';
+                var (first, second) = Lines(g, m);
+                if (first != null && string.Equals(first, pick, StringComparison.OrdinalIgnoreCase)) return '1';
+                if (second != null && string.Equals(second, pick, StringComparison.OrdinalIgnoreCase)) return '2';
                 return '0';
             }).ToArray();
 
             return new string(digits).TrimEnd('0');
         }
+
+        /// <summary>The game's teams in the order the printed form lists them: digit 1 is First, digit 2 is Second.</summary>
+        public static (string? First, string? Second) Lines(BowlGame game, Matchup matchup) =>
+            BlankFormSlots.HomeOnTop(game) ? (matchup.Home, matchup.Away) : (matchup.Away, matchup.Home);
+
+        /// <summary>The game's team labels in the order the printed form lists them.</summary>
+        public static (string First, string Second) LineLabels(BowlGame game, Matchup matchup) =>
+            BlankFormSlots.HomeOnTop(game) ? (matchup.HomeLabel, matchup.AwayLabel) : (matchup.AwayLabel, matchup.HomeLabel);
 
         /// <summary>The sequence with one game's digit set (a team clicked in a row), padded with 0 when needed.</summary>
         public static string WithDigit(string? sequence, int index, char digit)
