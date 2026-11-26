@@ -1,0 +1,36 @@
+/* Standings print (prototype PrintStandings): letter landscape, black and white, one page. */
+.st-loading { padding: 2rem; text-align: center; font-size: 1.1rem; }
+.st-toolbar { display: flex; gap: .75rem; justify-content: center; align-items: center; flex-wrap: wrap; margin: 0 0 .75rem; }
+.st-select { min-height: 48px; font-size: 1rem; padding: 0 .75rem; }
+
+.st-sheet { width: 10.5in; height: 8in; margin: 0 auto; background: #fff; color: #000; font-family: var(--bm-font-body, Arial, sans-serif);
+            display: flex; flex-direction: column; gap: .12in; overflow: hidden; border: 1px solid #ccc; box-sizing: border-box; padding: .1in .2in; }
+.st-head { border-bottom: 3px solid #000; padding-bottom: 6px; display: flex; justify-content: space-between; align-items: flex-end; gap: .2in; }
+.st-head h1 { margin: 0; font-family: var(--bm-font-head, 'Arial Narrow', sans-serif); font-size: 34px; font-weight: 700; line-height: 1; text-transform: uppercase; }
+.st-head .sub { font-size: 15px; margin-top: 4px; }
+.st-head .site { font-size: 15px; white-space: nowrap; }
+
+.st-blocks { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(var(--blocks), minmax(0, 1fr)); gap: .3in; align-items: start; }
+.st-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
+.st-table th { text-align: left; border-bottom: 2px solid #000; padding: 3px 4px; font-size: 13px; }
+.st-table td { border-bottom: 1px solid #bbb; padding: 2px 4px; height: 16px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-table tr.band td { background: #ededed; }
+.st-table .rank { width: 2.6em; font-weight: 700; }
+.st-table .num { text-align: right; width: 4.4em; }
+.st-table .strong { font-weight: 700; }
+/* Long pools (three or more blocks): smaller type and narrower number columns leave the names room. */
+.st-blocks.compact { gap: .2in; }
+.st-blocks.compact .st-table { font-size: 11px; }
+.st-blocks.compact .st-table th { font-size: 10px; padding: 2px 3px; }
+.st-blocks.compact .st-table td { padding: 1px 3px; height: 12px; line-height: 1.1; }
+.st-blocks.compact .st-table .rank { width: 2.2em; }
+.st-blocks.compact .st-table .num { width: 3.4em; }
+.st-foot { font-size: 11px; border-top: 1px solid #000; padding-top: 3px; }
+
+@media print {
+    @page { size: letter landscape; margin: .25in; }
+    .st-toolbar { display: none !important; }
+    .st-sheet { border: 0; margin: 0; }
+    /* Keep the shaded bands when the browser would drop backgrounds. */
+    .st-table tr.band td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

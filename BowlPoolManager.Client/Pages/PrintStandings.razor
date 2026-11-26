@@ -1,0 +1,153 @@
+@page "/print-standings"
+@layout BowlPoolManager.Client.Layout.PrintLayout
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core.Dtos
+@using BowlPoolManager.Core.Helpers
+@using BowlPoolManager.Client.Services
+@using MudBlazor
+@using BowlPoolManager.Client.Ui
+@inject ISeasonService SeasonService
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@inject PoolSelection PoolSelection
+
+<PageTitle>Print Standings</PageTitle>
+
+@*
+    The standings print (Release 2 group D, prototype PrintStandings): one landscape letter page, black and white.
+    How the rows are split across the page is decided in Core (StandingsPrintLayout).
+*@
+
+@if (!loaded)
+{
+    <div class="st-loading">Loading the standings...</div>
+}
+else if (currentPool == null)
+{
+    <div class="st-loading">There is no open pool to print yet.</div>
+}
+else
+{
+    <div class="st-toolbar no-print">
+        @if (pools.Count > 1)
+        {
+            <select class="st-select" aria-label="Pool" @onchange="OnPoolChanged">
+                @foreach (var pool in pools)
+                {
+                    <option value="@pool.Id" selected="@(pool.Id == currentPool.Id)">@pool.Name</option>
+                }
+            </select>
+        }
+        <PrimaryButton Icon="@Icons.Material.Filled.Print" OnClick="PrintPage">Print (landscape letter)</PrimaryButton>
+        <SecondaryButton Href="/">Back to the Leaderboard</SecondaryButton>
+    </div>
+
+    <div class="st-sheet">
+        <header class="st-head">
+            <div>
+                <h1>@PrintFormText.Title("BOWL MADNESS", currentPool, season) &middot; @currentPool.Name</h1>
+                <div class="sub">Leaderboard as of @StatusTime &middot; @totalFinalGames of @poolGameCount games final</div>
+            </div>
+            <div class="site">bowl-madness.com</div>
+        </header>
+
+        <div class="st-blocks @(standings.Compact ? "compact" : "")" style="--blocks: @standings.Blocks.Count">
+            @foreach (var block in standings.Blocks)
+            {
+                <table class="st-table">
+                    <thead>
+                        <tr>
+                            <th class="rank">#</th>
+                            <th class="name">Name</th>
+                            <th class="num">Points</th>
+                            <th class="num">Max</th>
+                            <th class="num">Correct</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < block.Count; i++)
+                        {
+                            var row = block[i];
+                            @* A shaded band every three rows helps eyes follow across. *@
+                            <tr class="@(i / 3 % 2 == 1 ? "band" : "")">
+                                <td class="rank">@row.Rank</td>
+                                <td class="name">@row.PlayerName</td>
+                                <td class="num strong">@row.Score</td>
+                                <td class="num">@row.MaxPossible</td>
+                                <td class="num">@row.CorrectPicks/@totalFinalGames</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+
+        <footer class="st-foot">
+            Max = the most points still possible. Ties are broken by Max, then the pool's tiebreakers, then name.
+        </footer>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "poolId")] public string? QueryPoolId { get; set; }
+
+    private class LeaderboardResponse
+    {
+        public int TotalFinalGames { get; set; }
+        public List<LeaderboardDto>? Leaderboard { get; set; }
+    }
+
+    private bool loaded;
+    private List<BowlPool> pools = new();
+    private List<BowlGame> seasonGames = new();
+    private BowlPool? currentPool;
+    private Season? season;
+    private int totalFinalGames;
+    private int poolGameCount;
+    private DateTime lastUpdate = DateTime.MinValue;
+    private StandingsPrintLayout<LeaderboardDto> standings = StandingsPrintLayout.Split<LeaderboardDto>(new List<LeaderboardDto>());
+
+    private string StatusTime => DateTimeHelper.ToCentralLabel(lastUpdate == DateTime.MinValue ? DateTime.UtcNow : lastUpdate, "ddd, MMM d, h:mm tt");
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            season = await SeasonService.GetCurrentSeasonAsync();
+            var seasonId = season?.Id ?? "";
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={seasonId}");
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={seasonId}");
+            await Task.WhenAll(poolsTask, gamesTask);
+            pools = (await poolsTask ?? new()).Where(p => !p.IsArchived).ToList();
+            seasonGames = await gamesTask ?? new();
+
+            var chosenId = PoolPicker.Pick(pools.Select(p => p.Id).ToList(), QueryPoolId,
+                string.IsNullOrEmpty(QueryPoolId) ? await PoolSelection.GetSavedIdAsync() : null, null);
+            currentPool = pools.FirstOrDefault(p => p.Id == chosenId) ?? pools.FirstOrDefault();
+
+            try { lastUpdate = await Http.GetFromJsonAsync<DateTime>("api/GetLastScoreUpdate"); } catch { /* optional */ }
+            await LoadStandings();
+        }
+        catch (Exception ex) { Console.WriteLine(ex.Message); }
+        loaded = true;
+    }
+
+    private async Task OnPoolChanged(ChangeEventArgs e)
+    {
+        currentPool = pools.FirstOrDefault(p => p.Id == e.Value?.ToString());
+        if (currentPool != null) await LoadStandings();
+    }
+
+    private async Task LoadStandings()
+    {
+        if (currentPool == null) return;
+        poolGameCount = PoolGames.Of(currentPool, seasonGames).Count;
+        var response = await Http.GetFromJsonAsync<LeaderboardResponse>(
+            $"api/GetLeaderboard?poolId={currentPool.Id}&seasonId={season?.Id ?? ""}");
+        totalFinalGames = response?.TotalFinalGames ?? 0;
+        var rows = (response?.Leaderboard ?? new()).OrderBy(r => r.Rank).ThenBy(r => r.PlayerName).ToList();
+        standings = StandingsPrintLayout.Split<LeaderboardDto>(rows);
+    }
+
+    private Task PrintPage() => JSRuntime.InvokeVoidAsync("window.print").AsTask();
+}
