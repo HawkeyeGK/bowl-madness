@@ -61,18 +61,44 @@ namespace BowlPoolManager.Core.Validation
         }
 
         /// <summary>
+        /// Every entry an Admin keys for someone names its owner: an account, or the person's name when they have no
+        /// account (Release 2 group C, owner decision 2026-11-25). A player's own save, and an Admin saving with
+        /// assignToMe, belong to the caller and need nothing here.
+        /// </summary>
+        public static ValidationResult ValidateOwner(BracketEntry submitted, bool isAdmin, bool assignToMe)
+        {
+            if (!isAdmin || assignToMe) return ValidationResult.Success();
+
+            var ownerName = (submitted.OwnerName ?? string.Empty).Trim();
+            if (ownerName.Length > MaxNameLength)
+                return ValidationResult.Fail($"The owner's name must be {MaxNameLength} characters or fewer.");
+
+            if (string.IsNullOrWhiteSpace(submitted.UserId) && ownerName.Length == 0)
+                return ValidationResult.Fail("Say who this entry belongs to: choose their account, or type their name.");
+
+            return ValidationResult.Success();
+        }
+
+        /// <summary>
         /// Builds the entry to store. The audit log is left for the caller to fill in.
         /// An Admin keeps the owner they chose (an Admin may enter or reassign an entry for someone), unless
         /// assignToMe is set; a player's save is always recorded as theirs. IsAdminEntered is set on a new entry
         /// that an Admin creates for another user (issue 161); an existing entry keeps its stored value.
+        /// An Admin who types an owner's name without choosing an account leaves the entry with no account
+        /// (<see cref="BracketEntry.OwnerName"/> holds the name); choosing an account drops the typed name.
         /// </summary>
         public static BracketEntry Build(BracketEntry submitted, BracketEntry? existing, string poolId, string seasonId,
             string documentType, string callerUserId, bool isAdmin, bool assignToMe)
         {
             string userId;
-            if (!isAdmin || assignToMe) userId = callerUserId;
-            else if (!string.IsNullOrEmpty(submitted.UserId)) userId = submitted.UserId;
-            else userId = existing?.UserId ?? callerUserId;
+            string? ownerName;
+            // Only football entries take a typed owner for now; hoops keeps its Phase 1.1 owner rules.
+            var typedOwner = documentType == Constants.DocumentTypes.BracketEntry ? (submitted.OwnerName ?? string.Empty).Trim() : string.Empty;
+            if (!isAdmin) { userId = callerUserId; ownerName = existing?.OwnerName; }
+            else if (assignToMe) { userId = callerUserId; ownerName = null; }
+            else if (!string.IsNullOrWhiteSpace(submitted.UserId)) { userId = submitted.UserId.Trim(); ownerName = null; }
+            else if (typedOwner.Length > 0) { userId = string.Empty; ownerName = typedOwner; }
+            else { userId = existing?.UserId ?? callerUserId; ownerName = existing?.OwnerName; }
 
             return new BracketEntry
             {
@@ -81,6 +107,7 @@ namespace BowlPoolManager.Core.Validation
                 SeasonId = seasonId,
                 PoolId = poolId,
                 UserId = userId,
+                OwnerName = ownerName,
                 PlayerName = (submitted.PlayerName ?? string.Empty).Trim(),
                 Picks = new Dictionary<string, string>(submitted.Picks ?? new Dictionary<string, string>()),
                 TieBreakerPoints = submitted.TieBreakerPoints,

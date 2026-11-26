@@ -230,6 +230,51 @@ namespace BowlPoolManager.Tests.Api
             f.Saved!.IsPaid.Should().BeFalse("payment changes only through SetEntryPaidStatus");
         }
 
+        // ── Release 2 group C: an admin-keyed entry names its owner ─────────────
+
+        [Theory]
+        [InlineData(Tier.Admin)]
+        [InlineData(Tier.SuperAdmin)]
+        public async Task CreateEntry_ShouldRefuse_WhenAdminGivesNoOwner(Tier tier)
+        {
+            var f = new Fixture();
+            var body = MakeEntry("e1", "");
+
+            var result = await f.Build().CreateEntry(EndpointKit.Request(tier, body: body));
+
+            EndpointKit.Status(result).Should().Be(400);
+            f.Saved.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task CreateEntry_ShouldSaveTheTypedOwnerWithNoAccount_WhenAdminTypesAName()
+        {
+            var f = new Fixture();
+            var body = MakeEntry("e1", "");
+            body.OwnerName = "Grandma Jo";
+
+            var result = await f.Build().CreateEntry(EndpointKit.Request(Tier.Admin, body: body));
+
+            EndpointKit.Status(result).Should().Be(200);
+            f.Saved!.UserId.Should().BeEmpty();
+            f.Saved.OwnerName.Should().Be("Grandma Jo");
+            f.Saved.IsAdminEntered.Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task CreateEntry_ShouldIgnoreTheOwnerName_WhenPlayerSaves()
+        {
+            var f = new Fixture();
+            var body = MakeEntry("e1", "");
+            body.OwnerName = "Someone";
+
+            var result = await f.Build().CreateEntry(EndpointKit.Request(Tier.Player, body: body));
+
+            EndpointKit.Status(result).Should().Be(200);
+            f.Saved!.UserId.Should().Be(EndpointKit.PlayerId);
+            f.Saved.OwnerName.Should().BeNull();
+        }
+
         // ── #131 ──────────────────────────────────────────────────────────────
 
         [Fact]
@@ -370,6 +415,63 @@ namespace BowlPoolManager.Tests.Api
             var result = await f.Build().GetEntry(EndpointKit.Request(Tier.Admin, "?id=e1&seasonId=season-1"));
 
             EndpointKit.BodyText(result).Should().Contain(SecretPick).And.Contain(EndpointKit.OtherPlayerId).And.Contain("owner@test.com");
+        }
+
+        // ── Release 2 group C: entries with no account (an owner name only) ─────
+
+        private static BracketEntry NoAccountEntry(string poolId) 
+        {
+            var entry = MakeEntry("e1", "", poolId, SecretPick);
+            entry.OwnerName = "Grandma Jo";
+            return entry;
+        }
+
+        [Fact]
+        public async Task CreateEntry_ShouldReturn403_WhenPlayerEditsAnEntryWithNoAccount()
+        {
+            var f = new Fixture();
+            f.Stored(NoAccountEntry("pool-open"));
+            var body = MakeEntry("e1", "", "pool-open", "Team B");
+
+            var result = await f.Build().CreateEntry(EndpointKit.Request(Tier.Player, body: body));
+
+            EndpointKit.Status(result).Should().Be(403);
+            f.Saved.Should().BeNull();
+        }
+
+        [Theory]
+        [InlineData("pool-open")]
+        [InlineData("pool-locked")]
+        public async Task GetEntry_ShouldHideTheOwnerName_WhenPlayerReadsAnEntryWithNoAccount(string poolId)
+        {
+            var f = new Fixture();
+            f.Stored(NoAccountEntry(poolId));
+
+            var result = await f.Build().GetEntry(EndpointKit.Request(Tier.Player, "?id=e1&seasonId=season-1"));
+
+            EndpointKit.BodyText(result).Should().NotContain("Grandma Jo");
+        }
+
+        [Fact]
+        public async Task GetEntry_ShouldHidePicks_WhenPlayerReadsAnEntryWithNoAccountBeforeLock()
+        {
+            var f = new Fixture();
+            f.Stored(NoAccountEntry("pool-open"));
+
+            var result = await f.Build().GetEntry(EndpointKit.Request(Tier.Player, "?id=e1&seasonId=season-1"));
+
+            EndpointKit.BodyText(result).Should().NotContain(SecretPick);
+        }
+
+        [Fact]
+        public async Task GetEntries_ShouldHideTheOwnerName_WhenPlayerListsAPoolWithAnEntryWithNoAccount()
+        {
+            var f = new Fixture();
+            f.Listed(NoAccountEntry("pool-open"));
+
+            var result = await f.Build().GetEntries(EndpointKit.Request(Tier.Player, "?seasonId=season-1&poolId=pool-open"));
+
+            EndpointKit.BodyText(result).Should().NotContain("Grandma Jo");
         }
     }
 

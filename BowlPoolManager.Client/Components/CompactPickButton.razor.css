@@ -1,0 +1,6 @@
+.cp { min-height: 44px; width: 100%; display: flex; align-items: center; gap: 8px; padding: 4px 8px; box-sizing: border-box; border-radius: 8px; border: 1px solid var(--bm-line-strong); background: var(--bm-surface); color: var(--bm-ink); font-family: inherit; font-size: 16px; text-align: left; cursor: pointer; }
+.cp:hover:not(:disabled) { background: #F8F9FB; }
+.cp--on, .cp--on:hover:not(:disabled) { border: 2px solid var(--bm-navy); background: var(--bm-navy); color: #fff; font-weight: 700; }
+.cp:disabled { background: #F4F5F7; color: #6B7280; border-style: dashed; cursor: not-allowed; font-style: italic; }
+.cp-name { min-width: 0; overflow-wrap: anywhere; }
+.cp-seed { font-size: 14px; font-weight: 400; }
