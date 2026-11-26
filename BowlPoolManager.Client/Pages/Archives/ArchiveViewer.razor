@@ -77,7 +77,8 @@
                             <div class="bm-note">Tap a name in the standings to see how that entry picked.</div>
                         }
                         <DataTable Label="Game results">
-                            @foreach (var game in archive.Games.OrderByDescending(g => g.StartTime).ThenBy(g => g.BowlName))
+                            @* By kickoff: football archives keep no playoff round (BUSINESS-RULES section 2), so playoff games cannot be put last. *@
+                            @foreach (var game in archive.Games.OrderBy(g => g.StartTime).ThenBy(g => g.GameId, StringComparer.Ordinal))
                             {
                                 var winner = WinnerOf(game);
                                 <TableRow Columns="minmax(0, 1fr) 56px">

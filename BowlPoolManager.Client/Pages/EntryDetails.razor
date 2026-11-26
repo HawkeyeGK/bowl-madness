@@ -5,13 +5,15 @@
 @using BowlPoolManager.Client.Services
 @using BowlPoolManager.Client.Helpers
 @using MudBlazor
+@using Microsoft.AspNetCore.Components.Authorization
 @inject ISeasonService SeasonService
 @inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
 
 @*
     Release 2 Entry details: one entry's picks as MatchupCards, grouped Bowl games then each playoff round, each pick marked
     right, wrong or pending. Later-round teams come from the entry's own earlier picks (BracketHelper.ResolveMatchup).
-    The server hides other players' picks until the pool locks; this page also shows nothing before then.
+    The server hides other players' picks until the pool locks; before then this page shows only the signed-in owner's own picks (Admins use the admin section).
 *@
 
 <PageContainer>
@@ -37,7 +39,7 @@
             <Action><PrimaryButton Href="leaderboard">Back to the Leaderboard</PrimaryButton></Action>
         </EmptyState>
     }
-    else if (entry.Picks == null || (currentPool != null && DateTime.UtcNow < currentPool.LockDate))
+    else if (entry.Picks == null || !PickVisibility.OnPublicPage(poolLocked, isOwnEntry))
     {
         <EmptyState Title="Picks are hidden until the pool locks" Icon="@Icons.Material.Outlined.Lock">
             <ChildContent>Everyone's picks show here once picks lock, so nobody can copy another bracket.</ChildContent>
@@ -125,13 +127,15 @@
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={currentSeasonId}");
             var entryTask = FetchEntryAsync();
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");
-            await Task.WhenAll(gamesTask, entryTask, poolsTask);
+            var myEntriesTask = FetchMyEntryIdsAsync();
+            await Task.WhenAll(gamesTask, entryTask, poolsTask, myEntriesTask);
 
             var allGames = await gamesTask ?? new();
             var allPools = await poolsTask ?? new();
 
             // The server hides other players' picks until the pool locks.
             entry = await entryTask;
+            isOwnEntry = entry != null && (await myEntriesTask).Contains(entry.Id);
 
             if (entry != null)
             {
@@ -164,6 +168,26 @@
         finally { isLoading = false; }
     }
 
+    // Before lock only the signed-in owner sees the picks here; an Admin uses the admin section (owner decision 2026-11-25).
+    private bool isOwnEntry;
+    // A pool that cannot be found is treated as not locked, so only the owner sees the picks.
+    private bool poolLocked => currentPool != null && DateTime.UtcNow > currentPool.LockDate;
+
+    private async Task<HashSet<string>> FetchMyEntryIdsAsync()
+    {
+        try
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            if (auth.User.Identity?.IsAuthenticated == true)
+            {
+                var mine = await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyEntries?seasonId={currentSeasonId}") ?? new();
+                return mine.Select(e => e.Id).ToHashSet();
+            }
+        }
+        catch { /* a public page: no sign-in is fine */ }
+        return new();
+    }
+
     // One entry by id. A missing entry (404) leaves the page on its "not found" view.
     private async Task<BracketEntry?> FetchEntryAsync()
     {
@@ -173,26 +197,14 @@
 
     private record Section(string Title, List<BowlGame> Games);
 
-    // Bowl games first, then each playoff round, each in kickoff order.
+    // Owner rule (2026-11-25): non-playoff games by kickoff, then playoff games by kickoff (GameOrder, shared with print and paper entry).
     private IEnumerable<Section> Sections()
     {
-        var standard = games.Where(g => !g.IsPlayoff).OrderBy(g => g.StartTime).ToList();
+        var ordered = GameOrder.ForEntry(games);
+        var standard = ordered.Where(g => !g.IsPlayoff).ToList();
+        var playoff = ordered.Where(g => g.IsPlayoff).ToList();
         if (standard.Count > 0) yield return new Section("Bowl games", standard);
-
-        foreach (var (round, title) in new[]
-        {
-            (TournamentRound.Round1, "Playoff: first round"), (TournamentRound.QuarterFinal, "Playoff: quarterfinals"),
-            (TournamentRound.SemiFinal, "Playoff: semifinals"), (TournamentRound.Championship, "Playoff: championship")
-        })
-        {
-            var inRound = games.Where(g => g.IsPlayoff && g.Round == round).OrderBy(g => g.StartTime).ToList();
-            if (inRound.Count > 0) yield return new Section(title, inRound);
-        }
-
-        // A playoff game with an unexpected round still shows.
-        var other = games.Where(g => g.IsPlayoff && g.Round is not (TournamentRound.Round1 or TournamentRound.QuarterFinal or TournamentRound.SemiFinal or TournamentRound.Championship))
-            .OrderBy(g => g.StartTime).ToList();
-        if (other.Count > 0) yield return new Section("Playoff", other);
+        if (playoff.Count > 0) yield return new Section("Playoff", playoff);
     }
 
     private static MatchupStatus StatusOf(BowlGame game) => game.Status switch

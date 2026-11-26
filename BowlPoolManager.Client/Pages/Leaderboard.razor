@@ -33,16 +33,16 @@
             <PoolSwitcher Mode="PoolSwitcherMode.Segmented" />
             @* Group D's page; the link resolves once it is merged. *@
             <span class="bm-only-phone">
-                <SecondaryButton Href="@StandingsPrintHref" Icon="@Icons.Material.Outlined.FormatListNumbered" IconOnly="true">Print Standings</SecondaryButton>
+                <SecondaryButton Href="@StandingsPrintHref" Icon="@Icons.Material.Outlined.FormatListNumbered" IconOnly="true">Print standings</SecondaryButton>
             </span>
             <span class="bm-only-wide">
-                <SecondaryButton Href="@StandingsPrintHref" Icon="@Icons.Material.Outlined.FormatListNumbered">Print Standings</SecondaryButton>
+                <SecondaryButton Href="@StandingsPrintHref" Icon="@Icons.Material.Outlined.FormatListNumbered">Print standings</SecondaryButton>
             </span>
             <span class="bm-only-phone">
-                <SecondaryButton Href="print-bracket" Icon="@Icons.Material.Outlined.Print" IconOnly="true">Print Bracket</SecondaryButton>
+                <SecondaryButton Href="print-bracket" Icon="@Icons.Material.Outlined.Print" IconOnly="true">Print blank form</SecondaryButton>
             </span>
             <span class="bm-only-wide">
-                <SecondaryButton Href="print-bracket" Icon="@Icons.Material.Outlined.Print">Print Bracket</SecondaryButton>
+                <SecondaryButton Href="print-bracket" Icon="@Icons.Material.Outlined.Print">Print blank form</SecondaryButton>
             </span>
         </Actions>
     </PageHeader>
@@ -74,7 +74,7 @@
                     <div><Badge>out</Badge> No longer able to finish in the top 3.</div>
                 }
                 <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
-                    @if (!picksHidden)
+                    @if (PickVisibility.OnPublicPage(!picksHidden, isSignedIn))
                     {
                         <SecondaryButton Href="@($"entry/{mine.Id}")" Icon="@Icons.Material.Outlined.ListAlt">View my picks</SecondaryButton>
                     }
@@ -436,7 +436,7 @@
     {
         if (pinned.Rows.Any(r => r.Id == row.Id))
         {
-            if (!picksHidden) Nav.NavigateTo($"entry/{row.Id}");
+            if (PickVisibility.OnPublicPage(!picksHidden, signedInEntryIds.Contains(row.Id))) Nav.NavigateTo($"entry/{row.Id}");
             return;
         }
 
@@ -466,7 +466,7 @@
 
     private string RowLabel(LeaderboardDto row) =>
         pinned.Rows.Any(r => r.Id == row.Id)
-            ? $"{row.PlayerName}, your entry, rank {row.Rank}, {row.Score} points." + (picksHidden ? "" : " Open its picks.")
+            ? $"{row.PlayerName}, your entry, rank {row.Rank}, {row.Score} points." + (PickVisibility.OnPublicPage(!picksHidden, signedInEntryIds.Contains(row.Id)) ? " Open its picks." : "")
         : picksHidden
             ? $"{row.PlayerName}, rank {row.Rank}, {row.Score} points. Tap to say this is you."
             : $"{row.PlayerName}, rank {row.Rank}, {row.Score} points, up to {row.MaxPossible} possible. Tap to say this is you.";

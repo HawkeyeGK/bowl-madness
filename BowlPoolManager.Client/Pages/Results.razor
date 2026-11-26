@@ -219,7 +219,10 @@
         await Task.WhenAll(entryTask, entriesTask);
 
         if (version != loadVersion) return; // the visitor already moved to another pool
-        pickEntry = await entryTask;
+        var entry = await entryTask;
+        // Before lock, only the signed-in owner's own entry shows its picks here, even for an Admin (owner decision 2026-11-25).
+        var isOwn = entry != null && signedInEntries.Any(e => e.Id == entry.Id);
+        pickEntry = entry != null && PickVisibility.OnPublicPage(pickLocked, isOwn) ? entry : null;
         poolEntries = await entriesTask;
     }
 
