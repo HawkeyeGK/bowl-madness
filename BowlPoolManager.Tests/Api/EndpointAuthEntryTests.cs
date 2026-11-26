@@ -267,6 +267,20 @@ namespace BowlPoolManager.Tests.Api
         }
 
         [Fact]
+        public async Task DeleteEntry_ShouldReturn403_WhenPlayerDeletesAnEntryWithNoAccount()
+        {
+            // An Admin keyed it for someone who never signs in: no player owns it.
+            var f = new Fixture();
+            var entry = MakeEntry("e1", ""); entry.OwnerName = "Grandma Jo";
+            f.Stored(entry);
+
+            var result = await f.Build().DeleteEntry(EndpointKit.Request(Tier.Player, DeleteQuery), "e1");
+
+            EndpointKit.Status(result).Should().Be(403);
+            f.NothingDeleted();
+        }
+
+        [Fact]
         public async Task DeleteEntry_ShouldRefuse_WhenOwnerDeletesAfterLock()
         {
             var f = new Fixture();

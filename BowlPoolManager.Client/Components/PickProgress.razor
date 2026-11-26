@@ -1,0 +1,27 @@
+@*
+    "12 of 34 picked" with a bar. Used by My Picks and the admin entry screens. The words carry the meaning; the bar
+    only shows it. Colors come from the theme variables.
+*@
+<div class="pp">
+    <div class="pp-text">
+        <strong>@Picked of @Total picked</strong>
+        @if (Total > Picked)
+        {
+            <span class="bm-note">@(Total - Picked) to go</span>
+        }
+        else if (Total > 0)
+        {
+            <span class="bm-note">All picked</span>
+        }
+    </div>
+    <div class="pp-bar" role="progressbar" aria-valuemin="0" aria-valuemax="@Total" aria-valuenow="@Picked" aria-label="Picks made">
+        <div class="pp-fill" style="width: @Percent%"></div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int Picked { get; set; }
+    [Parameter] public int Total { get; set; }
+
+    private int Percent => Total <= 0 ? 0 : Math.Min(100, (int)Math.Round(100.0 * Picked / Total));
+}

@@ -1,0 +1,4 @@
+.ps { background: var(--bm-orange-tint); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.ps-label { font-weight: 700; font-size: 16px; color: var(--bm-ink); }
+.ps-input { min-height: 48px; width: 100%; box-sizing: border-box; font-size: 24px; letter-spacing: 6px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; border-radius: 8px; border: 2px solid var(--bm-orange); padding: 0 12px; background: var(--bm-surface); color: var(--bm-ink); }
+.ps-input:focus { outline: 3px solid var(--bm-navy); outline-offset: 1px; }
