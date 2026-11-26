@@ -1,0 +1,197 @@
+@page "/print-all-picks"
+@page "/admin/print-all-picks"
+@layout BowlPoolManager.Client.Layout.PrintLayout
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core.Dtos
+@using BowlPoolManager.Core.Helpers
+@using BowlPoolManager.Client.Services
+@using MudBlazor
+@using BowlPoolManager.Client.Ui
+@inject ISeasonService SeasonService
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Nav
+@inject PoolSelection PoolSelection
+
+<PageTitle>Print All Picks</PageTitle>
+
+@*
+    The all-picks print (Release 2 group D): every entry's picks side by side, games down the side, entries across
+    the top, one landscape letter page always (it shrinks to fit; owner, 2026-11-25).
+    Other players' picks are private until the pool locks (BUSINESS-RULES section 3). The server enforces that:
+    GetEntries returns no picks for other players before lock unless the caller is an Admin. This page also waits
+    for lock on the public route; Admins reach it before lock only through /admin/print-all-picks.
+*@
+
+@if (!loaded)
+{
+    <div class="ap-loading">Loading the picks...</div>
+}
+else if (currentPool == null)
+{
+    <div class="ap-loading">There is no open pool to print yet.</div>
+}
+else if (!IsAdminRoute && !locked)
+{
+    <div class="ap-loading">Everyone's picks can be printed once the pool locks (@DateTimeHelper.ToCentralLabel(currentPool.LockDate, "ddd, MMM d 'at' h:mm tt")).</div>
+}
+else if (loadFailed)
+{
+    <div class="ap-loading">The picks could not be loaded. Reload the page to try again.</div>
+}
+else if (hiddenCount > 0)
+{
+    <div class="ap-loading">Some picks are still private, so this can't be printed yet.</div>
+}
+else
+{
+    <div class="ap-toolbar no-print">
+        @if (pools.Count > 1)
+        {
+            <select class="ap-select" aria-label="Pool" @onchange="OnPoolChanged">
+                @foreach (var pool in pools)
+                {
+                    <option value="@pool.Id" selected="@(pool.Id == currentPool.Id)">@pool.Name</option>
+                }
+            </select>
+        }
+        <PrimaryButton Icon="@Icons.Material.Filled.Print" OnClick="PrintPage">Print (landscape letter)</PrimaryButton>
+        <SecondaryButton Href="@(IsAdminRoute ? "/admin" : "/")">@(IsAdminRoute ? "Back to Admin" : "Back to the Leaderboard")</SecondaryButton>
+    </div>
+
+    <div class="ap-sheet" style="--cell-font: @(AllPicksGrid.CellFontPx(entries.Count))px; --row-font: @(AllPicksGrid.RowFontPx(games.Count))px">
+        <header class="ap-head">
+            <h1>@PrintFormText.Title("BOWL MADNESS", currentPool, season) &middot; All picks &middot; @currentPool.Name</h1>
+            <div class="sub">@entries.Count entries &middot; Printed @DateTimeHelper.ToCentralLabel(DateTime.UtcNow, "ddd, MMM d, h:mm tt")</div>
+        </header>
+
+        <table class="ap-table">
+            <colgroup>
+                <col class="game-col" />
+                <col class="winner-col" />
+                @foreach (var _ in entries) { <col /> }
+            </colgroup>
+            <thead>
+                <tr>
+                    <th class="game">Game</th>
+                    <th class="winner"><span>Winner</span></th>
+                    @foreach (var e in entries)
+                    {
+                        <th class="entry"><span>@e.PlayerName</span></th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @for (int i = 0; i < games.Count; i++)
+                {
+                    var game = games[i];
+                    <tr class="@(game.IsPlayoff && (i == 0 || !games[i - 1].IsPlayoff) ? "first-playoff" : "")">
+                        <td class="game">@GameLabel(game)</td>
+                        <td class="winner">@(AllPicksGrid.Decided(game)?.Winner is { } w ? grid.ShortName(w) : "")</td>
+                        @foreach (var e in entries)
+                        {
+                            var cell = grid.Cell(game, BlankFormSlots.PickFor(game, e.Picks));
+                            <td class="@CellClass(cell.Mark)">@cell.Text</td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <footer class="ap-foot">Bold = right. Struck through = that team has lost, so the pick can't score. Entries are in standings order.</footer>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "poolId")] public string? QueryPoolId { get; set; }
+
+    private class LeaderboardResponse
+    {
+        public List<LeaderboardDto>? Leaderboard { get; set; }
+    }
+
+    private bool loaded;
+    private List<BowlPool> pools = new();
+    private List<BowlGame> seasonGames = new();
+    private BowlPool? currentPool;
+    private Season? season;
+    private List<BowlGame> games = new();
+    private List<BracketEntry> entries = new();
+    private AllPicksGrid grid = AllPicksGrid.For(Array.Empty<BowlGame>());
+    private int hiddenCount;
+    private bool loadFailed;
+
+    private bool IsAdminRoute => Nav.ToBaseRelativePath(Nav.Uri).StartsWith("admin/", StringComparison.OrdinalIgnoreCase);
+    private bool locked => currentPool != null && DateTime.UtcNow > currentPool.LockDate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            season = await SeasonService.GetCurrentSeasonAsync();
+            var seasonId = season?.Id ?? "";
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={seasonId}");
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={seasonId}");
+            await Task.WhenAll(poolsTask, gamesTask);
+            pools = (await poolsTask ?? new()).Where(p => !p.IsArchived).ToList();
+            seasonGames = await gamesTask ?? new();
+
+            var chosenId = PoolPicker.Pick(pools.Select(p => p.Id).ToList(), QueryPoolId,
+                string.IsNullOrEmpty(QueryPoolId) ? await PoolSelection.GetSavedIdAsync() : null, null);
+            currentPool = pools.FirstOrDefault(p => p.Id == chosenId) ?? pools.FirstOrDefault();
+            await Load();
+        }
+        catch (Exception ex) { Console.WriteLine(ex.Message); }
+        loaded = true;
+    }
+
+    private async Task OnPoolChanged(ChangeEventArgs e)
+    {
+        currentPool = pools.FirstOrDefault(p => p.Id == e.Value?.ToString());
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        entries = new();
+        games = new();
+        hiddenCount = 0;
+        loadFailed = false;
+        var pool = currentPool;
+        if (pool == null || (!IsAdminRoute && !locked)) return;
+
+        try
+        {
+            var seasonId = season?.Id ?? "";
+            var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetEntries?poolId={pool.Id}&seasonId={seasonId}");
+            var boardTask = Http.GetFromJsonAsync<LeaderboardResponse>($"api/GetLeaderboard?poolId={pool.Id}&seasonId={seasonId}");
+            await Task.WhenAll(entriesTask, boardTask);
+            if (!ReferenceEquals(pool, currentPool)) return;   // the pool changed while this was loading
+
+            var all = await entriesTask ?? new();
+            // The server withholds picks it may not show this viewer; never print a partial grid.
+            hiddenCount = all.Count(e => e.Picks == null);
+            var ranks = ((await boardTask)?.Leaderboard ?? new()).GroupBy(r => r.Id).ToDictionary(g => g.Key, g => g.First().Rank);
+            var poolGames = PoolGames.Of(pool, seasonGames);
+            games = GameOrder.ForEntry(poolGames);
+            grid = AllPicksGrid.For(poolGames);
+            entries = AllPicksGrid.Order(all, ranks);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            if (ReferenceEquals(pool, currentPool)) loadFailed = true;
+        }
+    }
+
+    private Task PrintPage() => JSRuntime.InvokeVoidAsync("window.print").AsTask();
+
+    private static string GameLabel(BowlGame g) => g.Round == TournamentRound.Championship ? "Championship" : g.BowlName;
+
+    private static string CellClass(GridMark mark) => mark switch
+    {
+        GridMark.Correct => "pick right",
+        GridMark.Out => "pick out",
+        _ => "pick"
+    };
+}
