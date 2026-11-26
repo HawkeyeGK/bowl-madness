@@ -31,5 +31,28 @@ namespace BowlPoolManager.Core.Helpers
                 return $"{name} {pool.Season}";
             return name;
         }
+
+        /// <summary>The points a game of <paramref name="round"/> is worth in this pool, or null when the pool has none.</summary>
+        public static int? PointsFor(IEnumerable<BowlGame> games, TournamentRound round) =>
+            games.FirstOrDefault(g => round == TournamentRound.Standard ? !g.IsPlayoff : g.IsPlayoff && g.Round == round)?.PointValue;
+
+        private static readonly (TournamentRound Round, string Label)[] RoundLabels =
+        {
+            (TournamentRound.Standard, "Bowls"), (TournamentRound.Round1, "First round"), (TournamentRound.QuarterFinal, "Quarters"),
+            (TournamentRound.SemiFinal, "Semis"), (TournamentRound.Championship, "Final"),
+        };
+
+        /// <summary>"Bowls 1 pt · First round 3 · Quarters 4 · Semis 5 · Final 10", leaving out rounds the pool does not have.</summary>
+        public static string PointsLine(IEnumerable<BowlGame> games)
+        {
+            var list = games.ToList();
+            var parts = new List<string>();
+            foreach (var (round, label) in RoundLabels)
+            {
+                if (PointsFor(list, round) is not int points) continue;
+                parts.Add(parts.Count == 0 ? $"{label} {points} pt{(points == 1 ? "" : "s")}" : $"{label} {points}");
+            }
+            return string.Join(" · ", parts);
+        }
     }
 }

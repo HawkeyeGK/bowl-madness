@@ -1,46 +1,61 @@
-/* Blank entry form: letter landscape, black and white, one page. Sizes are in inches so the page does not depend on the screen. */
+/* Printed entry form (prototype PrintBlank): letter landscape, black and white, one page. The sheet is sized in inches so the page does not depend on the screen. */
 .blank-loading { padding: 2rem; text-align: center; font-size: 1.1rem; }
 .blank-toolbar { display: flex; gap: .75rem; justify-content: center; align-items: center; flex-wrap: wrap; margin: 0 0 .75rem; }
 .blank-select { min-height: 48px; font-size: 1rem; padding: 0 .75rem; }
 
-.sheet { width: 10.5in; height: 8in; margin: 0 auto; background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif;
-         display: flex; flex-direction: column; gap: .08in; overflow: hidden; border: 1px solid #ccc; box-sizing: border-box; padding: .05in; }
+.sheet { width: 10.5in; height: 8in; margin: 0 auto; background: #fff; color: #000; font-family: var(--bm-font-body, Arial, sans-serif);
+         display: flex; flex-direction: column; gap: 5px; overflow: hidden; border: 1px solid #ccc; box-sizing: border-box; padding: .05in .1in; }
 
-.sheet-head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: .05in; flex: 0 0 auto; }
-.fill-ins { display: flex; gap: .25in; flex: 1; }
-.fill { display: flex; align-items: flex-end; gap: .06in; font-size: 11px; font-weight: 700; flex: 1; }
-.fill.short { flex: .6; }
-.fill i, .tiebreak i, .champion i { flex: 1; border-bottom: 1px solid #000; height: 16px; min-width: .5in; }
-.title { text-align: right; line-height: 1.1; font-size: 10px; }
-.title h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: .5px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: flex-end; gap: .2in; border-bottom: 3px solid #000; padding-bottom: 4px; flex: 0 0 auto; }
+.sheet-head h1 { margin: 0; font-family: var(--bm-font-head, 'Arial Narrow', sans-serif); font-size: 28px; font-weight: 700; line-height: 1; text-transform: uppercase; }
+.sheet-head .sub { font-size: 13px; margin-top: 2px; }
+.sheet-head .points { font-size: 12px; text-align: right; max-width: 2.6in; }
 
-.bowls { flex: 1 1 0; min-height: 0; display: grid; grid-auto-flow: column; grid-template-columns: repeat(3, 1fr);
-         grid-template-rows: repeat(var(--bowl-rows), 1fr); gap: 3px .1in; }
-.bowl { border: 1px solid #000; padding: 1px 4px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; min-height: 0; }
-.bowl-top { display: flex; justify-content: space-between; gap: 4px; font-size: calc(var(--bowl-font, 11px) - 2px); line-height: 1.15; white-space: nowrap; }
-.bowl-top b { text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; }
-.bowl-top span { font-weight: 400; font-size: calc(var(--bowl-font, 11px) - 3px); flex: 0 0 auto; }
-.side { font-size: var(--bowl-font, 11px); font-weight: 700; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.side u { text-decoration: none; display: inline-block; }
-.side u:not(.blank) { width: 8px; height: 8px; border: 1px solid #000; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
-.side u.blank { width: 100%; border-bottom: 1px solid #000; height: 12px; }
+.fill-ins { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .25in; font-size: 14px; flex: 0 0 auto; }
+.fill { border-bottom: 1px solid #000; padding-bottom: 1px; min-height: 18px; white-space: nowrap; overflow: hidden; }
 
-.tree { flex: 0 0 2.9in; display: grid; grid-template-columns: repeat(4, 1fr); gap: .15in; border-top: 2px solid #000; padding-top: .05in; min-height: 0; }
+.section { margin: 2px 0 0; font-family: var(--bm-font-head, 'Arial Narrow', sans-serif); font-size: 17px; font-weight: 700; line-height: 1; text-transform: uppercase; flex: 0 0 auto; }
+
+/* Bowls read down each column, then across: the same order as the entry screen and fast paper entry. */
+.bowls { flex: 1 1 0; min-height: 0; display: grid; grid-auto-flow: column; grid-template-columns: repeat(var(--bowl-cols, 3), minmax(0, 1fr));
+         grid-template-rows: repeat(var(--bowl-rows), 1fr); column-gap: .2in; }
+.bowl { border-bottom: 1px solid #9a9a9a; padding: 1px 0; display: flex; flex-direction: column; justify-content: center; overflow: hidden; min-height: 0; }
+.bowl-top { font-size: calc(var(--bowl-font, 11px)); line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bowl-top span { font-weight: 400; }
+.bowl .side { font-size: calc(var(--bowl-font, 11px) + 3px); }
+
+.side { display: flex; align-items: center; gap: 5px; line-height: 1.2; white-space: nowrap; overflow: hidden; min-height: 0; }
+.side .team { overflow: hidden; text-overflow: ellipsis; }
+.side small { font-size: .8em; }
+.box { text-decoration: none; display: inline-block; flex: none; width: .8em; height: .8em; border: 2px solid #000; box-sizing: border-box; }
+/* A picked box is filled with its own border: browsers leave backgrounds out of printouts by default, borders always print. */
+.box.on { border-width: .4em; }
+.blank { flex: 1; align-self: stretch; border-bottom: 1px solid #000; display: flex; align-items: flex-end; justify-content: space-between; min-width: 0; }
+.blank small { font-size: 9px; color: #555; margin-left: auto; white-space: nowrap; }
+.written { font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+
+.tree { flex: 0 0 2.5in; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: .2in; min-height: 0; }
 .col { display: flex; flex-direction: column; min-height: 0; }
-.col h2 { margin: 0 0 3px; font-size: 10px; text-transform: uppercase; text-align: center; border: 1px solid #000; padding: 1px 0; }
-.col-games { flex: 1; display: flex; flex-direction: column; justify-content: space-around; min-height: 0; }
-.card { border: 1px solid #000; padding: 1px 4px 2px; }
-.card .side { height: 15px; font-size: 11px; }
-.card .bowl-top { font-size: 9px; }
-.card .bowl-top span { font-size: 8px; }
-.champion { display: flex; align-items: flex-end; gap: 4px; margin-top: 10px; font-size: 11px; }
+.col h3 { margin: 0 0 3px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.col-games { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 3px; min-height: 0; }
+.po-card { border: 1px solid #000; padding: 1px 5px 2px; }
+.po-card.final { border-width: 2px; }
+.po-card-top { display: flex; justify-content: space-between; gap: 4px; font-size: 10px; border-bottom: 1px solid #9a9a9a; padding-bottom: 1px; white-space: nowrap; }
+.po-card-top b { overflow: hidden; text-overflow: ellipsis; }
+.po-card-top span { font-weight: 400; flex: none; }
+.po-card .side { height: 17px; font-size: 13px; }
 
-.sheet-foot { flex: 0 0 auto; border-top: 1px solid #000; padding-top: .04in; font-size: 9.5px; line-height: 1.3; }
-.tiebreak { display: flex; align-items: flex-end; gap: 8px; margin-top: 3px; font-size: 11px; }
-.tiebreak i { flex: 0 0 .9in; }
+.champion-box { border: 2px solid #000; padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; }
+.champion { display: flex; align-items: flex-end; gap: 6px; font-size: 13px; }
+.champion i, .tiebreak-line { font-style: normal; font-weight: 700; border-bottom: 1px solid #000; min-height: 18px; }
+.champion i { flex: 1; }
+.tiebreak-text { font-size: 11px; line-height: 1.2; }
+.tiebreak-line { display: block; width: .9in; }
+
+.sheet-foot { flex: 0 0 auto; font-size: 11px; }
 
 @media print {
     @page { size: letter landscape; margin: .25in; }
     .blank-toolbar { display: none !important; }
-    .sheet { border: 0; margin: 0; width: 10.5in; height: 8in; padding: 0; }
+    .sheet { border: 0; margin: 0; width: 10.5in; height: 8in; }
 }

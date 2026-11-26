@@ -3,8 +3,9 @@ using BowlPoolManager.Core.Domain;
 namespace BowlPoolManager.Core.Helpers
 {
     /// <summary>
-    /// The football playoff games of a pool, grouped by round and ordered for drawing a tree: each round lists its
-    /// games in the order of the games they feed, so lines between columns do not cross.
+    /// The football playoff games of a pool, grouped by round for the printed form. Each round lists its games in
+    /// <see cref="GameOrder"/> order (kickoff, id breaks ties), so reading the columns left to right, top to bottom,
+    /// follows fast paper entry (owner, 2026-11-25). Blank lines name their feeder game instead of sitting beside it.
     /// </summary>
     public sealed class PlayoffColumns
     {
@@ -15,22 +16,15 @@ namespace BowlPoolManager.Core.Helpers
 
         public static PlayoffColumns Build(IEnumerable<BowlGame> games)
         {
-            var playoff = games.Where(g => g.IsPlayoff).ToList();
-            var champ = playoff.Where(g => g.Round == TournamentRound.Championship).OrderBy(g => g.StartTime).ToList();
-            var semi = Sort(playoff, TournamentRound.SemiFinal, champ);
-            var quarter = Sort(playoff, TournamentRound.QuarterFinal, semi);
-            var first = Sort(playoff, TournamentRound.Round1, quarter);
-            return new PlayoffColumns { FirstRound = first, Quarterfinals = quarter, SemiFinals = semi, Championship = champ };
+            var playoff = GameOrder.ForEntry(games.Where(g => g.IsPlayoff));
+            List<BowlGame> Round(TournamentRound round) => playoff.Where(g => g.Round == round).ToList();
+            return new PlayoffColumns
+            {
+                FirstRound = Round(TournamentRound.Round1),
+                Quarterfinals = Round(TournamentRound.QuarterFinal),
+                SemiFinals = Round(TournamentRound.SemiFinal),
+                Championship = Round(TournamentRound.Championship),
+            };
         }
-
-        private static List<BowlGame> Sort(List<BowlGame> playoff, TournamentRound round, List<BowlGame> nextRoundSorted) =>
-            playoff.Where(g => g.Round == round)
-                   .OrderBy(g =>
-                   {
-                       var index = nextRoundSorted.FindIndex(n => n.Id == g.NextGameId);
-                       return index == -1 ? int.MaxValue : index;
-                   })
-                   .ThenBy(g => g.StartTime)
-                   .ToList();
     }
 }

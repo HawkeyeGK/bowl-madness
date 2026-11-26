@@ -67,5 +67,36 @@ namespace BowlPoolManager.Tests.Core
             PrintFormText.Title("BOWL MADNESS", new BowlPool { Season = 0 }, new Season { SeasonId = "not a year" })
                 .Should().Be("BOWL MADNESS");
         }
+
+        private static BowlGame Pts(bool playoff, TournamentRound round, int points) =>
+            new BowlGame { Id = Guid.NewGuid().ToString(), IsPlayoff = playoff, Round = round, PointValue = points };
+
+        [Fact]
+        public void PointsFor_ShouldReadThePoolsGames_WhenRoundIsPresent()
+        {
+            var games = new[] { Pts(false, TournamentRound.Standard, 1), Pts(true, TournamentRound.QuarterFinal, 4) };
+
+            PrintFormText.PointsFor(games, TournamentRound.Standard).Should().Be(1);
+            PrintFormText.PointsFor(games, TournamentRound.QuarterFinal).Should().Be(4);
+            PrintFormText.PointsFor(games, TournamentRound.SemiFinal).Should().BeNull();
+        }
+
+        [Fact]
+        public void PointsLine_ShouldListEachRoundInPlayOrder_WhenAllRoundsArePresent()
+        {
+            var games = new[]
+            {
+                Pts(true, TournamentRound.Championship, 10), Pts(false, TournamentRound.Standard, 1), Pts(true, TournamentRound.SemiFinal, 5),
+                Pts(true, TournamentRound.Round1, 3), Pts(true, TournamentRound.QuarterFinal, 4),
+            };
+
+            PrintFormText.PointsLine(games).Should().Be("Bowls 1 pt · First round 3 · Quarters 4 · Semis 5 · Final 10");
+        }
+
+        [Fact]
+        public void PointsLine_ShouldLeaveOutMissingRounds_WhenPoolHasNoPlayoff()
+        {
+            PrintFormText.PointsLine(new[] { Pts(false, TournamentRound.Standard, 2) }).Should().Be("Bowls 2 pts");
+        }
     }
 }
