@@ -1,0 +1,253 @@
+@page "/print-bracket"
+@page "/print-bracket/{EntryId}"
+@layout BowlPoolManager.Client.Layout.PrintLayout
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core.Helpers
+@using BowlPoolManager.Client.Services
+@using MudBlazor
+@using BowlPoolManager.Client.Ui
+@inject ISeasonService SeasonService
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<PageTitle>@(entry == null ? "Blank Entry Form" : "Print My Picks")</PageTitle>
+
+@*
+    The printed entry form (Release 2 group D, prototype PrintBlank): one landscape letter page, always, black and white.
+    /print-bracket is the blank form; /print-bracket/{id} is the same sheet with an entry's picks filled in.
+    The server decides which picks a viewer may see (GetEntry: before lock, only the entry's owner or an Admin).
+    What goes on the sheet is decided in Core (PrintFormText, BlankFormSlots, PlayoffColumns, GameOrder); this page only draws.
+*@
+
+@if (!loaded)
+{
+    <div class="blank-loading">Loading the form...</div>
+}
+else if (!string.IsNullOrEmpty(EntryId) && entry == null)
+{
+    <div class="blank-loading">That entry could not be loaded.</div>
+}
+else if (entry != null && entry.Picks == null)
+{
+    @* The server hides picks before lock from anyone but the entry's owner (BUSINESS-RULES section 3). *@
+    <div class="blank-loading">These picks are private until the pool locks. Sign in as the entry's owner to print them now.</div>
+}
+else if (entry != null && currentPool == null)
+{
+    <div class="blank-loading">That entry's pool is closed, so it can't be printed here.</div>
+}
+else if (currentPool == null)
+{
+    <div class="blank-loading">There is no open pool to print yet.</div>
+}
+else
+{
+    <div class="blank-toolbar no-print">
+        @if (entry == null && pools.Count > 1)
+        {
+            <select class="blank-select" aria-label="Pool" @onchange="OnPoolChanged">
+                @foreach (var pool in pools)
+                {
+                    <option value="@pool.Id" selected="@(pool.Id == currentPool.Id)">@pool.Name</option>
+                }
+            </select>
+        }
+        <PrimaryButton Icon="@Icons.Material.Filled.Print" OnClick="PrintPage">Print (landscape letter)</PrimaryButton>
+        <SecondaryButton Href="/">Back to the Leaderboard</SecondaryButton>
+    </div>
+
+    <div class="sheet" style="--bowl-cols: @BlankFormSizing.Columns(standardGames.Count); --bowl-rows: @BowlRows; --bowl-font: @(BlankFormSizing.BowlFontPx(BowlRows))px">
+        <header class="sheet-head">
+            <div>
+                <h1>@titleText &middot; @(entry == null ? "Entry form" : "Picks") &middot; @currentPool.Name</h1>
+                <div class="sub">Due @DateTimeHelper.ToCentralLabel(currentPool.LockDate, "ddd, MMM d 'at' h:mm tt") &middot; Or enter online at bowl-madness.com</div>
+            </div>
+            <div class="points">@pointsLine</div>
+        </header>
+
+        <div class="fill-ins">
+            @if (entry != null)
+            {
+                <div class="fill"><span>Entry name:</span> <b>@entry.PlayerName</b></div>
+            }
+            else
+            {
+                <div class="fill"><span>Entry name:</span></div>
+                <div class="fill"><span>Your name:</span></div>
+                <div class="fill"><span>Phone or email:</span></div>
+            }
+        </div>
+
+        <h2 class="section">Bowl games &middot; check the winner of each game</h2>
+        <section class="bowls" aria-label="Bowl games">
+            @foreach (var game in standardGames)
+            {
+                <div class="bowl">
+                    <div class="bowl-top"><b>@game.BowlName</b> <span>&middot; @Short(game)</span></div>
+                    @TeamLine(game.TeamAway, null, BlankFormSlots.IsPicked(game, game.TeamAway, picks))
+                    @TeamLine(game.TeamHome, null, BlankFormSlots.IsPicked(game, game.TeamHome, picks))
+                </div>
+            }
+        </section>
+
+        @if (columns.FirstRound.Count + columns.Quarterfinals.Count + columns.SemiFinals.Count + columns.Championship.Count > 0)
+        {
+            <h2 class="section">College Football Playoff &middot; check the winner of each game, then write that winner on the blank in the next round</h2>
+            <section class="tree" aria-label="Playoff">
+                <div class="col">
+                    <h3>First round @RoundPoints(TournamentRound.Round1)</h3>
+                    <div class="col-games">@foreach (var g in columns.FirstRound) { @Card(g) }</div>
+                </div>
+                <div class="col">
+                    <h3>Quarterfinals @RoundPoints(TournamentRound.QuarterFinal)</h3>
+                    <div class="col-games">@foreach (var g in columns.Quarterfinals) { @Card(g) }</div>
+                </div>
+                <div class="col">
+                    <h3>Semifinals @RoundPoints(TournamentRound.SemiFinal)</h3>
+                    <div class="col-games">@foreach (var g in columns.SemiFinals) { @Card(g) }</div>
+                </div>
+                <div class="col">
+                    <h3>National championship @RoundPoints(TournamentRound.Championship)</h3>
+                    <div class="col-games">
+                        @foreach (var g in columns.Championship) { @Card(g) }
+                        <div class="champion-box">
+                            <div class="champion"><b>CHAMPION:</b><i>@ChampionPick</i></div>
+                            @if (tieBreakerLine != null)
+                            {
+                                <div class="tiebreak-text">@tieBreakerLine</div>
+                                <i class="tiebreak-line">@(entry?.Picks != null ? entry.TieBreakerPoints.ToString() : "")</i>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </section>
+        }
+
+        <footer class="sheet-foot">Numbers in parentheses are playoff seeds.</footer>
+    </div>
+}
+
+@code {
+    private RenderFragment Card(BowlGame game) => __builder =>
+    {
+        var (top, bottom) = BlankFormSlots.SlotsFor(game, poolGames, picks);
+        <div class="po-card @(game.Round == TournamentRound.Championship ? "final" : "")">
+            <div class="po-card-top"><b>@(game.Round == TournamentRound.Championship ? "Championship game" : game.BowlName)</b><span>@Short(game)</span></div>
+            @SlotLine(top)
+            @SlotLine(bottom)
+        </div>
+    };
+
+    private RenderFragment SlotLine(FormSlot slot) => __builder =>
+    {
+        if (slot.Team != null)
+        {
+            @TeamLine(slot.Team, slot.Seed, slot.Checked)
+        }
+        else
+        {
+            <div class="side">
+                <u class="@(slot.Checked ? "box on" : "box")"></u>
+                <span class="blank"><span class="written">@slot.Written</span>@if (slot.FeederBowl != null && slot.Written == null) {<small>winner, @slot.FeederBowl</small>}</span>
+            </div>
+        }
+    };
+
+    private static RenderFragment TeamLine(string? team, int? seed, bool isChecked) => __builder =>
+    {
+        <div class="side">
+            <u class="@(isChecked ? "box on" : "box")"></u>
+            <span class="team">@team@if (seed is > 0) {<small> (@seed)</small>}</span>
+        </div>
+    };
+
+    [Parameter] public string? EntryId { get; set; }
+    [SupplyParameterFromQuery(Name = "poolId")] public string? QueryPoolId { get; set; }
+
+    private bool loaded;
+    private List<BowlPool> pools = new();
+    private List<BowlGame> allSeasonGames = new();
+    private Season? season;
+    private BowlPool? currentPool;
+    private BracketEntry? entry;
+    private IReadOnlyDictionary<string, string>? picks;
+    private List<BowlGame> poolGames = new();
+    private List<BowlGame> standardGames = new();
+    private PlayoffColumns columns = new();
+    private string titleText = "BOWL MADNESS";
+    private string pointsLine = "";
+    private string? tieBreakerLine;
+
+    private int BowlRows => BlankFormSizing.Rows(standardGames.Count);
+
+    private string? ChampionPick => columns.Championship.Select(g => BlankFormSlots.PickFor(g, picks)).FirstOrDefault(p => p != null);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            season = await SeasonService.GetCurrentSeasonAsync();
+            var seasonId = season?.Id ?? "";
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={seasonId}");
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={seasonId}");
+            await Task.WhenAll(poolsTask, gamesTask);
+            pools = (await poolsTask ?? new()).Where(p => !p.IsArchived).ToList();
+            allSeasonGames = await gamesTask ?? new();
+
+            if (!string.IsNullOrEmpty(EntryId))
+            {
+                // The server hides the picks from anyone but the owner (or an Admin) before lock.
+                try { entry = await Http.GetFromJsonAsync<BracketEntry>($"api/GetEntry?id={Uri.EscapeDataString(EntryId)}&seasonId={seasonId}"); }
+                catch { entry = null; }
+                picks = entry?.Picks;
+                currentPool = entry == null ? null : pools.FirstOrDefault(p => p.Id == entry.PoolId);
+            }
+            else
+            {
+                currentPool = pools.FirstOrDefault(p => p.Id == QueryPoolId);
+                if (currentPool == null)
+                {
+                    try
+                    {
+                        var saved = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "lastSelectedPoolId");
+                        currentPool = pools.FirstOrDefault(p => p.Id == saved);
+                    }
+                    catch { /* storage may be unavailable */ }
+                }
+                currentPool ??= pools.FirstOrDefault();
+            }
+            Prepare();
+        }
+        catch (Exception ex) { Console.WriteLine(ex.Message); }
+        loaded = true;
+    }
+
+    private async Task OnPoolChanged(ChangeEventArgs e)
+    {
+        currentPool = pools.FirstOrDefault(p => p.Id == e.Value?.ToString());
+        if (currentPool == null) return;
+        try { await JSRuntime.InvokeVoidAsync("localStorage.setItem", "lastSelectedPoolId", currentPool.Id); } catch { }
+        Prepare();
+    }
+
+    private void Prepare()
+    {
+        if (currentPool == null) return;
+
+        poolGames = PoolGames.Of(currentPool, allSeasonGames);
+
+        // The shared order (same as fast paper entry): regular bowls by kickoff, then playoff games by kickoff.
+        standardGames = GameOrder.ForEntry(poolGames).Where(g => !g.IsPlayoff).ToList();
+        columns = PlayoffColumns.Build(poolGames);
+        titleText = PrintFormText.Title("BOWL MADNESS", currentPool, season);
+        pointsLine = PrintFormText.PointsLine(poolGames);
+        tieBreakerLine = PrintFormText.TieBreakerLine(currentPool, poolGames);
+    }
+
+    private Task PrintPage() => JSRuntime.InvokeVoidAsync("window.print").AsTask();
+
+    private static string Short(BowlGame g) => DateTimeHelper.ToCentralLabel(g.StartTime, "MMM d h:mm tt");
+
+    private string RoundPoints(TournamentRound round) =>
+        PrintFormText.PointsFor(poolGames, round) is int p ? $"· {p} pt{(p == 1 ? "" : "s")}" + (round == TournamentRound.Championship ? "" : " each") : "";
+}

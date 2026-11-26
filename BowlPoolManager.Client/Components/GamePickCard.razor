@@ -1,0 +1,91 @@
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core.Helpers
+@using BowlPoolManager.Client.Helpers
+
+@*
+    One game in the pick editor (My Picks and the admin entry form): the bowl, its kickoff, and two team buttons.
+    The away team is listed first and the home team second, the same order the printed form and fast paper entry use
+    (key 1 and key 2). Built from the shared TeamPickButton; the only styles here lay the card out.
+*@
+<section class="gp-card @(Cleared ? "gp-card--cleared" : null)" aria-label="@Game.BowlName">
+    <div class="gp-head">
+        <span class="gp-name">@Game.BowlName</span>
+        <span class="gp-when">@DateTimeHelper.ToCentralLabel(Game.StartTime, "ddd MMM d, h:mm tt") · @Game.PointValue @(Game.PointValue == 1 ? "pt" : "pts")</span>
+    </div>
+    @if (Game.IsPlayoff || Cleared || !string.IsNullOrEmpty(ScoreLine))
+    {
+        <div class="gp-tags">
+            @if (Game.IsPlayoff) { <Badge>Playoff</Badge> }
+            @if (Cleared) { <Badge Tone="BadgeTone.Alert">Pick cleared. Pick again.</Badge> }
+            @if (!string.IsNullOrEmpty(ScoreLine)) { <span class="bm-note">@ScoreLine</span> }
+        </div>
+    }
+    <div class="gp-teams">
+        <TeamPickButton Name="@Slots.AwayLabel" Team="@TeamInfoOf(Slots.AwayLabel)" ShowLogo="@(Slots.Away == null)"
+                        Seed="@SeedOf(Slots.Away, Game.TeamAway, Game.TeamAwaySeed)" SubText="@SubTextOf(Slots.Away)"
+                        State="@StateOf(Slots.Away)" OnClick="@(() => Choose(Slots.Away))" />
+        <TeamPickButton Name="@Slots.HomeLabel" Team="@TeamInfoOf(Slots.HomeLabel)" ShowLogo="@(Slots.Home == null)"
+                        Seed="@SeedOf(Slots.Home, Game.TeamHome, Game.TeamHomeSeed)" SubText="@SubTextOf(Slots.Home)"
+                        State="@StateOf(Slots.Home)" OnClick="@(() => Choose(Slots.Home))" />
+    </div>
+    @if (!string.IsNullOrEmpty(Hint))
+    {
+        <div class="bm-note">@Hint</div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public BowlGame Game { get; set; } = default!;
+    /// <summary>The two teams this entry may pick between (from <see cref="EntryPickRules.Resolve"/>).</summary>
+    [Parameter, EditorRequired] public Matchup Slots { get; set; } = default!;
+    /// <summary>Every game of the season, for finding a team's logo.</summary>
+    [Parameter] public IReadOnlyList<BowlGame> AllGames { get; set; } = new List<BowlGame>();
+    /// <summary>The entry's pick for this game, if any.</summary>
+    [Parameter] public string? Pick { get; set; }
+    /// <summary>Picks can no longer change: the buttons do nothing and show right and wrong once a game is final.</summary>
+    [Parameter] public bool Locked { get; set; }
+    /// <summary>This pick was cleared because an earlier pick changed.</summary>
+    [Parameter] public bool Cleared { get; set; }
+    /// <summary>Teams that have lost, for the "Eliminated" note on a locked pick.</summary>
+    [Parameter] public HashSet<string>? EliminatedTeams { get; set; }
+    /// <summary>Line under the buttons, for example "Pick Rose Bowl first."</summary>
+    [Parameter] public string? Hint { get; set; }
+    [Parameter] public EventCallback<string> OnPick { get; set; }
+
+    private string? ScoreLine =>
+        Game.Status != GameStatus.Scheduled && Game.TeamAwayScore != null && Game.TeamHomeScore != null
+            ? $"{(Game.IsFinal ? "Final" : "Live")}: {Game.TeamAwayScore} to {Game.TeamHomeScore}"
+            : null;
+
+    private TeamInfo? TeamInfoOf(string label) => VisualHelper.GetTeamInfo(label, Game, AllGames.ToList());
+
+    // A seed belongs to the game's own team; a team that moved in from an earlier game has no seed here.
+    private static int? SeedOf(string? slotTeam, string gameTeam, int? seed) =>
+        slotTeam != null && string.Equals(slotTeam, gameTeam, StringComparison.OrdinalIgnoreCase) ? seed : null;
+
+    private bool IsPick(string? team) =>
+        team != null && !string.IsNullOrEmpty(Pick) && string.Equals(Pick, team, StringComparison.OrdinalIgnoreCase);
+
+    private string? SubTextOf(string? team) =>
+        Locked && IsPick(team) && !Game.IsFinal && EliminatedTeams != null && team != null && EliminatedTeams.Contains(team)
+            ? "Eliminated"
+            : null;
+
+    private PickButtonState StateOf(string? team)
+    {
+        if (team == null) return PickButtonState.Disabled;
+        if (IsPick(team))
+        {
+            if (Locked && Game.IsFinal)
+                return string.Equals(Game.WinningTeamName, team, StringComparison.OrdinalIgnoreCase) ? PickButtonState.Correct : PickButtonState.Wrong;
+            return PickButtonState.Selected;
+        }
+        return PickButtonState.Normal;
+    }
+
+    private async Task Choose(string? team)
+    {
+        if (Locked || team == null) return;
+        await OnPick.InvokeAsync(team);
+    }
+}

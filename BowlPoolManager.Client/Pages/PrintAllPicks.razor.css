@@ -1,0 +1,34 @@
+/* All-picks print: letter landscape, black and white, one page always. Type shrinks with the number of entries and games. */
+.ap-loading { padding: 2rem; text-align: center; font-size: 1.1rem; }
+.ap-toolbar { display: flex; gap: .75rem; justify-content: center; align-items: center; flex-wrap: wrap; margin: 0 0 .75rem; }
+.ap-select { min-height: 48px; font-size: 1rem; padding: 0 .75rem; }
+
+.ap-sheet { width: 10.5in; height: 8in; margin: 0 auto; background: #fff; color: #000; font-family: var(--bm-font-body, Arial, sans-serif);
+            display: flex; flex-direction: column; gap: 4px; overflow: hidden; border: 1px solid #ccc; box-sizing: border-box; padding: .05in .1in; }
+.ap-head { border-bottom: 3px solid #000; padding-bottom: 3px; display: flex; justify-content: space-between; align-items: flex-end; gap: .2in; flex: 0 0 auto; }
+.ap-head h1 { margin: 0; font-family: var(--bm-font-head, 'Arial Narrow', sans-serif); font-size: 24px; font-weight: 700; line-height: 1; text-transform: uppercase; }
+.ap-head .sub { font-size: 12px; white-space: nowrap; }
+
+.ap-table { width: 100%; table-layout: fixed; border-collapse: collapse; flex: 0 1 auto; }
+.ap-table .game-col { width: 1.45in; }
+.ap-table .winner-col { width: .42in; }
+.ap-table th, .ap-table td { border: 1px solid #999; padding: 0 1px; white-space: nowrap; overflow: hidden; }
+.ap-table th { height: 1.05in; vertical-align: bottom; font-size: min(var(--cell-font), 10px); font-weight: 700; }
+.ap-table th.game { text-align: left; font-size: 11px; padding-left: 3px; }
+/* Names run bottom to top so a narrow column can carry a long name. */
+.ap-table th.entry span, .ap-table th.winner span { writing-mode: vertical-rl; transform: rotate(180deg); display: inline-block; max-height: 1in; overflow: hidden; text-overflow: ellipsis; }
+.ap-table td { font-size: var(--row-font); line-height: 1.15; }
+.ap-table td.game { text-overflow: ellipsis; padding-left: 3px; }
+.ap-table td.winner { text-align: center; font-weight: 700; }
+/* A pick never sets a taller row than the game rows were sized for, so no row falls off the page. */
+.ap-table td.pick { text-align: center; font-size: min(var(--cell-font), var(--row-font)); }
+.ap-table td.right { font-weight: 700; }
+.ap-table td.out { text-decoration: line-through; color: #555; }
+.ap-table tr.first-playoff td { border-top: 2px solid #000; }
+.ap-foot { font-size: 10px; flex: 0 0 auto; }
+
+@media print {
+    @page { size: letter landscape; margin: .25in; }
+    .ap-toolbar { display: none !important; }
+    .ap-sheet { border: 0; margin: 0; }
+}

@@ -4,6 +4,7 @@
 
 @using BowlPoolManager.Client.Services
 @using Microsoft.AspNetCore.Authorization
+@using MudBlazor
 @using System.Net.Http.Json
 @attribute [Authorize(Roles = "SuperAdmin,Admin")]
 @inject HttpClient Http
@@ -11,125 +12,103 @@
 @inject IJSRuntime JS
 @inject ISeasonService SeasonService
 
-<PageTitle>Manage Entries</PageTitle>
+@* Release 2 group C: the admin entries list. Shows season and pool names, never season ids. Edit opens the entry form, where Move Entry lives. *@
 
-<div class="container-fluid mt-3 px-4">
-    <div class="d-flex justify-content-between align-items-end mb-3">
-        <div class="d-flex flex-column gap-2">
-             <div class="d-flex align-items-center gap-3">
-                <h1 class="h3 fw-bold mb-0"><i class="bi bi-list-check text-primary"></i> Manage Entries</h1>
-            </div>
-        </div>
-        <div class="d-flex gap-2">
-            <a href="/admin/dashboard" class="btn btn-outline-secondary">Dashboard</a>
-            <a href="/admin/entry" class="btn btn-primary"><i class="bi bi-plus-lg"></i> New Entry</a>
-        </div>
-    </div>
-    
-    @* FILTERS *@
-    <div class="card mb-4">
-        <div class="card-body py-2">
-            <div class="row align-items-center g-3">
-                @* Season Filter *@
-                <div class="col-auto">
-                    <label class="fw-bold me-2">Season:</label>
-                    <select class="form-select form-select-sm d-inline-block w-auto" @onchange="OnSeasonFilterChanged" value="@selectedSeasonId">
-                        <option value="">All Seasons</option>
-                        @foreach (var s in seasons)
-                        {
-                            <option value="@s.Id">@s.Name @(s.IsCurrent ? "(Current)" : "")</option>
-                        }
-                    </select>
-                </div>
+<PageContainer>
+    <PageHeader Title="Manage entries" Subtitle="@($"Showing {filteredEntries.Count} {(filteredEntries.Count == 1 ? "entry" : "entries")}")">
+        <Actions>
+            <PrimaryButton Href="/admin/entry" Icon="@Icons.Material.Outlined.Add">New entry</PrimaryButton>
+        </Actions>
+    </PageHeader>
 
-                @* Pool Filter *@
-                <div class="col-auto">
-                    <label class="fw-bold me-2">Pool:</label>
-                    <select class="form-select form-select-sm d-inline-block w-auto" @onchange="OnPoolFilterChanged" value="@selectedPoolId">
-                        <option value="">-- All Pools --</option>
-                        @foreach (var pool in FilteredPoolOptions)
-                        {
-                            <option value="@pool.Id">@pool.SeasonId - @pool.Name</option>
-                        }
-                    </select>
-                </div>
-                
-                <div class="col text-end small text-muted">
-                    Showing @filteredEntries.Count entries
-                </div>
-            </div>
-        </div>
-    </div>
+    <Card Tone="CardTone.Outlined">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" md="6">
+                <MudSelect T="string" Value="selectedSeasonId" ValueChanged="OnSeasonFilterChanged" Label="Season" Variant="Variant.Outlined">
+                    <MudSelectItem T="string" Value="@("")">All seasons</MudSelectItem>
+                    @foreach (var s in seasons)
+                    {
+                        <MudSelectItem T="string" Value="@s.Id">@s.Name@(s.IsCurrent ? " (current)" : "")</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect T="string" Value="selectedPoolId" ValueChanged="OnPoolFilterChanged" Label="Pool" Variant="Variant.Outlined">
+                    <MudSelectItem T="string" Value="@("")">All pools</MudSelectItem>
+                    @foreach (var pool in FilteredPoolOptions)
+                    {
+                        <MudSelectItem T="string" Value="@pool.Id">@(string.IsNullOrEmpty(selectedSeasonId) ? $"{SeasonName(pool.SeasonId)}: " : "")@pool.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </Card>
 
     @if (isLoading)
     {
-        <div class="d-flex justify-content-center">
-            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
-        </div>
+        <LoadingIndicator Text="Loading entries..." />
     }
     else if (filteredEntries.Count == 0)
     {
-        <div class="alert alert-info">No entries found matching the current filters.</div>
+        <EmptyState Title="No entries found" Icon="@Icons.Material.Outlined.Inbox">
+            <ChildContent>No entries match these filters.</ChildContent>
+        </EmptyState>
     }
     else
     {
-        <div class="card shadow-sm">
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Player Name</th>
-                                <th>Email</th>
-                                <th>Season / Pool</th>
-                                <th>Tiebreaker</th>
-                                <th>Created On (CT)</th>
-                                <th class="text-end">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var entry in filteredEntries)
-                            {
-                                <tr>
-                                    <td class="fw-bold">@entry.PlayerName</td>
-                                    <td>
-                                        @if (userEmailMap.TryGetValue(entry.UserId, out var email))
-                                        {
-                                            <a href="mailto:@email" class="text-decoration-none">@email</a>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted small fst-italic">Admin Entered</span>
-                                        }
-                                    </td>
-                                    <td>
-                                        @{
-                                            var poolName = pools.FirstOrDefault(p => p.Id == entry.PoolId)?.Name ?? "Unknown";
-                                        }
-                                        <div class="d-flex flex-column">
-                                            <span class="badge bg-light text-dark border mb-1 align-self-start">@poolName</span>
-                                            <small class="text-muted">Season: @entry.SeasonId</small>
-                                        </div>
-                                    </td>
-                                    <td>@entry.TieBreakerPoints</td>
-                                    <td>@DateTimeHelper.ToCentral(entry.CreatedOn).ToString("g")</td>
-                                    <td class="text-end">
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="/admin/entry/@entry.Id?seasonId=@entry.SeasonId" class="btn btn-outline-primary">Edit</a>
-                                            <button class="btn btn-outline-danger" @onclick="() => DeleteEntry(entry)">Delete</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+        <DataTable Label="Entries">
+            <TableHeader Columns="@PhoneColumns" ColumnsWide="@WideColumns">
+                <TableHeaderCell Text="Bracket" />
+                <TableHeaderCell Text="Owner" HidePhone="true" />
+                <TableHeaderCell Text="Pool" HidePhone="true" />
+                <TableHeaderCell Text="Season" HidePhone="true" />
+                <TableHeaderCell Text="Tiebreaker" End="true" HidePhone="true" />
+                <TableHeaderCell Text="Created" HidePhone="true" />
+                <TableHeaderCell Text="Actions" End="true" />
+            </TableHeader>
+            @foreach (var entry in filteredEntries)
+            {
+                var poolName = pools.FirstOrDefault(p => p.Id == entry.PoolId)?.Name ?? "Unknown pool";
+                <TableRow Columns="@PhoneColumns" ColumnsWide="@WideColumns">
+                    <TableCell Kind="CellKind.Name">
+                        <span>@entry.PlayerName</span>
+                        <span class="bm-only-phone"><Badge>@poolName</Badge></span>
+                    </TableCell>
+                    <TableCell HidePhone="true">
+                        @if (userEmailMap.TryGetValue(entry.UserId, out var email))
+                        {
+                            <a href="mailto:@email">@email</a>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(entry.OwnerName))
+                        {
+                            <span>@entry.OwnerName</span> <span class="bm-note">(no account)</span>
+                        }
+                        else
+                        {
+                            <span class="bm-note">Admin entered</span>
+                        }
+                    </TableCell>
+                    <TableCell HidePhone="true">@poolName</TableCell>
+                    <TableCell HidePhone="true">@SeasonName(entry.SeasonId)</TableCell>
+                    <TableCell Kind="CellKind.Muted" End="true" HidePhone="true">@entry.TieBreakerPoints</TableCell>
+                    <TableCell Kind="CellKind.Muted" HidePhone="true">@DateTimeHelper.ToCentralLabel(entry.CreatedOn, "MMM d yyyy, h:mm tt")</TableCell>
+                    <TableCell End="true">
+                        <MudStack Row="true" Spacing="1" Justify="Justify.FlexEnd">
+                            <SecondaryButton Href="@($"/admin/entry/{entry.Id}?seasonId={entry.SeasonId}")" Icon="@Icons.Material.Outlined.Edit" IconOnly="true" AriaLabel="@($"Edit {entry.PlayerName}")">Edit</SecondaryButton>
+                            <SecondaryButton Icon="@Icons.Material.Outlined.DeleteOutline" IconOnly="true" AriaLabel="@($"Delete {entry.PlayerName}")" OnClick="@(() => DeleteEntry(entry))">Delete</SecondaryButton>
+                        </MudStack>
+                    </TableCell>
+                </TableRow>
+            }
+        </DataTable>
     }
-</div>
+</PageContainer>
 
 @code {
+    // Phone: name (with the pool) and the buttons. Wide screens add owner, pool, season, tiebreaker and created.
+    private const string PhoneColumns = "minmax(0, 1fr) 112px";
+    private const string WideColumns = "minmax(160px, 1.4fr) minmax(160px, 1.4fr) minmax(120px, 1fr) 90px 90px 150px 112px";
+
     private List<BracketEntry> allEntries = new();
     private List<BracketEntry> filteredEntries = new();
     private List<BowlPool> pools = new();
@@ -193,17 +172,20 @@
         }
     }
     
-    private void OnSeasonFilterChanged(ChangeEventArgs e)
+    private string SeasonName(string seasonId) =>
+        seasons.FirstOrDefault(s => s.Id == seasonId)?.Name ?? seasonId;
+
+    private void OnSeasonFilterChanged(string seasonId)
     {
-        selectedSeasonId = e.Value?.ToString() ?? "";
+        selectedSeasonId = seasonId ?? "";
         // Reset pool selection when season changes, as the pool might not exist in the new season scope
         selectedPoolId = ""; 
         FilterData();
     }
     
-    private void OnPoolFilterChanged(ChangeEventArgs e)
+    private void OnPoolFilterChanged(string poolId)
     {
-        selectedPoolId = e.Value?.ToString() ?? "";
+        selectedPoolId = poolId ?? "";
         FilterData();
     }
     

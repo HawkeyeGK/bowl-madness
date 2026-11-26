@@ -33,8 +33,8 @@ The application utilizes CosmosDB with an approach abstracted by `CosmosReposito
 
 ### Key Domain Models / DTOs
 Models live in `BowlPoolManager.Core/Domain` and map directly to Cosmos documents. Every property must carry both `[JsonProperty]` (Newtonsoft.Json) and `[JsonPropertyName]` (System.Text.Json) attributes — see Section 5.
-- `BowlGame`, `BowlPool`: a football game and a football pool.
-- `BracketEntry`: a user's picks in a pool. Used for both sports; the `type` field tells them apart: `"BracketEntry"` for football and `"HoopsBracketEntry"` for hoops (`Constants.DocumentTypes`). There is no separate `HoopsBracketEntry` class. Hoops entries are written by `HoopsEntryFunctions.CreateHoopsEntry`, which forces the type and takes the season from the pool, and are read and written through `HoopsEntryRepository`, which filters on that type. Both kinds live in the `Picks` container, partitioned by `seasonId`. A hoops entry's `seasonId` is its pool's, which for some pools is the text "2026" (docs/BUSINESS-RULES.md section 6).
+- `BowlGame`, `BowlPool`: a football game and a football pool. `BowlGame` has nullable `homeApRank` and `awayApRank` (Release 2, typed by an admin); Release 1.1 code ignores them, and a Release 1.1 save after a revert drops them.
+- `BracketEntry`: a user's picks in a pool. Used for both sports; the `type` field tells them apart: `"BracketEntry"` for football and `"HoopsBracketEntry"` for hoops (`Constants.DocumentTypes`). There is no separate `HoopsBracketEntry` class. Hoops entries are written by `HoopsEntryFunctions.CreateHoopsEntry`, which forces the type and takes the season from the pool, and are read and written through `HoopsEntryRepository`, which filters on that type. Both kinds live in the `Picks` container, partitioned by `seasonId`. A hoops entry's `seasonId` is its pool's, which for some pools is the text "2026" (docs/BUSINESS-RULES.md section 6). `ownerName` (nullable, Release 2, football only) holds the owner's name when an Admin keyed the entry for someone with no account; `userId` is then empty. Phase 1.1 code ignores it, and `EntryVisibility.ForViewer` does not copy it for non-owners.
 - `UserProfile`: details about the logged-in user, including role and disabled flag.
 - Hoops models: see Section 12.
 
@@ -82,6 +82,7 @@ The Blazor client avoids heavy external state libraries (like Fluxor) in favor o
 - **`AppState` Service**: A scoped service class `AppState.cs` is registered in `Program.cs`. 
   - It uses standard C# events (`public event Action? OnChange;`) and notification methods (`public void NotifyDataChanged() => OnChange?.Invoke();`).
   - Components subscribe to `AppState.OnChange` to trigger `StateHasChanged()`.
+- **Browser storage**: `lastSelectedPoolId` (the pool choice, `PoolSelection`) and `bm.myEntries` (Find my entry: entry id and name per pool, `MyEntryStore` with `MyEntryMemory` in Core). The server records nothing about these choices (the ids are only used in ordinary reads).
 - **Domain Services**: Dedicated interaction services (e.g., `PoolService`, `SeasonService`) are injected as `Scoped` dependencies to handle localized network calling and mapping logic.
 
 ## 5. Development Constraints ("Rules of the Road")

@@ -12,360 +12,241 @@
 @inject BowlPoolManager.Client.Services.AppState AppState
 @inject BowlPoolManager.Client.Services.ISeasonService SeasonService
 @inject IJSRuntime JS
+@inject ISnackbar Snackbar
 @using BowlPoolManager.Client.Components
+@using MudBlazor
 @using BowlPoolManager.Client.Helpers
 
-<PageTitle>My Picks</PageTitle>
+@*
+    Release 2 group C: My Picks and the entry editor, built from the shared components in Client/Ui.
+    The pick rules are unchanged from Phase 1.1 (EntryPickRules in Core): a slot whose team is not known is disabled,
+    changing a pick clears the later picks that depended on it and says which, and an incomplete entry can be saved
+    until picks lock.
+*@
 
-<div class="container-fluid mt-3 px-4 pb-5 position-relative">
-    <div class="d-flex justify-content-between align-items-end mb-3">
-        @* LEFT SIDE *@
-        <div class="d-flex align-items-center gap-3">
-            <h1 class="h3 fw-bold mb-0"><i class="bi bi-clipboard-check-fill text-primary"></i> My Picks</h1>
-        </div>
-    </div>
-
-    @if (isLoading)
-    {
-        <div class="d-flex justify-content-center">
-            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
-        </div>
-    }
-    else
-    {
-        @* --- DASHBOARD VIEW --- *@
-        @if (viewMode == ViewMode.Dashboard)
-        {
-            @* CURRENT SEASON SECTION *@
-            <div class="mb-5">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h2 class="h4 text-secondary mb-0">Current Season (@currentSeasonDisplay)</h2>
-                    <button class="btn btn-primary" @onclick="CreateAdditionalEntry">
-                         <i class="bi bi-plus-lg"></i> New Entry
-                    </button>
-                </div>
-
-                @if (!currentEntries.Any())
+@if (isLoading)
+{
+    <PageContainer>
+        <PageHeader Title="My Picks" />
+        <LoadingIndicator Text="Loading your picks..." />
+    </PageContainer>
+}
+else if (viewMode == ViewMode.Dashboard)
+{
+    <PageContainer>
+        <PageHeader Title="My Picks" Subtitle="@(string.IsNullOrEmpty(currentSeasonDisplay) ? null : $"Season {currentSeasonDisplay}")">
+            <Actions>
+                <SecondaryButton OnClick="OpenPrintBlank" Icon="@Icons.Material.Outlined.Print">Print blank form</SecondaryButton>
+                @if (currentEntries.Any())
                 {
-                     <div class="card shadow-sm border-0 bg-light mb-5">
-                        <div class="card-body p-4 text-center">
-                            <i class="bi bi-ticket-perforated display-4 text-primary mb-3"></i>
-                            <h4 class="card-title fw-bold">Join the Action for @currentSeasonDisplay!</h4>
-                            <p class="text-muted mb-4">You don't have any brackets yet. Enter an invite code below to get started.</p>
-                            
-                            <div class="mx-auto" style="max-width: 400px;">
-                                <EditForm Model="@joinModel" OnValidSubmit="StartNewEntry">
-                                    <div class="input-group input-group-lg mb-3">
-                                        <InputText @bind-Value="joinModel.InviteCode" class="form-control" placeholder="Enter Invite Code" />
-                                        <button class="btn btn-primary" type="submit">Join Pool</button>
-                                    </div>
-                                </EditForm>
+                    <PrimaryButton Icon="@Icons.Material.Outlined.Add" OnClick="CreateAdditionalEntry">New Entry</PrimaryButton>
+                }
+            </Actions>
+        </PageHeader>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <Notice Tone="NoticeTone.Error">@errorMessage</Notice>
+        }
+
+        @if (!currentEntries.Any())
+        {
+            <EmptyState Title="@($"Join the pool for {currentSeasonDisplay}")" Icon="@Icons.Material.Outlined.ConfirmationNumber">
+                <ChildContent>You don't have an entry yet. Type the invite code you were given to start.</ChildContent>
+                <Action>
+                    <EditForm Model="@joinModel" OnValidSubmit="StartNewEntry">
+                        <MudTextField @bind-Value="joinModel.InviteCode" Label="Invite code" Variant="Variant.Outlined" Immediate="true" />
+                        <PrimaryButton ButtonType="ButtonType.Submit" FullWidth="true" Large="true">Join pool</PrimaryButton>
+                    </EditForm>
+                </Action>
+            </EmptyState>
+        }
+        else
+        {
+            <MudGrid Spacing="2">
+                @foreach (var entry in currentEntries)
+                {
+                    var stats = GetEntryStats(entry);
+                    var entryPool = pools.FirstOrDefault(p => p.Id == entry.PoolId);
+                    var poolName = entryPool?.Name ?? "Unknown pool";
+                    var entryLocked = entryPool != null && DateTime.UtcNow > entryPool.LockDate;
+                    <MudItem xs="12" md="6" lg="4">
+                        <Card Tone="CardTone.Outlined" Eyebrow="@poolName" Title="@entry.PlayerName">
+                            <div>Points <strong>@stats.Score</strong> · Max <strong>@stats.MaxPossible</strong> · Correct <strong>@stats.CorrectPicks</strong></div>
+                            <div class="bm-note">@(entryPool == null ? "" : StatusLineText.ForPool(DateTime.UtcNow, entryPool.LockDate, null, 0, 0))</div>
+                            <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                                <PrimaryButton Icon="@Icons.Material.Outlined.Edit" OnClick="@(() => EditEntry(entry))">@(entryLocked ? "View picks" : "View / Edit")</PrimaryButton>
+                                <SecondaryButton OnClick="@(() => OpenPrint(entry.Id))" Icon="@Icons.Material.Outlined.Print">Print my picks</SecondaryButton>
+                                @if (!entryLocked)
+                                {
+                                    <SecondaryButton Icon="@Icons.Material.Outlined.DeleteOutline" IconOnly="true" OnClick="@(() => DeleteEntry(entry))">Delete this entry</SecondaryButton>
+                                }
+                            </MudStack>
+                        </Card>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+
+        @if (pastEntries.Any())
+        {
+            <h2 class="bm-section-title">Past seasons</h2>
+            <MudGrid Spacing="2">
+                @foreach (var entry in pastEntries.OrderByDescending(e => e.SeasonId))
+                {
+                    var poolName = pools.FirstOrDefault(p => p.Id == entry.PoolId)?.Name ?? "Unknown pool";
+                    <MudItem xs="12" md="6" lg="4">
+                        <Card Tone="CardTone.Outlined" Eyebrow="@($"Season {(seasonNameMap.TryGetValue(entry.SeasonId, out var sName) ? sName : entry.SeasonId)}")" Title="@poolName">
+                            <div>Bracket: <strong>@entry.PlayerName</strong> <Badge>Archived</Badge></div>
+                            <div>
+                                <SecondaryButton Href="@($"history/{entry.PoolId}")" Icon="@Icons.Material.Outlined.History">View pool archive</SecondaryButton>
                             </div>
-                        </div>
-                    </div>
+                        </Card>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </PageContainer>
+}
+else if (viewMode == ViewMode.Join)
+{
+    <PageContainer Narrow="true">
+        <PageHeader Title="Join a pool" Subtitle="Type your invite code" />
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <Notice Tone="NoticeTone.Error">@errorMessage</Notice>
+        }
+        <Card Tone="CardTone.Outlined">
+            <EditForm Model="@joinModel" OnValidSubmit="StartNewEntry">
+                <MudTextField @bind-Value="joinModel.InviteCode" Label="Invite code" Placeholder="For example BOWL2026" Variant="Variant.Outlined" Immediate="true" />
+                <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap" Class="mt-3">
+                    <PrimaryButton ButtonType="ButtonType.Submit" Large="true">Continue</PrimaryButton>
+                    <SecondaryButton OnClick="BackToDashboard" Large="true">Back</SecondaryButton>
+                </MudStack>
+            </EditForm>
+        </Card>
+    </PageContainer>
+}
+else
+{
+    @* --- EDITOR --- *@
+    var poolGames = ValidGames;
+    var picked = PickedCount(poolGames);
+    var matchups = EntryPickRules.Resolve(allSeasonGames, activeEntry.Picks);
+    var tieBreakerGame = allSeasonGames.FirstOrDefault(g => g.Id == EntryPool?.TieBreakerGameId);
+    var tbText = tieBreakerGame != null
+        ? $"Tiebreaker: total points in the {tieBreakerGame.BowlName} ({tieBreakerGame.TeamAway} and {tieBreakerGame.TeamHome})"
+        : "Tiebreaker: total points";
+
+    <PageContainer>
+        <PageHeader Title="@(string.IsNullOrWhiteSpace(activeEntry.PlayerName) ? "New entry" : activeEntry.PlayerName)"
+                    Subtitle="@EntryPool?.Name"
+                    Status="@EditorStatus"
+                    StatusTone="@(IsEntryLocked ? StatusTone.Alert : StatusTone.Normal)"
+                    StatusIcon="@(IsEntryLocked ? Icons.Material.Outlined.Lock : Icons.Material.Outlined.Schedule)">
+            <Actions>
+                <SecondaryButton Icon="@Icons.Material.Outlined.ArrowBack" OnClick="BackToDashboard">Back</SecondaryButton>
+                @if (!string.IsNullOrEmpty(activeEntry.Id))
+                {
+                    <SecondaryButton OnClick="@(() => OpenPrint(activeEntry.Id))" Icon="@Icons.Material.Outlined.Print">Print my picks</SecondaryButton>
+                }
+            </Actions>
+        </PageHeader>
+
+        <EditForm Model="@activeEntry" OnValidSubmit="SavePicks" OnInvalidSubmit="HandleInvalidSubmit">
+            <DataAnnotationsValidator />
+            <MudStack Spacing="3">
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <Notice Tone="NoticeTone.Error">@errorMessage</Notice>
+            }
+
+            <Card Tone="CardTone.Outlined" Title="Bracket name">
+                <MudTextField @bind-Value="activeEntry.PlayerName" For="@(() => activeEntry.PlayerName)" Disabled="@(!CanEditName)"
+                              Label="Bracket name" Placeholder="Give this bracket a unique name" Variant="Variant.Outlined" Immediate="true" />
+                @if (IsEntryLocked && CanEditName)
+                {
+                    <div><PrimaryButton ButtonType="ButtonType.Submit" Disabled="@isSaving" Icon="@Icons.Material.Outlined.Save">Save name</PrimaryButton></div>
+                }
+            </Card>
+
+            <Card Tone="CardTone.Outlined">
+                <PickProgress Picked="@picked" Total="@poolGames.Count" />
+            </Card>
+
+            @if (!string.IsNullOrEmpty(clearNotice))
+            {
+                <Notice Tone="NoticeTone.Warning">
+                    @clearNotice
+                    <div><SecondaryButton OnClick="DismissClearNotice">Got it</SecondaryButton></div>
+                </Notice>
+            }
+
+            <MudGrid Spacing="2">
+                @{ bool? lastWasPlayoff = null; }
+                @foreach (var game in GameOrder.ForEntry(poolGames))
+                {
+                    @if (lastWasPlayoff != game.IsPlayoff)
+                    {
+                        lastWasPlayoff = game.IsPlayoff;
+                        <MudItem xs="12">
+                            <h2 class="bm-section-title">@(game.IsPlayoff ? "Playoff games" : "Bowl games")</h2>
+                            @if (!IsEntryLocked && !game.IsPlayoff)
+                            {
+                                <div class="bm-note">Tap the team you think will win.</div>
+                            }
+                        </MudItem>
+                    }
+                    var slots = matchups[game.Id];
+                    var waiting = new[] { slots.HomeWaitsFor, slots.AwayWaitsFor }.Where(n => n != null).ToList();
+                    string? hint = waiting.Any() ? $"Pick {string.Join(" and ", waiting)} first." : null;
+                    string? pick = activeEntry.Picks != null && activeEntry.Picks.TryGetValue(game.Id, out var p) ? p : null;
+                    var gameId = game.Id;
+                    <MudItem xs="12" md="6">
+                        <GamePickCard Game="@game" Slots="@slots" AllGames="@allSeasonGames" Pick="@pick"
+                                      Locked="@IsEntryLocked" Cleared="@clearedGameIds.Contains(game.Id)"
+                                      EliminatedTeams="@eliminatedTeams" Hint="@hint"
+                                      OnPick="@((team) => UpdatePick(gameId, team))" />
+                    </MudItem>
+                }
+            </MudGrid>
+
+            <Card Tone="CardTone.Tint" Title="@tbText">
+                <MudNumericField T="int" @bind-Value="activeEntry.TieBreakerPoints" Min="0" Max="999" Disabled="@IsEntryLocked"
+                                 Label="Total points" Variant="Variant.Outlined" HideSpinButtons="true" />
+            </Card>
+
+            @if (!IsEntryLocked)
+            {
+                <StickySaveBar>
+                    <PrimaryButton ButtonType="ButtonType.Submit" Large="true" FullWidth="true" Disabled="@isSaving" Icon="@Icons.Material.Outlined.Save">
+                        @(isSaving ? "Saving..." : "Save my picks")
+                    </PrimaryButton>
+                    <div class="bm-note bm-note--center">You can save part-way and finish later, until the lock time.</div>
+                </StickySaveBar>
+            }
+
+            <details>
+                <summary>Change history</summary>
+                @if (activeEntry.AuditLog != null && activeEntry.AuditLog.Any())
+                {
+                    <ul class="bm-note">
+                        @foreach (var log in activeEntry.AuditLog.AsEnumerable().Reverse())
+                        {
+                            <li>@log</li>
+                        }
+                    </ul>
                 }
                 else
                 {
-                    @* LIST OF CURRENT ENTRIES *@
-                    <div class="row g-3">
-                        @foreach (var entry in currentEntries)
-                        {
-                            var stats = GetEntryStats(entry);
-                            var poolName = pools.FirstOrDefault(p => p.Id == entry.PoolId)?.Name ?? "Unknown Pool";
-                            <div class="col-md-6 col-lg-4">
-                                <div class="card h-100 shadow-sm border-0">
-                                    <div class="card-header bg-white border-bottom-0 pb-0">
-                                         <span class="badge bg-light text-secondary border">@poolName</span>
-                                    </div>
-                                    <div class="card-body pt-2">
-                                         <div class="d-flex justify-content-between align-items-start mb-3">
-                                            <h4 class="card-title fw-bold text-primary mb-0 text-truncate" title="@entry.PlayerName">
-                                                @entry.PlayerName
-                                            </h4>
-                                        </div>
-
-                                         <div class="row text-center mb-3 g-0 border rounded bg-light py-2">
-                                            <div class="col border-end">
-                                                 <small class="text-muted d-block">Points</small>
-                                                <span class="fw-bold fs-5">@stats.Score</span>
-                                            </div>
-                                            <div class="col border-end">
-                                                <small class="text-muted d-block">Max</small>
-                                                 <span class="fw-bold fs-5">@stats.MaxPossible</span>
-                                            </div>
-                                             <div class="col">
-                                                <small class="text-muted d-block">Correct</small>
-                                                 <span class="fw-bold fs-5">@stats.CorrectPicks</span>
-                                            </div>
-                                        </div>
-
-                                         <div class="d-flex gap-2">
-                                            <button class="btn btn-outline-primary flex-grow-1" @onclick="() => EditEntry(entry)">
-                                                 <i class="bi bi-pencil-square"></i> View/Edit
-                                            </button>
-                                            
-                                            @* PRINT BUTTON *@
-                                            <a href="print-bracket/@entry.Id" target="_blank" class="btn btn-outline-secondary" title="Print Bracket">
-                                                 <i class="bi bi-printer"></i>
-                                            </a>
-
-                                             <button class="btn btn-outline-danger" @onclick="() => DeleteEntry(entry)" title="Delete Bracket">
-                                                <i class="bi bi-trash-fill"></i>
-                                             </button>
-                                        </div>
-                                      </div>
-                                </div>
-                            </div>
-                        }
-                    </div>
+                    <div class="bm-note">No changes recorded.</div>
                 }
-            </div>
-
-            @* PAST SEASONS SECTION *@
-            @if (pastEntries.Any())
-            {
-                <div class="mb-4 pt-4 border-top">
-                    <h3 class="h5 text-secondary mb-3"><i class="bi bi-clock-history me-2"></i>Past Seasons</h3>
-                    
-                    <div class="row g-3">
-                        @foreach (var entry in pastEntries.OrderByDescending(e => e.SeasonId))
-                        {
-                            var poolName = pools.FirstOrDefault(p => p.Id == entry.PoolId)?.Name ?? "Unknown Pool";
-                            <div class="col-md-6 col-lg-4"> 
-                                <div class="card h-100 shadow-sm border-0 bg-light">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-start mb-2">
-                                            <div>
-                                                 <h5 class="card-title text-dark mb-1">@poolName</h5>
-                                                 <h6 class="card-subtitle text-muted small">Season @(seasonNameMap.TryGetValue(entry.SeasonId, out var sName) ? sName : entry.SeasonId)</h6>
-                                            </div>
-                                            <span class="badge bg-secondary">Archived</span>
-                                        </div>
-                                        
-                                        <p class="card-text small mt-2">
-                                            Bracket: <strong>@entry.PlayerName</strong>
-                                        </p>
-
-                                        <div class="d-grid mt-3">
-                                            <a href="history/@entry.PoolId" class="btn btn-outline-primary btn-sm">
-                                                <i class="bi bi-eye me-1"></i> View Pool Archive
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                </div>
-            }
-        }
-
-        @* --- JOIN VIEW (STANDALONE) --- *@
-        @if (viewMode == ViewMode.Join)
-        {
-             <div class="card shadow-sm mw-100 mx-auto mt-5" style="max-width: 500px;">
-                <div class="card-body p-5 text-center">
-                    <button class="btn btn-sm btn-close position-absolute top-0 end-0 m-3" @onclick="BackToDashboard"></button>
-                     
-                    <i class="bi bi-ticket-perforated display-1 text-secondary mb-3"></i>
-                    <h3 class="mb-3">Enter Pool</h3>
-                    <p class="text-muted mb-4">Enter your invite code to join a pool.</p>
-                   
-                    <EditForm Model="@joinModel" OnValidSubmit="StartNewEntry">
-                        <div class="mb-3">
-                            <InputText @bind-Value="joinModel.InviteCode" class="form-control form-control-lg text-center" placeholder="e.g. BOWL2025" />
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-lg w-100">Continue</button>
-                     </EditForm>
-                </div>
-            </div>
-        }
-
-        @* --- EDITOR VIEW --- *@
-        @if (viewMode == ViewMode.Editor)
-        {
-             <div class="d-flex justify-content-between align-items-center mb-4">
-                <div class="d-flex align-items-center">
-                    <button class="btn btn-outline-secondary me-3" @onclick="BackToDashboard">
-                         <i class="bi bi-arrow-left"></i> Back
-                     </button>
-                    <div>
-                        <h2 class="fw-bold mb-0">
-                            @(string.IsNullOrEmpty(activeEntry.Id) ? "New Entry" : "Edit Entry")
-                        </h2>
-                        @if (EntryPool != null)
-                        {
-                            <div class="small text-muted">@EntryPool.Name</div>
-                        }
-
-                        @if (IsEntryLocked)
-                        {
-                             <span class="badge" style="background-color:#ffc107;color:#000;"><i class="bi bi-lock-fill"></i> Locked</span>
-                          }
-                        else if (EntryPool != null)
-                        {
-                            <span class="text-muted small">Deadline: @DateTimeHelper.ToCentralLabel(EntryPool.LockDate, "g")</span>
-                         }
-                    </div>
-                </div>
-                
-                @if(!string.IsNullOrEmpty(activeEntry.Id)) 
-                {
-                    <a href="print-bracket/@activeEntry.Id" target="_blank" class="btn btn-outline-secondary">
-                        <i class="bi bi-printer me-2"></i> Print Picks
-                     </a>
-                }
-            </div>
-
-            <EditForm Model="@activeEntry" OnValidSubmit="SavePicks" OnInvalidSubmit="HandleInvalidSubmit">
-                <DataAnnotationsValidator />
-                
-                @if (!string.IsNullOrEmpty(errorMessage))
-                 {
-                    <div class="alert alert-danger">
-                        <i class="bi bi-exclamation-triangle-fill"></i> @errorMessage
-                    </div>
-                 }
-
-                @* PLAYER NAME *@
-                <div class="card mb-4 shadow-sm">
-                    <div class="card-body">
-                        <label class="form-label fw-bold">Bracket Name</label>
-                        <div class="input-group">
-                             <InputText @bind-Value="activeEntry.PlayerName" class="form-control" disabled="@(!CanEditName)" placeholder="Give this bracket a unique name" />
-                             @if (IsEntryLocked && CanEditName)
-                             {
-                                 <button class="btn btn-primary" type="submit" disabled="@isSaving">
-                                     @if (isSaving)
-                                     {
-                                        <span class="spinner-border spinner-border-sm"></span>
-                                     }
-                                     else
-                                     {
-                                        <i class="bi bi-save-fill"></i> <span>Save Name</span>
-                                     }
-                                 </button>
-                             }
-                        </div>
-                        <ValidationMessage For="@(() => activeEntry.PlayerName)" />
-                    </div>
-                </div>
-
-                @* GAMES LIST *@
-                <div class="card shadow-sm mb-5">
-                    <div class="card-header bg-dark text-white fw-bold">
-                        @{ var poolGames = ValidGames; var picked = PickedCount(poolGames); }
-                        Make Your Picks: @picked of @poolGames.Count picked@(poolGames.Count - picked > 0 ? $", {poolGames.Count - picked} left" : "")
-                    </div>
-
-                    @if (!string.IsNullOrEmpty(clearNotice))
-                    {
-                        <div class="alert alert-warning alert-dismissible m-3 mb-0" role="alert">
-                            <i class="bi bi-exclamation-triangle-fill me-1"></i> @clearNotice
-                            <button type="button" class="btn-close" aria-label="Dismiss" @onclick="DismissClearNotice"></button>
-                        </div>
-                    }
-
-                    <div class="row row-cols-1 row-cols-lg-2 g-4">
-                        @{ var matchups = EntryPickRules.Resolve(allSeasonGames, activeEntry.Picks); }
-                        @foreach (var game in poolGames.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
-                        {
-                            string pick = "";
-                            if (activeEntry.Picks?.TryGetValue(game.Id, out var p) == true)
-                            {
-                                pick = p;
-                            }
-
-                            var slots = matchups[game.Id];
-                            var waiting = new[] { slots.HomeWaitsFor, slots.AwayWaitsFor }.Where(n => n != null).ToList();
-                            string? hint = waiting.Any() ? $"Pick {string.Join(" and ", waiting)} first." : null;
-
-                            <div class="col">
-                                <GameCard Game="@game"
-                                          HomeTeamName="@slots.HomeLabel"
-                                          AwayTeamName="@slots.AwayLabel"
-                                          HomeUnavailable="@(slots.Home == null)"
-                                          AwayUnavailable="@(slots.Away == null)"
-                                          Hint="@hint"
-                                          PickCleared="@clearedGameIds.Contains(game.Id)"
-                                          UserPick="@pick"
-                                          IsLocked="@IsEntryLocked"
-                                          AllGames="@allSeasonGames"
-                                          EliminatedTeams="@eliminatedTeams"
-                                          OnPickSelected="@((p) => UpdatePick(game.Id, p))" />
-                            </div>
-                        }
-                    </div>
-                </div>
-
-                 @* TIEBREAKER *@
-                <div class="card mb-4 shadow-sm border-primary">
-                     <div class="card-body bg-primary bg-opacity-10">
-                        @{
-                             var tieBreakerGame = allSeasonGames.FirstOrDefault(g => g.Id == EntryPool?.TieBreakerGameId);
-                             string tbText = tieBreakerGame != null 
-                                 ? $"Tiebreaker: Total Points in {tieBreakerGame.BowlName} - {tieBreakerGame.TeamHome} vs {tieBreakerGame.TeamAway}"
-                                 : "Tiebreaker: Total Points";
-                        }
-                        <label class="form-label fw-bold text-dark">@tbText</label>
-                         <InputNumber @bind-Value="activeEntry.TieBreakerPoints" class="form-control" disabled="@IsEntryLocked" />
-                    </div>
-                </div>
-
-                @* ACTIONS *@
-                @if (!IsEntryLocked)
-                 {
-                    <div class="d-grid gap-2 mb-5">
-                        <button type="submit" class="btn btn-success btn-lg" disabled="@isSaving">
-                             @if (isSaving)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2"></span> <span>Saving...</span>
-                             }
-                            else
-                            {
-                                  <i class="bi bi-save-fill"></i> <span>Save Bracket</span>
-                            }
-                        </button>
-                    </div>
-                }
-
-                @* AUDIT LOG *@
-                <div class="card mb-4 shadow-sm mt-5">
-                    <div class="card-header bg-secondary text-white small py-1">
-                        <i class="bi bi-clock-history me-1"></i> Change History
-                    </div>
-                    <div class="card-body bg-light p-2" style="max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.85em;">
-                        @if (activeEntry.AuditLog != null && activeEntry.AuditLog.Any())
-                        {
-                            <ul class="list-unstyled mb-0">
-                                @foreach (var log in activeEntry.AuditLog.AsEnumerable().Reverse())
-                                {
-                                    <li class="mb-1 border-bottom pb-1">@log</li>
-                                }
-                            </ul>
-                        }
-                        else
-                        {
-                            <div class="text-muted fst-italic p-2">No changes recorded.</div>
-                        }
-                    </div>
-                </div>
-             </EditForm>
-        }
-    }
-    
-    @* TOAST NOTIFICATION *@
-    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1050">
-        <div class="toast @(showToast ? "show" : "hide") align-items-center text-white @(isSuccessToast ? "bg-success" : "bg-danger") border-0" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body fs-6">
-                    <i class="@(isSuccessToast ? "bi bi-check-circle-fill" : "bi bi-exclamation-triangle-fill") me-2"></i> @toastMessage
-                </div>
-                 <button type="button" class="btn-close btn-close-white me-2 m-auto" @onclick="() => showToast = false"></button>
-            </div>
-        </div>
-    </div>
-</div>
+            </details>
+            </MudStack>
+        </EditForm>
+    </PageContainer>
+}
 
 @code {
     private enum ViewMode { Dashboard, Join, Editor }
@@ -378,10 +259,6 @@
     
     private bool isSaving = false;
     private string errorMessage = "";
-    
-    private bool showToast = false;
-    private bool isSuccessToast = true;
-    private string toastMessage = "";
     
     private List<BowlPool> pools = new();
     
@@ -435,6 +312,9 @@
     // Helpers for Editor
     private BowlPool? EntryPool => pools.FirstOrDefault(p => p.Id == activeEntry.PoolId);
     private bool IsEntryLocked => EntryPool != null && DateTime.UtcNow > EntryPool.LockDate;
+    private string EditorStatus => EntryPool == null ? "" : IsEntryLocked
+        ? "Picks are locked. Everyone can now see everyone's picks."
+        : StatusLineText.ForPool(DateTime.UtcNow, EntryPool.LockDate, null, 0, 0);
     private bool CanEditName => EntryPool == null || !EntryPool.IsConcluded;
 
     protected override async Task OnInitializedAsync()
@@ -766,22 +646,16 @@
         return rows.FirstOrDefault() ?? new LeaderboardRow();
     }
 
-    private void TriggerToast(string message, bool success)
-    {
-        toastMessage = message;
-        isSuccessToast = success;
-        showToast = true;
-        
-        _ = Task.Delay(4000).ContinueWith(t => 
-        {
-            showToast = false;
-            InvokeAsync(StateHasChanged);
-        });
-    }
+    // The print page opens in a new tab so unsaved picks in the editor are not lost.
+    private async Task OpenPrint(string entryId) =>
+        await JS.InvokeVoidAsync("open", $"print-bracket/{entryId}", "_blank");
+
+    // The blank entry form (group D builds it), for players who fill in picks on paper.
+    private async Task OpenPrintBlank() =>
+        await JS.InvokeVoidAsync("open", "print-bracket", "_blank");
+
+    private void TriggerToast(string message, bool success) =>
+        Snackbar.Add(message, success ? Severity.Success : Severity.Error);
 
 
 }
-
-<style>
-    /* Shared styles moved to GameCard.razor */
-</style>

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using BowlPoolManager.Api.Services;
 using BowlPoolManager.Api.Services.ScoreFeed;
 using BowlPoolManager.Core.Domain;
+using BowlPoolManager.Core.Helpers;
 using BowlPoolManager.Api.Helpers;
 using System.Text.Json;
 using BowlPoolManager.Api.Repositories; // NEW
@@ -147,6 +148,14 @@ namespace BowlPoolManager.Api.Functions
                  var badRequest = req.CreateResponse(HttpStatusCode.BadRequest);
                  await badRequest.WriteStringAsync("A Final game needs both scores and a winner. Games cannot end tied.");
                  return badRequest;
+             }
+
+             // AP rank is typed by hand: 1 to 25 or empty.
+             if (game != null && (!ApRank.IsValid(game.HomeApRank) || !ApRank.IsValid(game.AwayApRank)))
+             {
+                 var badRank = req.CreateResponse(HttpStatusCode.BadRequest);
+                 await badRank.WriteStringAsync($"An AP rank must be a number from 1 to {ApRank.Max}, or empty.");
+                 return badRank;
              }
 
              if (game != null) await _scoringService.ProcessGameUpdateAsync(game);

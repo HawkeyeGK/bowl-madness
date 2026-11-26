@@ -1,0 +1,35 @@
+/* MatchupCard: its own styles, scoped to the component (the shared ui.css is not touched). Colors come from theme.css. */
+.bm-mc { background: var(--bm-surface); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.2), 0 1px 1px rgba(0,0,0,.12); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; min-width: 0; }
+@media (min-width: 900px) { .bm-mc { padding: 14px 16px; } }
+
+.bm-mc-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.bm-mc-title { font-size: 15px; font-weight: 700; color: var(--bm-ink-2); min-width: 0; }
+.bm-mc-pts { font-weight: 400; color: var(--bm-muted); }
+.bm-mc-status { font-size: 14px; color: var(--bm-muted); white-space: nowrap; }
+.bm-mc-status--final { color: var(--bm-ink-2); font-weight: 700; }
+.bm-mc-status--live { font-weight: 700; color: #fff; background: var(--bm-red); border-radius: 4px; padding: 3px 8px; animation: bm-mc-pulse 2s infinite; }
+@keyframes bm-mc-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .bm-mc-status--live { animation: none; } }
+
+.bm-mc-team { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.bm-mc-team ::deep img, .bm-mc-team ::deep div[style] { flex: none; }
+.bm-mc-name { flex: 1; min-width: 0; font-size: 19px; overflow-wrap: anywhere; }
+.bm-mc-name--tbd { font-style: italic; color: var(--bm-muted); }
+.bm-mc-rank { font-size: 14px; font-weight: 700; margin-right: 3px; }
+.bm-mc-seed { font-size: 14px; color: var(--bm-muted); }
+.bm-mc-score { font-size: 26px; font-variant-numeric: tabular-nums; color: var(--bm-muted); min-width: 1.5em; text-align: right; }
+.bm-mc-team--won .bm-mc-name, .bm-mc-team--won .bm-mc-score { font-weight: 700; color: var(--bm-ink); }
+.bm-mc-team--lost .bm-mc-name { color: var(--bm-muted); }
+
+.bm-mc-pick { font-size: 16px; border-radius: 6px; padding: 6px 10px; background: var(--bm-orange-tint); color: #7C2D12; }
+.bm-mc-pick--correct { background: #DCFCE7; color: #166534; font-weight: 700; }
+.bm-mc-pick--wrong { background: #FEE2E2; color: #991B1B; }
+.bm-mc-pick--none { background: var(--bm-page); color: var(--bm-muted); }
+
+.bm-mc-split { display: flex; flex-direction: column; gap: 4px; }
+.bm-mc-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--bm-line); }
+.bm-mc-bar-a { background: var(--bm-navy); }
+.bm-mc-bar-b { background: var(--bm-amber); }
+.bm-mc-split-text { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; color: var(--bm-muted); }
+
+.bm-mc-where { font-size: 14px; color: var(--bm-muted); }

@@ -14,7 +14,7 @@ Where things live:
 | Component styles | `Client/wwwroot/css/ui.css` |
 | Fonts (shipped, no CDN) | `Client/wwwroot/fonts/` (OFL licences in `LICENSES.txt`) |
 | Frame: `MainLayout`, `AppHeader` | `Client/Layout/` |
-| Logic that is not drawing | `Core/Helpers`: `SiteNavigation`, `StatusLineText`, `TopThreeRule`, `PoolPicker` (xUnit tests in `Tests/Core`) |
+| Logic that is not drawing | `Core/Helpers`: `SiteNavigation`, `StatusLineText`, `TopThreeRule`, `PoolPicker`; group B adds `MyEntryMemory`, `PinnedEntries`, `PlaceText`, `ScoresGrouping`, `ScoreGameText`, `GameSlots`, `PickLine`, `PickOutcomes`, `PickSplit`, `PickVisibility`, `ApRank` (xUnit tests in `Tests/Core`) |
 
 ## Rules every page follows
 - Wrap the page in `PageContainer` and start with `PageHeader`. The browser tab title comes from `PageHeader`; do not add a `PageTitle`.
@@ -76,11 +76,24 @@ A message box: `Tone` is `Info`, `Tip`, `Success`, `Warning` or `Error`, with an
 ### TeamPickButton
 The big team button for picks. `Team` (for the logo, using `TeamLogo`), `Name`, `ApRank` (shown "#15"), `Seed` (shown "(7)"), `SubText`, `OnClick`, and `State`: `Normal`, `Selected`, `Disabled` (team not decided yet; use `ShowLogo` and a name such as "Winner of Rose Bowl"), `Error` (a pick is missing), `Correct` and `Wrong` (final game). Put two per row in a two-column grid on phones.
 
+### MatchupCard
+One game, for Scores and Entry details: both teams (away first) with `TeamLogo`, AP rank ("#22"), seed ("(7)") and score; a status (`Scheduled` shows the kickoff text, `Live` is red and pulses, `Final` makes the winner bold and dims the loser); points at stake (`PointsText`, for example "4 pts · Quarterfinal"); an optional pick line (`MatchupPick`: text and `PickOutcome`, green for right, red for wrong, grey for no pick; build it with `PickLine` in Core); an optional pool split bar (`PickSplitResult`); and a "where" line (network and place). Teams are `MatchupTeam` records (`GameSlots.Resolve` in Core works out "Winner of ..." slots); the status text comes from `ScoreGameText`. Its styles are in `MatchupCard.razor.css` (scoped; colors from theme.css), not ui.css. Put cards in a `MudGrid` (`xs="12" md="6" lg="4"`).
+
 ### PoolSwitcher
 Draws the pool choice from `PoolSelection`: `PoolSwitcherMode.HeaderTabs` (once, in `AppHeader`) on phones and `PoolSwitcherMode.Segmented` (in a page's `PageHeader` actions) on wide screens. Shown only when there is more than one pool.
 
 ### BottomNav
 The four phone tabs. Only `MainLayout` uses it. A `LiveKeys` entry puts a red dot on a tab (Scores while a game is being played).
+
+## Pick screens (Release 2 group C)
+Page-level components in `Client/Components`, built from the shared set and not part of it:
+- `GamePickCard`: one game on My Picks (away team first, home second), with locked (right or wrong once final) and "pick cleared" states.
+- `PickProgress`: "12 of 34 picked" with a bar.
+- `StickySaveBar`: keeps the save button on screen, just above the phone bottom navigation.
+- `CompactPickButton`: the 44 px team button in the paper-entry table.
+- `PickSequenceInput`: the fast-entry digit box (1 = first team listed, 2 = second, 0 = skip).
+
+Game order for picks and print is `GameOrder.ForEntry` (Core): bowl games by kickoff, then playoff games by kickoff. The digit logic is `FastEntry` (Core, xUnit tests).
 
 ## Adding to the set
 1. Write the component in `Client/Ui/` with a short comment per parameter.

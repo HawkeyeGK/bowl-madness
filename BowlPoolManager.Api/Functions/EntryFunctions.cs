@@ -206,6 +206,15 @@ namespace BowlPoolManager.Api.Functions
                 var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
                 bool assignToMe = string.Equals(queryParams["assignToMe"], "true", StringComparison.OrdinalIgnoreCase);
 
+                // An Admin keying an entry for someone says who it belongs to (an account or a typed name).
+                var ownerResult = EntrySubmission.ValidateOwner(submitted, isAdmin, assignToMe);
+                if (!ownerResult.IsValid)
+                {
+                    var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badReq.WriteStringAsync(ownerResult.ErrorMessage);
+                    return badReq;
+                }
+
                 // Only the name, picks and tiebreaker come from the browser; the rest is the stored entry or the server.
                 var entry = EntrySubmission.Build(submitted, existingEntry, pool.Id, pool.SeasonId,
                     Constants.DocumentTypes.BracketEntry, caller.UserId, isAdmin, assignToMe);

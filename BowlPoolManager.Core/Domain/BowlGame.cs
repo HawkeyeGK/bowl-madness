@@ -83,6 +83,15 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("teamAwaySeed")]
         public int? TeamAwaySeed { get; set; }
 
+        // AP RANK: typed by an admin on the games page, shown as "#15 Utah". Nullable: older documents have neither field.
+        [JsonProperty("homeApRank")]
+        [JsonPropertyName("homeApRank")]
+        public int? HomeApRank { get; set; }
+
+        [JsonProperty("awayApRank")]
+        [JsonPropertyName("awayApRank")]
+        public int? AwayApRank { get; set; }
+
         // SCORES
         [JsonProperty("teamHomeScore")]
         [JsonPropertyName("teamHomeScore")]

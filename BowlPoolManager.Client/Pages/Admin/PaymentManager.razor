@@ -3,122 +3,96 @@
 @using BowlPoolManager.Core
 @using Microsoft.AspNetCore.Authorization
 @using BowlPoolManager.Client.Services
+@using MudBlazor
 @using System.Net.Http.Json
 @attribute [Authorize(Roles = "SuperAdmin,Admin")]
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject ISeasonService SeasonService
+@inject ISnackbar Snackbar
 
-<PageTitle>Payment Manager</PageTitle>
+@* Release 2 group C: payments. Same calls as before (SetEntryPaidStatus checks the caller on the server). *@
 
-<div class="container-fluid mt-3 px-4">
-    <div class="d-flex justify-content-between align-items-end mb-3">
-        <div class="d-flex flex-column gap-2">
-            <div class="d-flex align-items-center gap-3">
-                <h1 class="h3 fw-bold mb-0"><i class="bi bi-cash-coin text-primary"></i> Payment Manager</h1>
-            </div>
-        </div>
-        <a href="admin/dashboard" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Dashboard
-        </a>
-    </div>
+<PageContainer>
+    <PageHeader Title="Payments" Subtitle="@Summary">
+        <Actions>
+            <SecondaryButton Href="/admin/dashboard" Icon="@Icons.Material.Outlined.ArrowBack">Dashboard</SecondaryButton>
+        </Actions>
+    </PageHeader>
 
-    @* --- FILTERS --- *@
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="form-label fw-bold">Select Pool</label>
-                    <select class="form-select" @bind="SelectedPoolId" disabled="@(Pools.Count == 0)">
-                        <option value="">-- All Active Pools (Current Season) --</option>
-                        @foreach (var pool in Pools)
-                        {
-                            <option value="@pool.Id">@pool.Name</option>
-                        }
-                    </select>
-                </div>
-                <div class="col-md-6 d-flex align-items-end">
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="unpaidOnly" @bind="ShowUnpaidOnly">
-                        <label class="form-check-label user-select-none" for="unpaidOnly">Show Unpaid Only</label>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <Card Tone="CardTone.Outlined">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" md="6">
+                <MudSelect T="string" @bind-Value="SelectedPoolId" Label="Pool" Variant="Variant.Outlined" Disabled="@(Pools.Count == 0)">
+                    <MudSelectItem T="string" Value="@("")">All pools (current season)</MudSelectItem>
+                    @foreach (var pool in Pools)
+                    {
+                        <MudSelectItem T="string" Value="@pool.Id">@pool.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSwitch T="bool" @bind-Value="ShowUnpaidOnly" Label="Show unpaid only" Color="Color.Primary" />
+            </MudItem>
+        </MudGrid>
+    </Card>
 
-    @* --- ENTRIES TABLE --- *@
     @if (IsLoading)
     {
-        <div class="d-flex justify-content-center my-5">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        </div>
+        <LoadingIndicator Text="Loading entries..." />
     }
     else if (FilteredEntries.Count == 0)
     {
-        <div class="alert alert-info text-center">
-            No entries found for the selected criteria.
-        </div>
+        <EmptyState Title="No entries found" Icon="@Icons.Material.Outlined.Payments">
+            <ChildContent>No entries match these filters.</ChildContent>
+        </EmptyState>
     }
     else
     {
-        <div class="card shadow-sm border-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
-                        <tr>
-                            <th scope="col" class="ps-4 cursor-pointer" style="cursor: pointer;" @onclick="@(() => Sort("PlayerName"))">
-                                Player Name @GetSortIcon("PlayerName")
-                            </th>
-                            <th scope="col" class="cursor-pointer" style="cursor: pointer;" @onclick="@(() => Sort("Email"))">
-                                Email @GetSortIcon("Email")
-                            </th>
-                            <th scope="col" class="cursor-pointer" style="cursor: pointer;" @onclick="@(() => Sort("Pool"))">
-                                Pool @GetSortIcon("Pool")
-                            </th>
-                            <th scope="col" class="cursor-pointer" style="cursor: pointer;" @onclick="@(() => Sort("Status"))">
-                                Payment Status @GetSortIcon("Status")
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var entry in FilteredEntries)
-                        {
-                            <tr>
-                                <td class="ps-4">
-                                    <span class="fw-bold text-dark">@entry.PlayerName</span>
-                                </td>
-                                <td>
-                                    <span class="small text-muted">@GetUserEmail(entry.UserId)</span>
-                                </td>
-                                <td>
-                                    <span class="badge bg-light text-dark border">@GetPoolName(entry.PoolId)</span>
-                                </td>
-                                <td>
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="pay-@entry.Id" 
-                                               checked="@entry.IsPaid" 
-                                               @onchange="@(e => TogglePayment(entry, (bool?)e.Value ?? false))">
-                                        <label class="form-check-label fw-bold @(entry.IsPaid ? "text-success" : "text-danger")" for="pay-@entry.Id">
-                                            @(entry.IsPaid ? "PAID" : "UNPAID")
-                                        </label>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-            <div class="card-footer bg-white text-muted small">
-                Showing @FilteredEntries.Count entries
-            </div>
-        </div>
+        <DataTable Label="Entry payments">
+            <TableHeader Columns="@PhoneColumns" ColumnsWide="@WideColumns">
+                <TableHeaderCell Text="Bracket" OnSort="@(() => Sort("PlayerName"))" SortActive="@(CurrentSortColumn == "PlayerName")" Ascending="IsAscending" />
+                <TableHeaderCell Text="Owner" HidePhone="true" OnSort="@(() => Sort("Email"))" SortActive="@(CurrentSortColumn == "Email")" Ascending="IsAscending" />
+                <TableHeaderCell Text="Pool" HidePhone="true" OnSort="@(() => Sort("Pool"))" SortActive="@(CurrentSortColumn == "Pool")" Ascending="IsAscending" />
+                <TableHeaderCell Text="Paid" End="true" OnSort="@(() => Sort("Status"))" SortActive="@(CurrentSortColumn == "Status")" Ascending="IsAscending" />
+            </TableHeader>
+            @foreach (var entry in FilteredEntries)
+            {
+                <TableRow Columns="@PhoneColumns" ColumnsWide="@WideColumns">
+                    <TableCell Kind="CellKind.Name">
+                        <span>@entry.PlayerName</span>
+                        <span class="bm-only-phone"><Badge>@GetPoolName(entry.PoolId)</Badge></span>
+                    </TableCell>
+                    <TableCell HidePhone="true">@GetUserEmail(entry)</TableCell>
+                    <TableCell HidePhone="true">@GetPoolName(entry.PoolId)</TableCell>
+                    <TableCell End="true">
+                        <MudStack Row="true" Spacing="1" Justify="Justify.FlexEnd" AlignItems="AlignItems.Center">
+                            <Badge Tone="@(entry.IsPaid ? BadgeTone.Good : BadgeTone.Alert)">@(entry.IsPaid ? "Paid" : "Unpaid")</Badge>
+                            <MudSwitch T="bool" Value="entry.IsPaid" ValueChanged="@(paid => TogglePayment(entry, paid))" Color="Color.Primary"
+                                       AriaLabel="@($"{entry.PlayerName} paid")" />
+                        </MudStack>
+                    </TableCell>
+                </TableRow>
+            }
+        </DataTable>
     }
-</div>
+</PageContainer>
 
 @code {
+    // Phone: name (with the pool) and the paid switch. Wide screens add email and pool.
+    private const string PhoneColumns = "minmax(0, 1fr) 128px";
+    private const string WideColumns = "minmax(160px, 1.4fr) minmax(180px, 1.6fr) minmax(120px, 1fr) 140px";
+
+    private string Summary
+    {
+        get
+        {
+            var scope = AllEntries.Where(e => string.IsNullOrEmpty(SelectedPoolId) || e.PoolId == SelectedPoolId).ToList();
+            int paid = scope.Count(e => e.IsPaid);
+            return $"{scope.Count} {(scope.Count == 1 ? "entry" : "entries")}: {paid} paid, {scope.Count - paid} unpaid";
+        }
+    }
+
     private bool IsLoading = true;
     private string SelectedPoolId = "";
     private bool ShowUnpaidOnly = false;
@@ -144,8 +118,8 @@
                     break;
                 case "Email":
                     query = IsAscending 
-                        ? query.OrderBy(e => GetUserEmail(e.UserId)) 
-                        : query.OrderByDescending(e => GetUserEmail(e.UserId));
+                        ? query.OrderBy(e => GetUserEmail(e)) 
+                        : query.OrderByDescending(e => GetUserEmail(e));
                     break;
                 case "Pool":
                     query = IsAscending 
@@ -219,9 +193,11 @@
         return pool?.Name ?? "Unknown Pool";
     }
 
-    private string GetUserEmail(string userId)
+    // The owner's email; for someone with no account, the name an Admin typed.
+    private string GetUserEmail(BracketEntry entry)
     {
-        return UserEmailMap.TryGetValue(userId, out var email) ? email : "Admin Entered";
+        if (UserEmailMap.TryGetValue(entry.UserId, out var email)) return email;
+        return string.IsNullOrWhiteSpace(entry.OwnerName) ? "Admin Entered" : $"{entry.OwnerName} (no account)";
     }
 
     private void Sort(string column)
@@ -237,12 +213,6 @@
         }
     }
 
-    private string GetSortIcon(string column)
-    {
-        if (CurrentSortColumn != column) return "↕";
-        return IsAscending ? "↑" : "↓";
-    }
-
     private async Task TogglePayment(BracketEntry entry, bool isPaid)
     {
         try
@@ -256,13 +226,13 @@
             {
                 // Revert on failure
                 entry.IsPaid = !isPaid;
-                Console.WriteLine("Failed to update payment status.");
+                Snackbar.Add($"Could not update payment for {entry.PlayerName}.", Severity.Error);
             }
         }
         catch (Exception ex)
         {
              entry.IsPaid = !isPaid;
-             Console.WriteLine($"Error: {ex.Message}");
+             Snackbar.Add($"Could not update payment for {entry.PlayerName}: {ex.Message}", Severity.Error);
         }
     }
 }
