@@ -1,0 +1,88 @@
+@* One game: both teams with logo, AP rank, seed and score, live status, points at stake, an optional line about one entry's pick, and an optional pool split bar. Used by Scores and Entry details. *@
+<article class="bm-mc" aria-label="@BowlName">
+    <div class="bm-mc-head">
+        <div class="bm-mc-title">@BowlName@if (!string.IsNullOrEmpty(PointsText)) {<span class="bm-mc-pts"> · @PointsText</span>}</div>
+        <div class="@StatusClass">@StatusDisplay</div>
+    </div>
+
+    @TeamRow(Away)
+    @TeamRow(Home)
+
+    @if (Pick != null)
+    {
+        <div class="bm-mc-pick @PickClass">@Pick.Text</div>
+    }
+
+    @if (Split != null)
+    {
+        <div class="bm-mc-split">
+            <div class="bm-mc-bar" role="img" aria-label="@SplitSummary">
+                <div class="bm-mc-bar-a" style="width: @Percent(Split.AwayPercent)"></div>
+                <div class="bm-mc-bar-b" style="width: @Percent(Split.HomePercent)"></div>
+            </div>
+            <div class="bm-mc-split-text" aria-hidden="true"><span>@Split.Away picked @Away.Name</span><span>@Split.Home picked @Home.Name</span></div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(Where))
+    {
+        <div class="bm-mc-where">@Where</div>
+    }
+</article>
+
+@code {
+    /// <summary>The bowl or playoff game name.</summary>
+    [Parameter, EditorRequired] public string BowlName { get; set; } = "";
+    /// <summary>Points at stake, for example "1 pt" or "4 pts · Quarterfinal".</summary>
+    [Parameter] public string? PointsText { get; set; }
+    [Parameter] public MatchupStatus Status { get; set; }
+    /// <summary>Kickoff time, the live clock, or "Final". "LIVE · " is added for a live game.</summary>
+    [Parameter] public string? StatusText { get; set; }
+    /// <summary>The team listed first (away).</summary>
+    [Parameter, EditorRequired] public MatchupTeam Away { get; set; } = default!;
+    /// <summary>The team listed second (home).</summary>
+    [Parameter, EditorRequired] public MatchupTeam Home { get; set; } = default!;
+    /// <summary>The remembered or viewed entry's pick; leave empty to draw nothing.</summary>
+    [Parameter] public MatchupPick? Pick { get; set; }
+    /// <summary>How the pool split its picks (only after lock); leave empty to draw nothing.</summary>
+    [Parameter] public BowlPoolManager.Core.Helpers.PickSplitResult? Split { get; set; }
+    /// <summary>Network and place, for example "ESPN · Tampa, FL".</summary>
+    [Parameter] public string? Where { get; set; }
+
+    private string StatusDisplay => Status == MatchupStatus.Live ? "LIVE · " + StatusText : StatusText ?? "";
+
+    private string StatusClass => Status switch
+    {
+        MatchupStatus.Live => "bm-mc-status bm-mc-status--live",
+        MatchupStatus.Final => "bm-mc-status bm-mc-status--final",
+        _ => "bm-mc-status"
+    };
+
+    private string PickClass => Pick?.Outcome switch
+    {
+        BowlPoolManager.Core.Helpers.PickOutcome.Correct => "bm-mc-pick--correct",
+        BowlPoolManager.Core.Helpers.PickOutcome.Wrong => "bm-mc-pick--wrong",
+        BowlPoolManager.Core.Helpers.PickOutcome.NoPick => "bm-mc-pick--none",
+        _ => ""
+    };
+
+    private string SplitSummary => Split == null ? "" : $"{Split.Away} picked {Away.Name}, {Split.Home} picked {Home.Name}";
+
+    private static string Percent(double value) => value.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+    private RenderFragment TeamRow(MatchupTeam team) => @<div class="bm-mc-team @(team.Won ? "bm-mc-team--won" : null) @(Status == MatchupStatus.Final && !team.Won && team.Decided ? "bm-mc-team--lost" : null)">
+        <TeamLogo Team="team.Decided ? team.Info : null" SizePx="40px" />
+        <div class="bm-mc-name @(team.Decided ? null : "bm-mc-name--tbd")">
+            @if (team.ApRank is > 0)
+            {
+                <span class="bm-mc-rank"><span class="bm-sr-only">Ranked </span>#@team.ApRank</span>
+            }
+            @team.Name
+            @if (team.Seed is > 0)
+            {
+                <span class="bm-mc-seed"> (@team.Seed)</span>
+            }
+        </div>
+        <div class="bm-mc-score">@team.Score</div>
+    </div>;
+}

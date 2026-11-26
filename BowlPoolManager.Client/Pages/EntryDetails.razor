@@ -3,105 +3,100 @@
 @using BowlPoolManager.Core
 @using BowlPoolManager.Core.Helpers
 @using BowlPoolManager.Client.Services
-@using BowlPoolManager.Client.Components
 @using BowlPoolManager.Client.Helpers
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Authorization
 @inject ISeasonService SeasonService
 @inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
 
-<div class="container-fluid mt-3 px-4 pb-5">
-    <div class="mb-4">
-        <a href="/" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-arrow-left"></i> Back to Leaderboard
-        </a>
-    </div>
+@*
+    Release 2 Entry details: one entry's picks as MatchupCards, grouped Bowl games then each playoff round, each pick marked
+    right, wrong or pending. Later-round teams come from the entry's own earlier picks (BracketHelper.ResolveMatchup).
+    The server hides other players' picks until the pool locks; before then this page shows only the signed-in owner's own picks (Admins use the admin section).
+*@
+
+<PageContainer>
+    <PageHeader Title="@(entry?.PlayerName ?? "Entry")"
+                DocumentTitle="@(entry == null ? "Entry" : entry.PlayerName + " - picks")"
+                Subtitle="@currentPool?.Name"
+                Status="@StatusText"
+                StatusIcon="@Icons.Material.Outlined.Schedule">
+        <Actions>
+            <span class="bm-only-phone"><SecondaryButton Href="@BackHref" Icon="@Icons.Material.Outlined.ArrowBack" IconOnly="true">Leaderboard</SecondaryButton></span>
+            <span class="bm-only-wide"><SecondaryButton Href="@BackHref" Icon="@Icons.Material.Outlined.ArrowBack">Leaderboard</SecondaryButton></span>
+        </Actions>
+    </PageHeader>
 
     @if (isLoading)
     {
-        <div class="d-flex justify-content-center">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        </div>
+        <LoadingIndicator Text="Loading the picks..." />
     }
     else if (entry == null)
     {
-        <div class="alert alert-warning">Entry not found.</div>
+        <EmptyState Title="Entry not found" Icon="@Icons.Material.Outlined.SearchOff">
+            <ChildContent>This entry may have been deleted or the link is wrong.</ChildContent>
+            <Action><PrimaryButton Href="leaderboard">Back to the Leaderboard</PrimaryButton></Action>
+        </EmptyState>
     }
-    else if (entry.Picks == null || (currentPool != null && DateTime.UtcNow < currentPool.LockDate)) 
+    else if (entry.Picks == null || !PickVisibility.OnPublicPage(poolLocked, isOwnEntry))
     {
-        <div class="alert alert-info text-center py-5">
-            <i class="bi bi-shield-lock display-1"></i>
-            <h2 class="mt-3">Picks Hidden</h2>
-            <p>This bracket is hidden until the pool unlocks.</p>
-            <AuthorizeView Roles="@Constants.Roles.SuperAdmin">
-                <Authorized>
-                    <div class="mt-3">
-                        <a href="/admin/entry/@entry.Id" class="btn btn-warning shadow-sm">
-                            <i class="bi bi-pencil-square"></i> Edit Picks (Admin Bypass)
-                        </a>
-                    </div>
-                </Authorized>
-            </AuthorizeView>
-        </div>
+        <EmptyState Title="Picks are hidden until the pool locks" Icon="@Icons.Material.Outlined.Lock">
+            <ChildContent>Everyone's picks show here once picks lock, so nobody can copy another bracket.</ChildContent>
+            <Action>
+                <AuthorizeView Roles="@Constants.Roles.SuperAdmin">
+                    <Authorized>
+                        <SecondaryButton Href="@($"admin/entry/{entry.Id}")" Icon="@Icons.Material.Outlined.Edit">Edit picks (admin)</SecondaryButton>
+                    </Authorized>
+                </AuthorizeView>
+            </Action>
+        </EmptyState>
     }
     else
     {
-        <div class="card shadow-sm mb-4">
-            <div class="card-body bg-light">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h2 class="fw-bold mb-0">@entry.PlayerName</h2>
-                    
-                    <div class="d-flex gap-2">
-                         <AuthorizeView Roles="@Constants.Roles.SuperAdmin">
-                            <Authorized>
-                                <a href="/admin/entry/@entry.Id" class="btn btn-warning btn-sm shadow-sm">
-                                    <i class="bi bi-pencil-square"></i> Edit Picks
-                                </a>
-                            </Authorized>
-                        </AuthorizeView>
-                    </div>
-                </div>
+        <Card Tone="CardTone.Highlight">
+            <MudStack Row="true" Justify="Justify.SpaceAround" AlignItems="AlignItems.Center" Spacing="2">
+                <MudStack AlignItems="AlignItems.Center" Spacing="0">
+                    <span class="bm-note">Points</span>
+                    <MudText Typo="Typo.h4">@currentScore</MudText>
+                </MudStack>
+                <MudStack AlignItems="AlignItems.Center" Spacing="0">
+                    <span class="bm-note">Max possible</span>
+                    <MudText Typo="Typo.h4">@maxPossible</MudText>
+                </MudStack>
+                <MudStack AlignItems="AlignItems.Center" Spacing="0">
+                    <span class="bm-note">Tiebreaker</span>
+                    <MudText Typo="Typo.h4">@entry.TieBreakerPoints</MudText>
+                </MudStack>
+            </MudStack>
+            <AuthorizeView Roles="@Constants.Roles.SuperAdmin">
+                <Authorized>
+                    <div><SecondaryButton Href="@($"admin/entry/{entry.Id}")" Icon="@Icons.Material.Outlined.Edit">Edit picks (admin)</SecondaryButton></div>
+                </Authorized>
+            </AuthorizeView>
+        </Card>
 
-                <div class="row text-center border-top pt-3">
-                    <div class="col-md-4">
-                         <span class="text-muted small d-block">Tiebreaker</span>
-                        <h4 class="fw-bold text-dark">@entry.TieBreakerPoints</h4>
-                    </div>
-                    <div class="col-md-4 border-start border-end">
-                         <span class="text-muted small d-block">Current Points</span>
-                        <h2 class="text-primary fw-bold mb-0">@currentScore</h2>
-                    </div>
-                    <div class="col-md-4">
-                        <span class="text-muted small d-block">Max Potential</span>
-                        <h2 class="text-info fw-bold mb-0">@maxPossible</h2>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
-            @foreach (var game in games.OrderBy(g => g.IsPlayoff).ThenBy(g => g.StartTime))
-            {
-                string? pick = null;
-                bool hasPick = entry.Picks != null && entry.Picks.TryGetValue(game.Id, out pick);
-                
-                var slots = BracketHelper.ResolveMatchup(game, entry.Picks, games);
-
-                <div class="col">
-                    <GameCard Game="@game" 
-                              HomeTeamName="@slots.Home" 
-                              AwayTeamName="@slots.Away" 
-                              UserPick="@pick" 
-                              IsLocked="true" 
-                              AllGames="@games" 
-                              EliminatedTeams="@eliminatedTeams" />
-                </div>
-            }
-        </div>
+        @foreach (var block in Sections())
+        {
+            <h2 class="bm-section-title">@block.Title</h2>
+            <MudGrid Spacing="2">
+                @foreach (var game in block.Games)
+                {
+                    <MudItem xs="12" md="6" lg="4" @key="game.Id">
+                        <MatchupCard BowlName="@game.BowlName"
+                                     PointsText="@ScoreGameText.PointsText(game)"
+                                     Status="@StatusOf(game)"
+                                     StatusText="@ScoreGameText.StatusText(game, DateTime.UtcNow)"
+                                     Away="@TeamOf(game, false)"
+                                     Home="@TeamOf(game, true)"
+                                     Pick="@PickOf(game)"
+                                     Where="@WhereOf(game)" />
+                    </MudItem>
+                }
+            </MudGrid>
+        }
     }
-</div>
-
-
+</PageContainer>
 
 @code {
     [Parameter] public string EntryId { get; set; } = string.Empty;
@@ -110,55 +105,49 @@
     private List<BowlGame> games = new();
     private int currentScore = 0;
     private int maxPossible = 0;
-    
-    // NEW
     private string currentSeasonId = "";
-
     private HashSet<string> eliminatedTeams = new(StringComparer.OrdinalIgnoreCase);
     private BowlPool? currentPool;
+    private DateTime lastUpdate = DateTime.MinValue;
+
+    private string BackHref => entry == null ? "leaderboard" : $"leaderboard?poolId={Uri.EscapeDataString(entry.PoolId)}";
+
+    private string? StatusText => currentPool == null
+        ? null
+        : StatusLineText.ForPool(DateTime.UtcNow, currentPool.LockDate, lastUpdate == DateTime.MinValue ? null : lastUpdate,
+            games.Count(g => g.IsFinal), games.Count);
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            // 0. Fetch Current Season
             var currentSeason = await SeasonService.GetCurrentSeasonAsync();
             currentSeasonId = currentSeason?.Id ?? "";
 
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={currentSeasonId}");
             var entryTask = FetchEntryAsync();
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");
-            await Task.WhenAll(gamesTask, entryTask, poolsTask);
+            var myEntriesTask = FetchMyEntryIdsAsync();
+            await Task.WhenAll(gamesTask, entryTask, poolsTask, myEntriesTask);
 
-            // 1. Get All Data
             var allGames = await gamesTask ?? new();
             var allPools = await poolsTask ?? new();
 
-            // 2. The entry (the server hides other players' picks until the pool locks)
+            // The server hides other players' picks until the pool locks.
             entry = await entryTask;
-            
+            isOwnEntry = entry != null && (await myEntriesTask).Contains(entry.Id);
+
             if (entry != null)
             {
-                // 3. Find Pool and Filter Games
                 currentPool = allPools.FirstOrDefault(p => p.Id == entry.PoolId);
-                
-                if (currentPool != null && currentPool.GameIds != null && currentPool.GameIds.Any())
-                {
-                    games = allGames.Where(g => currentPool.GameIds.Contains(g.Id)).ToList();
-                }
-                else
-                {
-                    // Fallback
-                    games = allGames.ToList();
-                }
 
-                // Logic Consolidation: Use Domain Model properties
+                games = currentPool?.GameIds is { Count: > 0 } ids
+                    ? allGames.Where(g => ids.Contains(g.Id)).ToList()
+                    : allGames.ToList();
+
                 foreach (var g in games.Where(x => x.IsFinal))
                 {
-                    if (!string.IsNullOrEmpty(g.LosingTeamName))
-                    {
-                        eliminatedTeams.Add(g.LosingTeamName);
-                    }
+                    if (!string.IsNullOrEmpty(g.LosingTeamName)) eliminatedTeams.Add(g.LosingTeamName);
                 }
 
                 if (entry.Picks != null)
@@ -168,12 +157,35 @@
                     maxPossible = stats.MaxPossible;
                 }
             }
+
+            try { lastUpdate = await Http.GetFromJsonAsync<DateTime>("api/GetLastScoreUpdate"); }
+            catch { /* the status line just leaves it out */ }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error loading entry: {ex.Message}");
         }
         finally { isLoading = false; }
+    }
+
+    // Before lock only the signed-in owner sees the picks here; an Admin uses the admin section (owner decision 2026-11-25).
+    private bool isOwnEntry;
+    // A pool that cannot be found is treated as not locked, so only the owner sees the picks.
+    private bool poolLocked => currentPool != null && DateTime.UtcNow > currentPool.LockDate;
+
+    private async Task<HashSet<string>> FetchMyEntryIdsAsync()
+    {
+        try
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            if (auth.User.Identity?.IsAuthenticated == true)
+            {
+                var mine = await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyEntries?seasonId={currentSeasonId}") ?? new();
+                return mine.Select(e => e.Id).ToHashSet();
+            }
+        }
+        catch { /* a public page: no sign-in is fine */ }
+        return new();
     }
 
     // One entry by id. A missing entry (404) leaves the page on its "not found" view.
@@ -183,5 +195,55 @@
         return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<BracketEntry>() : null;
     }
 
+    private record Section(string Title, List<BowlGame> Games);
 
+    // Owner rule (2026-11-25): non-playoff games by kickoff, then playoff games by kickoff (GameOrder, shared with print and paper entry).
+    private IEnumerable<Section> Sections()
+    {
+        var ordered = GameOrder.ForEntry(games);
+        var standard = ordered.Where(g => !g.IsPlayoff).ToList();
+        var playoff = ordered.Where(g => g.IsPlayoff).ToList();
+        if (standard.Count > 0) yield return new Section("Bowl games", standard);
+        if (playoff.Count > 0) yield return new Section("Playoff", playoff);
+    }
+
+    private static MatchupStatus StatusOf(BowlGame game) => game.Status switch
+    {
+        GameStatus.InProgress => MatchupStatus.Live,
+        GameStatus.Final => MatchupStatus.Final,
+        _ => MatchupStatus.Scheduled
+    };
+
+    // The teams as this entry sees them: later rounds show the teams its own earlier picks lead to.
+    private MatchupTeam TeamOf(BowlGame game, bool isHome)
+    {
+        var slots = BracketHelper.ResolveMatchup(game, entry!.Picks, games);
+        var name = isHome ? slots.Home : slots.Away;
+        var storedName = isHome ? game.TeamHome : game.TeamAway;
+        var isStored = string.Equals(name, storedName, StringComparison.OrdinalIgnoreCase);
+        var info = VisualHelper.GetTeamInfo(name, game, games);
+        var winner = game.IsFinal ? game.WinningTeamName : null;
+
+        return new MatchupTeam(
+            name,
+            info,
+            ApRank: isStored ? (isHome ? game.HomeApRank : game.AwayApRank) : null,
+            Seed: isStored ? (isHome ? game.TeamHomeSeed : game.TeamAwaySeed) : null,
+            Score: isHome ? game.TeamHomeScore : game.TeamAwayScore,
+            Decided: !BracketSlots.IsPlaceholder(name),
+            Won: winner != null && string.Equals(winner, name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private MatchupPick PickOf(BowlGame game)
+    {
+        entry!.Picks!.TryGetValue(game.Id, out var pick);
+        var line = PickLine.For(game, pick, null, eliminatedTeams);
+        return new MatchupPick(line.Text, line.Outcome);
+    }
+
+    private static string? WhereOf(BowlGame game)
+    {
+        var text = string.Join(" · ", new[] { game.Television, game.Location }.Where(p => !string.IsNullOrWhiteSpace(p)));
+        return text.Length == 0 ? null : text;
+    }
 }

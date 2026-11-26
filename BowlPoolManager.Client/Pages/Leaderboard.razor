@@ -13,10 +13,15 @@
 @inject NavigationManager Nav
 @inject ISiteContext SiteContext
 @inject PoolSelection PoolSelection
+@inject MyEntryStore MyEntryStore
+@inject IJSRuntime JS
 
 @*
     Release 2 reference page: the Leaderboard built only from the shared components in Client/Ui.
-    Later pages copy this pattern. Logic that is not drawing lives in Core: StatusLineText, TopThreeRule, PoolPicker.
+    Later pages copy this pattern. Logic that is not drawing lives in Core: StatusLineText, TopThreeRule, PoolPicker,
+    and for Find my entry: MyEntryMemory, PinnedEntries, PlaceText.
+    Tapping a name asks "Is this you?"; a yes is remembered in this browser only (per pool). Signed-in players
+    have their own entries pinned without tapping.
 *@
 
 <PageContainer>
@@ -26,11 +31,28 @@
                 StatusIcon="@Icons.Material.Outlined.Schedule">
         <Actions>
             <PoolSwitcher Mode="PoolSwitcherMode.Segmented" />
+            @* Group D's page; the link resolves once it is merged. *@
             <span class="bm-only-phone">
-                <SecondaryButton Href="print-bracket" Icon="@Icons.Material.Outlined.Print" IconOnly="true">Print Bracket</SecondaryButton>
+                <SecondaryButton Href="@StandingsPrintHref" Icon="@Icons.Material.Outlined.FormatListNumbered" IconOnly="true">Print standings</SecondaryButton>
             </span>
             <span class="bm-only-wide">
-                <SecondaryButton Href="print-bracket" Icon="@Icons.Material.Outlined.Print">Print Bracket</SecondaryButton>
+                <SecondaryButton Href="@StandingsPrintHref" Icon="@Icons.Material.Outlined.FormatListNumbered">Print standings</SecondaryButton>
+            </span>
+            @* Group D's page; shown only after lock (the page and the server also refuse before lock). *@
+            @if (currentPool != null && !picksHidden)
+            {
+                <span class="bm-only-phone">
+                    <SecondaryButton Href="@AllPicksPrintHref" Icon="@Icons.Material.Outlined.GridOn" IconOnly="true">Print all picks</SecondaryButton>
+                </span>
+                <span class="bm-only-wide">
+                    <SecondaryButton Href="@AllPicksPrintHref" Icon="@Icons.Material.Outlined.GridOn">Print all picks</SecondaryButton>
+                </span>
+            }
+            <span class="bm-only-phone">
+                <SecondaryButton Href="print-bracket" Icon="@Icons.Material.Outlined.Print" IconOnly="true">Print blank form</SecondaryButton>
+            </span>
+            <span class="bm-only-wide">
+                <SecondaryButton Href="print-bracket" Icon="@Icons.Material.Outlined.Print">Print blank form</SecondaryButton>
             </span>
         </Actions>
     </PageHeader>
@@ -47,6 +69,62 @@
     }
     else
     {
+        @foreach (var mine in pinned.Rows)
+        {
+            var isRemembered = remembered?.EntryId == mine.Id;
+            var isSignedIn = signedInEntryIds.Contains(mine.Id);
+            <Card Tone="CardTone.Highlight" Eyebrow="@(isSignedIn ? "Your entry" : "You on this phone")" @key="mine.Id">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Baseline" Spacing="2">
+                    <MudText Typo="Typo.h5" Style="min-width: 0; overflow-wrap: anywhere">@mine.PlayerName</MudText>
+                    <MudText Typo="Typo.h4" Style="white-space: nowrap">@mine.Score pts</MudText>
+                </MudStack>
+                <div>@PlaceText.For(mine.Rank, IsTied(mine)) · could still reach @mine.MaxPossible</div>
+                @if (outIds.Contains(mine.Id))
+                {
+                    <div><Badge>out</Badge> No longer able to finish in the top 3.</div>
+                }
+                <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                    @if (PickVisibility.OnPublicPage(!picksHidden, isSignedIn))
+                    {
+                        <SecondaryButton Href="@($"entry/{mine.Id}")" Icon="@Icons.Material.Outlined.ListAlt">View my picks</SecondaryButton>
+                    }
+                    @if (isRemembered && !isSignedIn)
+                    {
+                        <SecondaryButton OnClick="ForgetAsync">Not you? Forget me</SecondaryButton>
+                    }
+                </MudStack>
+            </Card>
+        }
+
+        @if (pinned.RememberedMissing)
+        {
+            <Notice Tone="NoticeTone.Info" Title="This phone remembers an entry that is no longer in this pool.">
+                It may have been renamed, moved or deleted. Tap your name below to pick it again.
+                <SecondaryButton OnClick="ForgetAsync">Forget it</SecondaryButton>
+            </Notice>
+        }
+
+        @if (pendingRow != null)
+        {
+            <Card Tone="CardTone.Dark" AriaLabel="Is this you?">
+                <div role="status">Is <strong>@pendingRow.PlayerName</strong> you?</div>
+                <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                    <PrimaryButton OnClick="ConfirmPendingAsync">Yes, remember me</PrimaryButton>
+                    <SecondaryButton OnClick="CancelPending">No</SecondaryButton>
+                </MudStack>
+                @if (!picksHidden)
+                {
+                    <div><a href="@($"entry/{pendingRow.Id}")">Just look at their picks</a></div>
+                }
+            </Card>
+        }
+        else if (!pinned.Rows.Any() && !pinned.RememberedMissing)
+        {
+            <Card Tone="CardTone.Tint">
+                <div><MudIcon Icon="@Icons.Material.Outlined.Search" Size="Size.Small" Style="vertical-align: -3px" /> Looking for yourself? <strong>Tap your name</strong> and this device will keep you at the top. No sign-in needed.</div>
+            </Card>
+        }
+
         <DataTable Label="Leaderboard">
             <TableHeader Columns="@PhoneColumns" ColumnsWide="@WideColumns">
                 <TableHeaderCell Text="#" OnSort="@(() => Sort("Rank"))" SortActive="@(sortColumn == "Rank")" Ascending="isAscending" Hint="Rank" />
@@ -63,8 +141,10 @@
             </TableHeader>
             @foreach (var row in leaderboard)
             {
+                var thisRow = row;
                 <TableRow Columns="@PhoneColumns" ColumnsWide="@WideColumns"
-                          Href="@(picksHidden ? null : $"entry/{row.Id}")"
+                          State="@RowStateFor(row)"
+                          OnClick="@(() => RowTappedAsync(thisRow))"
                           AriaLabel="@RowLabel(row)">
                     <TableCell Kind="CellKind.Rank">@row.Rank</TableCell>
                     <TableCell Kind="CellKind.Name">
@@ -115,7 +195,7 @@
             {
                 <div><MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Style="vertical-align: -3px" /> Picks are hidden until the pool locks, so names are not links yet.</div>
             }
-            <div>Max = the most points still possible. "Out" means no longer able to finish in the top 3. Ties are broken by Max, then the pool's tiebreakers, then name.</div>
+            <div>Tap a name to find your entry. Max = the most points still possible. "Out" means no longer able to finish in the top 3. Ties are broken by Max, then the pool's tiebreakers, then name.</div>
         </div>
     }
 </PageContainer>
@@ -175,7 +255,8 @@
             await Task.WhenAll(poolsTask, myEntriesTask);
             var allPools = await poolsTask ?? new();
 
-            var myEntries = await myEntriesTask;
+            myEntries = await myEntriesTask;
+            signedInEntryIds = myEntries.Select(e => e.Id).ToHashSet();
 
             // Fetch the last update timestamp
             try {
@@ -203,6 +284,8 @@
             currentPool = pools.FirstOrDefault(p => p.Id == chosenId);
 
             PoolSelection.Show(pools.Select(p => new PoolChoice(p.Id, p.Name)).ToList(), currentPool?.Id);
+
+            memory = await MyEntryStore.LoadAsync();
 
             if (currentPool != null)
             {
@@ -286,6 +369,8 @@
             outIds = picksHidden ? new() : TopThreeRule.OutEntryIds(leaderboard);
 
             Sort(sortColumn, forceToggle: false);
+            pendingRow = null;
+            RefreshPinned();
         }
         catch (Exception ex)
         {
@@ -333,10 +418,70 @@
         leaderboard = isAscending ? leaderboard.OrderBy(key).ToList() : leaderboard.OrderByDescending(key).ToList();
     }
 
+    private string StandingsPrintHref => currentPool == null ? "print-standings" : $"print-standings?poolId={Uri.EscapeDataString(currentPool.Id)}";
+
+    private string AllPicksPrintHref => $"print-all-picks?poolId={Uri.EscapeDataString(currentPool?.Id ?? "")}";
+
+    // ---- Find my entry ----
+    private List<BracketEntry> myEntries = new();
+    private HashSet<string> signedInEntryIds = new();
+    private MyEntryMemory memory = new();
+    private RememberedEntry? remembered;
+    private PinnedEntries pinned = new(Array.Empty<LeaderboardDto>(), false);
+    private LeaderboardDto? pendingRow;
+
+    private void RefreshPinned()
+    {
+        remembered = currentPool == null ? null : memory.Get(currentPool.Id);
+        pinned = PinnedEntries.Find(leaderboard, remembered, signedInEntryIds);
+    }
+
+    private bool IsTied(LeaderboardDto row) => leaderboard.Count(r => r.Rank == row.Rank) > 1;
+
+    private RowState RowStateFor(LeaderboardDto row) =>
+        pendingRow?.Id == row.Id ? RowState.Pending
+        : pinned.Rows.Any(r => r.Id == row.Id) ? RowState.Selected
+        : RowState.Normal;
+
+    // A tap on someone else's row asks "Is this you?". A tap on one of your own rows opens its picks once they are visible.
+    private async Task RowTappedAsync(LeaderboardDto row)
+    {
+        if (pinned.Rows.Any(r => r.Id == row.Id))
+        {
+            if (PickVisibility.OnPublicPage(!picksHidden, signedInEntryIds.Contains(row.Id))) Nav.NavigateTo($"entry/{row.Id}");
+            return;
+        }
+
+        pendingRow = row;
+        await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
+    }
+
+    private void CancelPending() => pendingRow = null;
+
+    private async Task ConfirmPendingAsync()
+    {
+        if (pendingRow == null || currentPool == null) return;
+        memory.Remember(currentPool.Id, pendingRow.Id, pendingRow.PlayerName);
+        pendingRow = null;
+        RefreshPinned();
+        await MyEntryStore.SaveAsync(memory);
+        await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
+    }
+
+    private async Task ForgetAsync()
+    {
+        if (currentPool == null) return;
+        memory.Forget(currentPool.Id);
+        RefreshPinned();
+        await MyEntryStore.SaveAsync(memory);
+    }
+
     private string RowLabel(LeaderboardDto row) =>
-        picksHidden
-            ? $"{row.PlayerName}, rank {row.Rank}, {row.Score} points"
-            : $"{row.PlayerName}, rank {row.Rank}, {row.Score} points, up to {row.MaxPossible} possible. Open this entry's picks.";
+        pinned.Rows.Any(r => r.Id == row.Id)
+            ? $"{row.PlayerName}, your entry, rank {row.Rank}, {row.Score} points." + (PickVisibility.OnPublicPage(!picksHidden, signedInEntryIds.Contains(row.Id)) ? " Open its picks." : "")
+        : picksHidden
+            ? $"{row.PlayerName}, rank {row.Rank}, {row.Score} points. Tap to say this is you."
+            : $"{row.PlayerName}, rank {row.Rank}, {row.Score} points, up to {row.MaxPossible} possible. Tap to say this is you.";
 
     private static string TrophyColor(int rank) => rank switch { 1 => "#D4A017", 2 => "#8A8F98", _ => "#A9682B" };
     private static string TrophyTitle(int rank) => rank switch { 1 => "1st place - Gold", 2 => "2nd place - Silver", _ => "3rd place - Bronze" };
