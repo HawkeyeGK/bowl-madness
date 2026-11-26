@@ -1,0 +1,33 @@
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Client.Shared
+
+@*
+    A compact team button for the paper-entry table (prototype 4): one row per game, 44 px tall, small logo.
+    The big TeamPickButton in Client/Ui is for players; this one keeps a 34-game table on one screen.
+*@
+<button type="button" class="cp @(Selected ? "cp--on" : null)" aria-pressed="@(Selected ? "true" : "false")"
+        disabled="@Disabled" aria-label="@AriaLabel" @onclick="OnClick">
+    @if (Team != null)
+    {
+        <TeamLogo Team="Team" SizePx="26px" />
+    }
+    <span class="cp-name">
+        @Name
+        @if (Seed is > 0)
+        {
+            <span class="cp-seed"> (@Seed)</span>
+        }
+    </span>
+</button>
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+    [Parameter] public TeamInfo? Team { get; set; }
+    [Parameter] public int? Seed { get; set; }
+    /// <summary>The entry's pick.</summary>
+    [Parameter] public bool Selected { get; set; }
+    /// <summary>The team is not known yet (a playoff slot waiting for an earlier pick).</summary>
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+}

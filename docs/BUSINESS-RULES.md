@@ -36,7 +36,7 @@ disagree, this document is the intent and the code is the bug.
 
 - **Locking.** Up to and including the lock date, an entry may be created and changed freely. After it, no new entries and no changes to picks or the tiebreaker; renaming is still allowed unless the pool is concluded or archived.
 - **Admins ignore every lock** and may edit, delete or reassign any entry at any time. A player's save never moves an entry to another pool; only an Admin moves entries.
-- **What a save can change.** A save sets only the bracket name (1 to 60 characters, trimmed), the picks and the tiebreaker (0 to 999). Picks must be for games in the pool, except that a pick already stored on the entry is kept. The owner, season, payment status, creation time and audit log come from the stored entry or the server.
+- **What a save can change.** A save sets only the bracket name (1 to 60 characters, trimmed), the picks and the tiebreaker (0 to 999). Picks must be for games in the pool, except that a pick already stored on the entry is kept. The owner, season, payment status, creation time and audit log come from the stored entry or the server (an Admin may set the owner: an account or a typed name).
 - **Visibility.** Before lock, no one except Admins sees another player's picks, by any route (page, API, backup). The leaderboard shows names and scores only. Once the pool is locked, everyone can see everyone's picks. A player always sees their own. *(Owner decision)*
 - A bracket name is unique within a pool, ignoring case. A player's save is always recorded as theirs.
 - A player can delete their own entry until lock.
@@ -45,6 +45,7 @@ disagree, this document is the intent and the code is the bug.
 - **Football picks must be reachable.** A pick in a later round must be one of the two teams the entry's own earlier picks lead to, or a team already placed in that slot. The server refuses a changed pick that is not. A stored pick that is saved again unchanged is left alone, so an old entry can still be renamed. Hoops is not checked this way yet.
 - **Moving an entry.** Only an Admin or SuperAdmin moves an entry to another pool. The target must be in the same season, not archived, and must not already have that bracket name. The move is written to the entry's change history. Payment status stays with the entry; picks for games not in the target pool are kept but do not score. A player's save never moves an entry.
 - **Admin-entered flag.** IsAdminEntered is set when an Admin or SuperAdmin creates an entry for another user. It is kept for audit only, and an existing entry keeps its stored value.
+- **Every entry names its owner.** A player's own entry belongs to their account. An entry an Admin keys for someone else must say who it belongs to: their account, or, when the person never signs in, their name as typed (the entry's owner name, with no account). The server refuses an Admin's save that gives neither. Choosing an account drops a typed name. An entry with no account has no Owner: only Admins can edit it, delete it or see its picks before lock, and the typed name is shown only to Admins. Football only; hoops keeps its earlier owner rules for now. *(Owner decision, 2026-11-25)*
 
 ## 4. Scoring and ranking
 

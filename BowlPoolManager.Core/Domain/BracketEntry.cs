@@ -22,6 +22,14 @@ namespace BowlPoolManager.Core.Domain
         [JsonPropertyName("userId")]
         public string UserId { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Who the entry belongs to when that person has no account (Release 2): typed by an Admin keying a paper
+        /// entry. Null when <see cref="UserId"/> names the owner. Added as nullable; older entries have none.
+        /// </summary>
+        [JsonProperty("ownerName")]
+        [JsonPropertyName("ownerName")]
+        public string? OwnerName { get; set; }
+
         [Required(ErrorMessage = "Bracket Name is required.")]
         [JsonProperty("playerName")]
         [JsonPropertyName("playerName")]

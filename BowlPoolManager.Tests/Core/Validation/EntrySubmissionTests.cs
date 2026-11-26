@@ -190,5 +190,113 @@ namespace BowlPoolManager.Tests.Core.Validation
 
             Build(submitted, existing, isAdmin: true).IsAdminEntered.Should().Be(stored);
         }
+
+        // ── Release 2 group C: every admin-entered entry names its owner ───────
+
+        [Fact]
+        public void Build_ShouldKeepTheTypedNameAndNoAccount_WhenAnAdminTypesAnOwnerWithoutAnAccount()
+        {
+            var submitted = Entry(); submitted.UserId = ""; submitted.OwnerName = "  Grandma Jo  ";
+
+            var built = Build(submitted, null, isAdmin: true);
+
+            built.UserId.Should().BeEmpty();
+            built.OwnerName.Should().Be("Grandma Jo");
+            built.IsAdminEntered.Should().BeTrue();
+        }
+
+        [Fact]
+        public void Build_ShouldDropTheTypedName_WhenAnAdminChoosesAnAccount()
+        {
+            var submitted = Entry(); submitted.UserId = "player-1"; submitted.OwnerName = "Grandma Jo";
+
+            var built = Build(submitted, null, isAdmin: true);
+
+            built.UserId.Should().Be("player-1");
+            built.OwnerName.Should().BeNull();
+        }
+
+        [Fact]
+        public void Build_ShouldKeepTheStoredOwnerName_WhenAPlayerSaves()
+        {
+            var existing = Entry(); existing.UserId = "player-1"; existing.OwnerName = "Grandma Jo";
+            var submitted = Entry(); submitted.Id = existing.Id; submitted.OwnerName = "Someone Else";
+
+            Build(submitted, existing, isAdmin: false, caller: "player-1").OwnerName.Should().Be("Grandma Jo");
+        }
+
+        [Fact]
+        public void Build_ShouldDropTheOwnerName_WhenAnAdminUsesAssignToMe()
+        {
+            var submitted = Entry(); submitted.OwnerName = "Grandma Jo";
+
+            Build(submitted, null, isAdmin: true, assignToMe: true).OwnerName.Should().BeNull();
+        }
+
+        [Fact]
+        public void Build_ShouldIgnoreTheTypedName_WhenTheEntryIsHoops()
+        {
+            var submitted = Entry(); submitted.UserId = ""; submitted.OwnerName = "Grandma Jo";
+
+            var built = EntrySubmission.Build(submitted, null, "pool-1", "season-1", Constants.DocumentTypes.HoopsBracketEntry, "admin-1", true, false);
+
+            built.OwnerName.Should().BeNull();
+            built.UserId.Should().Be("admin-1");
+        }
+
+        [Fact]
+        public void Build_ShouldKeepTheTypedName_WhenTheAccountIsOnlySpaces()
+        {
+            var submitted = Entry(); submitted.UserId = "  "; submitted.OwnerName = "Grandma Jo";
+
+            var built = Build(submitted, null, isAdmin: true);
+
+            built.UserId.Should().BeEmpty();
+            built.OwnerName.Should().Be("Grandma Jo");
+        }
+
+        [Fact]
+        public void ValidateOwner_ShouldFail_WhenAnAdminGivesNoAccountAndNoName()
+        {
+            var submitted = Entry(); submitted.UserId = ""; submitted.OwnerName = "   ";
+
+            var result = EntrySubmission.ValidateOwner(submitted, isAdmin: true, assignToMe: false);
+
+            result.IsValid.Should().BeFalse();
+            result.ErrorMessage.Should().Contain("belongs to");
+        }
+
+        [Fact]
+        public void ValidateOwner_ShouldPass_WhenAnAdminChoosesAnAccount()
+        {
+            var submitted = Entry(); submitted.UserId = "player-1";
+
+            EntrySubmission.ValidateOwner(submitted, isAdmin: true, assignToMe: false).IsValid.Should().BeTrue();
+        }
+
+        [Fact]
+        public void ValidateOwner_ShouldPass_WhenAnAdminTypesAName()
+        {
+            var submitted = Entry(); submitted.OwnerName = "Grandma Jo";
+
+            EntrySubmission.ValidateOwner(submitted, isAdmin: true, assignToMe: false).IsValid.Should().BeTrue();
+        }
+
+        [Fact]
+        public void ValidateOwner_ShouldFail_WhenTheTypedNameIsTooLong()
+        {
+            var submitted = Entry(); submitted.OwnerName = new string('a', EntrySubmission.MaxNameLength + 1);
+
+            EntrySubmission.ValidateOwner(submitted, isAdmin: true, assignToMe: false).IsValid.Should().BeFalse();
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, true)]
+        public void ValidateOwner_ShouldPass_WhenTheCallerOwnsTheEntry(bool isAdmin, bool assignToMe)
+        {
+            // A player's save, or an admin saving their own entry from My Picks: the owner is the caller.
+            EntrySubmission.ValidateOwner(Entry(), isAdmin, assignToMe).IsValid.Should().BeTrue();
+        }
     }
 }

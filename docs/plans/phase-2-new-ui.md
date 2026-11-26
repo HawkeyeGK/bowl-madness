@@ -25,7 +25,7 @@ If the go/no-go fails, production stays on Phase 1.1 for the bowl season, and Re
 ## Revert point
 - Before group A starts, tag the last Phase 1.1 code on `main` as `release-1.1` (`bd7c70c`, the merge of PR 167). The owner approves the tag push.
 - To go back after a Release 2 release: a new PR that reverts the release merge commit (`git revert -m 1 <merge>`), through `staging` to `main` like any release. Never force-push or reset.
-- Data must stay readable by Phase 1.1 code. Release 2 may only add fields (nullable, with defaults), never rename or remove one. A Phase 1.1 save after a revert drops fields it doesn't know (for example an AP rank), which is acceptable.
+- Data must stay readable by Phase 1.1 code. Release 2 may only add fields (nullable, with defaults), never rename or remove one. A Phase 1.1 save after a revert drops fields it doesn't know (for example an AP rank, or the typed owner name of an entry with no account), which is acceptable.
 - What a revert loses: only the new look and features. Picks, entries, payments and results are untouched. "Find my entry" lives in each browser and is simply ignored.
 
 ## Decided (do not reopen)
@@ -96,11 +96,13 @@ If the go/no-go fails, production stays on Phase 1.1 for the bowl season, and Re
 
 **Work:**
 1. Entry editor, prototype 2: big team buttons with logos, progress bar, lock time, "save part-way" note. Keeps every Phase 1.1 rule: unresolved slots disabled, dependent picks cleared with a notice, incomplete saves allowed.
-2. **Fast paper entry**, prototype 4: games in the same order as the printed blank form; one keystroke per game (1 = first team listed, 2 = second); click a team to fix one; running count; a check before save; "Save and start next entry". Owner optional ("Leave blank for players who never sign in"). The server rules from Phase 1.1 apply unchanged.
+2. **Fast paper entry**, prototype 4: games in the same order as the printed blank form; one keystroke per game (1 = first team listed, 2 = second); click a team to fix one; running count; a check before save; "Save and start next entry". ~~Owner optional.~~ Owner required (decided 2026-11-25, below). The other Phase 1.1 save rules apply unchanged.
 3. Admin entries list: names instead of season GUIDs; Move Entry kept.
 4. Payments restyled.
 
-**Progress:** [ ] entry editor [ ] fast entry order shared with print (Core) [ ] fast paper entry [ ] entries list [ ] payments [ ] reviews [ ] test site check [ ] merged
+**Decided in group C (2026-11-25, owner):** game order everywhere is bowl games by kickoff, then playoff games by kickoff (`GameOrder.ForEntry`, PR 177). An admin-keyed entry names its owner: an account, or a typed name for someone with no account (new nullable `BracketEntry.OwnerName`, football only; the server refuses neither). Fast entry is one digit box as in prototype 4 (1 = first team listed, 2 = second, 0 = skip); changing a game clears later picks whose team came through it, with a notice; saved picks are never dropped on open. Paper entry uses the prototype's two-column layout with a Paid box. My Picks has a fixed save bar, bowl and playoff sections, and labelled "Print blank form" and "Print my picks" buttons (group D's request).
+
+**Progress:** [x] entry editor [x] fast entry order shared with print (Core) [x] fast paper entry [x] entries list [x] payments [x] reviews [ ] test site check [ ] merged
 
 ---
 

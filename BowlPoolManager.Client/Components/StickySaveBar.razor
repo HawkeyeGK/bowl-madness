@@ -1,0 +1,11 @@
+@*
+    The save button that stays on screen while a long list of picks scrolls (prototype 2). On phones it sits just above
+    the bottom navigation; on wide screens at the bottom of the window.
+*@
+<div class="ssb">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

@@ -82,6 +82,16 @@ Draws the pool choice from `PoolSelection`: `PoolSwitcherMode.HeaderTabs` (once,
 ### BottomNav
 The four phone tabs. Only `MainLayout` uses it. A `LiveKeys` entry puts a red dot on a tab (Scores while a game is being played).
 
+## Pick screens (Release 2 group C)
+Page-level components in `Client/Components`, built from the shared set and not part of it:
+- `GamePickCard`: one game on My Picks (away team first, home second), with locked (right or wrong once final) and "pick cleared" states.
+- `PickProgress`: "12 of 34 picked" with a bar.
+- `StickySaveBar`: keeps the save button on screen, just above the phone bottom navigation.
+- `CompactPickButton`: the 44 px team button in the paper-entry table.
+- `PickSequenceInput`: the fast-entry digit box (1 = first team listed, 2 = second, 0 = skip).
+
+Game order for picks and print is `GameOrder.ForEntry` (Core): bowl games by kickoff, then playoff games by kickoff. The digit logic is `FastEntry` (Core, xUnit tests).
+
 ## Adding to the set
 1. Write the component in `Client/Ui/` with a short comment per parameter.
 2. Add its states to `Pages/Admin/ComponentSheet.razor`.

@@ -1,0 +1,7 @@
+.gp-card { background: var(--bm-surface); border-radius: 12px; border: 1px solid var(--bm-line); padding: 12px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; min-width: 0; }
+.gp-card--cleared { border: 2px solid var(--bm-orange); }
+.gp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.gp-name { font-weight: 700; font-size: 17px; color: var(--bm-ink); }
+.gp-when { font-size: 15px; color: var(--bm-muted); }
+.gp-tags { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.gp-teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }

@@ -1,0 +1,32 @@
+@*
+    The fast paper entry box (prototype 4): one digit per game, typed while reading down the paper form.
+    The page turns the digits into picks with FastEntry in Core.
+*@
+<div class="ps">
+    <label for="@Id" class="ps-label">@Label</label>
+    <input id="@Id" @ref="input" class="ps-input" value="@(pending ?? Value)" @oninput="Changed" autocomplete="off" spellcheck="false"
+           inputmode="numeric" placeholder="For example 2211..." aria-describedby="@($"{Id}-help")" />
+    <div id="@($"{Id}-help")" class="bm-note">@Help</div>
+</div>
+
+@code {
+    [Parameter] public string Id { get; set; } = "pick-sequence";
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string? Help { get; set; }
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    private ElementReference input;
+    private string? pending;
+
+    // The page may drop a character it does not accept. Render what was typed first, then the page's value, so the
+    // box is rewritten even when the page's value did not change.
+    private async Task Changed(ChangeEventArgs e)
+    {
+        pending = e.Value?.ToString() ?? "";
+        await ValueChanged.InvokeAsync(pending);
+        await Task.Yield(); // let the typed text render before the page's value replaces it
+        pending = null;
+        StateHasChanged();
+    }
+}
