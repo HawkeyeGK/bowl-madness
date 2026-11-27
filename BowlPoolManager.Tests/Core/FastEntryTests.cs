@@ -6,7 +6,8 @@ namespace BowlPoolManager.Tests.Core
 {
     /// <summary>
     /// Fast paper entry: the keyer types one digit per game, reading down the printed form (prototype 4, owner decision
-    /// 2026-11-25). 1 = the team listed first (away), 2 = the team listed second (home), 0 = no pick.
+    /// 2026-11-25). 1 = the team on the form's first line, 2 = the second line, 0 = no pick. A regular bowl lists the
+    /// away team first; a playoff game lists its home team first.
     /// Bracket used below: b1 and b2 are regular bowls; r1a and r1b feed qf; qf home is the winner of r1a (earlier
     /// kickoff) and qf away is the winner of r1b. Entry order: b1, b2, r1a, r1b, qf.
     /// </summary>
@@ -83,17 +84,79 @@ namespace BowlPoolManager.Tests.Core
         }
 
         [Fact]
+        public void Apply_ShouldPickTheTeamOnTopOfThePrintedForm_WhenAPlayoffGameIsKeyedOne()
+        {
+            // The printed form puts a playoff game's home team (the higher seed) on top, so 1 is the home team there.
+            var result = Apply("0012");
+
+            result.Picks["r1a"].Should().Be("Miami");
+            result.Picks["r1b"].Should().Be("James Madison");
+        }
+
+        [Fact]
+        public void Apply_ShouldMatchThePrintedFormLineByLine_WhenEveryGameIsKeyedOne()
+        {
+            // Regression (production, 2026-11-25): keying 1 for the top line of a playoff game picked the other team.
+            var games = Games();
+            var ordered = Ordered(games);
+            var picks = FastEntry.Apply(ordered, games, "11111").Picks;
+
+            foreach (var game in ordered.Where(g => g.IsPlayoff))
+            {
+                var top = BlankFormSlots.SlotsFor(game, games).Top;
+                var expected = top.Team ?? picks[games.Single(g => g.BowlName == top.FeederBowl).Id];
+                picks[game.Id].Should().Be(expected, $"1 should pick the top line of {game.Id}");
+            }
+            picks["b1"].Should().Be("Toledo");
+            picks["b2"].Should().Be("Utah");
+        }
+
+        [Theory]
+        [InlineData('1')]
+        [InlineData('2')]
+        public void Apply_ShouldMatchThePrintedFormLineByLine_WhenSeedsAndFeedersShareAGame(char digit)
+        {
+            // qfa: a seed at home and a feeder away; qfb: a seed away and a feeder at home; sf: two feeders.
+            var games = new List<BowlGame>
+            {
+                Game("r1a", "Navy", "Army", 10, "qfa", true),
+                Game("r1b", "Tulane", "Memphis", 11, "qfb", true),
+                Game("qfa", "Winner of R1A", "Ohio State", 12, "sf", true),
+                Game("qfb", "Georgia", "Winner of R1B", 13, "sf", true),
+                Game("sf", "Winner of QFB", "Winner of QFA", 14, null, true)
+            };
+            var ordered = Ordered(games);
+            var picks = FastEntry.Apply(ordered, games, new string(digit, ordered.Count)).Picks;
+
+            foreach (var game in ordered)
+            {
+                var (top, bottom) = BlankFormSlots.SlotsFor(game, games);
+                var line = digit == '1' ? top : bottom;
+                var expected = line.Team ?? picks[games.Single(g => g.BowlName == line.FeederBowl).Id];
+                picks[game.Id].Should().Be(expected, $"{digit} should pick line {digit} of {game.Id} on the printed form");
+            }
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, true)]
+        public void HomeOnTop_ShouldPutTheHomeTeamFirst_OnlyWhenTheGameIsAPlayoffGame(bool playoff, bool expected)
+        {
+            BlankFormSlots.HomeOnTop(Game("g", "Away", "Home", 10, null, playoff)).Should().Be(expected);
+        }
+
+        [Fact]
         public void Apply_ShouldPickTheTeamTheEarlierDigitsLeadTo_WhenTheGameIsAPlayoffSlot()
         {
-            // r1a = 2 (Miami), r1b = 2 (Oregon); qf: 1 = the first team listed (away: winner of r1b).
-            Apply("00221").Picks["qf"].Should().Be("Oregon");
-            Apply("00222").Picks["qf"].Should().Be("Miami");
+            // r1a = 1 (Miami, home), r1b = 1 (Oregon, home); qf: 1 = home (winner of r1a), 2 = away (winner of r1b).
+            Apply("00112").Picks["qf"].Should().Be("Oregon");
+            Apply("00111").Picks["qf"].Should().Be("Miami");
         }
 
         [Fact]
         public void Apply_ShouldListTheGameAsNotKnown_WhenItsTeamDependsOnABlankGame()
         {
-            var result = Apply("00201");
+            var result = Apply("00102");
 
             result.Picks.Should().NotContainKey("qf");
             result.NotKnownGameIds.Should().Equal("qf");
@@ -109,7 +172,7 @@ namespace BowlPoolManager.Tests.Core
                 Game("feed", "Navy", "Army", 12, "next", true)
             };
 
-            var result = FastEntry.Apply(Ordered(games), games, "11");
+            var result = FastEntry.Apply(Ordered(games), games, "22");
 
             result.Picks["feed"].Should().Be("Navy");
             result.Picks["next"].Should().Be("Navy");
@@ -133,7 +196,7 @@ namespace BowlPoolManager.Tests.Core
             var games = Games();
             var stored = new Dictionary<string, string> { ["qf"] = "Busted Team", ["b1"] = "Pitt" };
 
-            var result = FastEntry.Apply(Ordered(games), games, "10221", stored);
+            var result = FastEntry.Apply(Ordered(games), games, "10112", stored);
 
             result.Picks["qf"].Should().Be("Oregon");
             result.Picks["b1"].Should().Be("Toledo");
@@ -147,7 +210,7 @@ namespace BowlPoolManager.Tests.Core
             var ordered = Ordered(games).Where(g => g.Id != "r1a").ToList();
             var stored = new Dictionary<string, string> { ["r1a"] = "Miami" };
 
-            var result = FastEntry.Apply(ordered, games, "0022", stored);
+            var result = FastEntry.Apply(ordered, games, "0011", stored);
 
             result.Picks["qf"].Should().Be("Miami");
             result.Picks["r1a"].Should().Be("Miami");
@@ -164,20 +227,20 @@ namespace BowlPoolManager.Tests.Core
         [Fact]
         public void ClearDependents_ShouldClearALaterPlayoffDigit_WhenItsTeamCameThroughTheChangedGame()
         {
-            // qf keyed 1 = the away slot = the winner of r1b; r1b changes from Oregon to James Madison.
-            var result = Rekey("12221", "12211");
+            // qf keyed 2 = the away slot = the winner of r1b; r1b changes from Oregon to James Madison.
+            var result = Rekey("12112", "12122");
 
-            result.Sequence.Should().Be("12210");
+            result.Sequence.Should().Be("12120");
             result.ClearedGameIds.Should().Equal("qf");
         }
 
         [Fact]
         public void ClearDependents_ShouldKeepALaterPlayoffDigit_WhenItsTeamCameFromTheOtherFeeder()
         {
-            // qf keyed 1 takes the winner of r1b; changing r1a does not touch it.
-            var result = Rekey("12221", "12121");
+            // qf keyed 2 takes the winner of r1b; changing r1a does not touch it.
+            var result = Rekey("12112", "12212");
 
-            result.Sequence.Should().Be("12121");
+            result.Sequence.Should().Be("12212");
             result.ClearedGameIds.Should().BeEmpty();
         }
 
@@ -191,18 +254,18 @@ namespace BowlPoolManager.Tests.Core
                 Game("feed", "Navy", "Army", 12, "next", true)
             };
 
-            var result = FastEntry.ClearDependents(Ordered(games), games, "1", "11", null);
+            var result = FastEntry.ClearDependents(Ordered(games), games, "2", "22", null);
 
-            result.Sequence.Should().Be("11");
+            result.Sequence.Should().Be("22");
             result.ClearedGameIds.Should().BeEmpty();
         }
 
         [Fact]
         public void ClearDependents_ShouldChangeNothing_WhenOnlyARegularBowlChanges()
         {
-            var result = Rekey("12221", "22221");
+            var result = Rekey("12112", "22112");
 
-            result.Sequence.Should().Be("22221");
+            result.Sequence.Should().Be("22112");
             result.ClearedGameIds.Should().BeEmpty();
         }
 
@@ -219,9 +282,9 @@ namespace BowlPoolManager.Tests.Core
         public void ClearDependents_ShouldKeepADigit_WhenThatGameChangedInTheSameEdit()
         {
             // Pasting a whole new line changes the feeder and the later game together: both are what the keyer meant.
-            var result = Rekey("12221", "12122");
+            var result = Rekey("12112", "12211");
 
-            result.Sequence.Should().Be("12122");
+            result.Sequence.Should().Be("12211");
             result.ClearedGameIds.Should().BeEmpty();
         }
 
@@ -230,7 +293,7 @@ namespace BowlPoolManager.Tests.Core
         {
             var stored = new Dictionary<string, string> { ["qf"] = "Miami" };
 
-            var result = Rekey("00200", "00100", stored);
+            var result = Rekey("00100", "00200", stored);
 
             result.ClearedGameIds.Should().Equal("qf");
         }
@@ -242,9 +305,9 @@ namespace BowlPoolManager.Tests.Core
             games.Single(g => g.Id == "qf").NextGameId = "sf";
             games.Add(Game("sf", "Winner of QF", "Ohio State", 20, null, true));
 
-            var result = FastEntry.ClearDependents(Ordered(games), games, "122211", "122111", null);
+            var result = FastEntry.ClearDependents(Ordered(games), games, "121122", "121222", null);
 
-            result.Sequence.Should().Be("122100");
+            result.Sequence.Should().Be("121200");
             result.ClearedGameIds.Should().Equal("qf", "sf");
         }
 
