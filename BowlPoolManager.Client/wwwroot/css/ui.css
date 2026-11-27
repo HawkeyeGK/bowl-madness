@@ -41,8 +41,10 @@
 .bm-card-eyebrow { font-size: 14px; font-weight: 700; color: var(--bm-orange); text-transform: uppercase; letter-spacing: .6px; }
 
 /* ---------- Table (rows laid out on a grid so phone and desktop share markup) ---------- */
+/* Rows start their columns at the left edge, so when the columns are wider than the table it scrolls sideways.
+   A <button> row would otherwise centre them and hide the first column. */
 .bm-table { background: var(--bm-surface); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.2), 0 1px 1px rgba(0,0,0,.12); overflow-x: auto; }
-.bm-grid-row { display: grid; grid-template-columns: var(--bm-cols); align-items: center; column-gap: 4px; padding: 0 14px; min-width: 0; box-sizing: border-box; }
+.bm-grid-row { display: grid; grid-template-columns: var(--bm-cols); justify-content: start; align-items: center; column-gap: 4px; padding: 0 14px; min-width: 0; box-sizing: border-box; }
 @media (min-width: 900px) {
     .bm-grid-row { grid-template-columns: var(--bm-cols-wide, var(--bm-cols)); column-gap: 8px; padding: 0 16px; }
     .bm-table-inner { min-width: 760px; }
@@ -59,6 +61,14 @@ a.bm-row:hover, button.bm-row:hover { background: #F8F9FB; color: var(--bm-ink);
 a.bm-row--selected:hover, button.bm-row--selected:hover { background: var(--bm-orange-tint); }
 .bm-row--pending { background: #E8EEF7; }
 .bm-row--disabled { color: #6B7280; cursor: default; }
+/* A small action inside a row (Leaderboard "Not me"), and the strip that opens under a row ("Is this you?"). */
+.bm-row-action { flex: none; min-height: 40px; padding: 2px 10px; border: 1px solid var(--bm-line-strong); border-radius: 8px; background: #fff; color: var(--bm-navy); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.bm-row-action:hover { background: #F8F9FB; }
+/* On a phone the name, badges and "Not me" share a narrow column, so that one cell may wrap to a second line. */
+@media (max-width: 899.98px) { .bm-cell--name:has(.bm-row-action) { flex-wrap: wrap; row-gap: 4px; padding: 6px 0; } }
+.bm-row-confirm { background: #E8EEF7; border-bottom: 1px solid #EEF0F3; padding: 8px 14px 12px; }
+.bm-row-confirm-body { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 17px; }
+@media (min-width: 900px) { .bm-row-confirm { padding: 8px 16px 12px; } }
 .bm-cell { min-width: 0; }
 .bm-cell--end { text-align: right; }
 .bm-cell--strong { font-weight: 700; }
