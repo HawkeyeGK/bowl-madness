@@ -14,14 +14,14 @@
 @inject ISiteContext SiteContext
 @inject PoolSelection PoolSelection
 @inject MyEntryStore MyEntryStore
-@inject IJSRuntime JS
 
 @*
     Release 2 reference page: the Leaderboard built only from the shared components in Client/Ui.
     Later pages copy this pattern. Logic that is not drawing lives in Core: StatusLineText, TopThreeRule, PoolPicker,
-    and for Find my entry: MyEntryMemory, PinnedEntries, PlaceText.
-    Tapping a name asks "Is this you?"; a yes is remembered in this browser only (per pool). Signed-in players
-    have their own entries pinned without tapping.
+    and for Find my entry: MyEntryMemory, PinnedEntries.
+    Your own rows are highlighted in the table; there is no separate card above it. Tapping someone else's name asks
+    "Is this you?" just under that row; a yes is remembered in this browser only (per pool), and that row gets a
+    "Not me" button. Signed-in players have their own entries highlighted without tapping.
 *@
 
 <PageContainer>
@@ -69,60 +69,12 @@
     }
     else
     {
-        @foreach (var mine in pinned.Rows)
-        {
-            var isRemembered = remembered?.EntryId == mine.Id;
-            var isSignedIn = signedInEntryIds.Contains(mine.Id);
-            <Card Tone="CardTone.Highlight" Eyebrow="@(isSignedIn ? "Your entry" : "You on this phone")" @key="mine.Id">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Baseline" Spacing="2">
-                    <MudText Typo="Typo.h5" Style="min-width: 0; overflow-wrap: anywhere">@mine.PlayerName</MudText>
-                    <MudText Typo="Typo.h4" Style="white-space: nowrap">@mine.Score pts</MudText>
-                </MudStack>
-                <div>@PlaceText.For(mine.Rank, IsTied(mine)) · could still reach @mine.MaxPossible</div>
-                @if (outIds.Contains(mine.Id))
-                {
-                    <div><Badge>out</Badge> No longer able to finish in the top 3.</div>
-                }
-                <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
-                    @if (PickVisibility.OnPublicPage(!picksHidden, isSignedIn))
-                    {
-                        <SecondaryButton Href="@($"entry/{mine.Id}")" Icon="@Icons.Material.Outlined.ListAlt">View my picks</SecondaryButton>
-                    }
-                    @if (isRemembered && !isSignedIn)
-                    {
-                        <SecondaryButton OnClick="ForgetAsync">Not you? Forget me</SecondaryButton>
-                    }
-                </MudStack>
-            </Card>
-        }
-
         @if (pinned.RememberedMissing)
         {
             <Notice Tone="NoticeTone.Info" Title="This phone remembers an entry that is no longer in this pool.">
                 It may have been renamed, moved or deleted. Tap your name below to pick it again.
                 <SecondaryButton OnClick="ForgetAsync">Forget it</SecondaryButton>
             </Notice>
-        }
-
-        @if (pendingRow != null)
-        {
-            <Card Tone="CardTone.Dark" AriaLabel="Is this you?">
-                <div role="status">Is <strong>@pendingRow.PlayerName</strong> you?</div>
-                <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
-                    <PrimaryButton OnClick="ConfirmPendingAsync">Yes, remember me</PrimaryButton>
-                    <SecondaryButton OnClick="CancelPending">No</SecondaryButton>
-                </MudStack>
-                @if (!picksHidden)
-                {
-                    <div><a href="@($"entry/{pendingRow.Id}")">Just look at their picks</a></div>
-                }
-            </Card>
-        }
-        else if (!pinned.Rows.Any() && !pinned.RememberedMissing)
-        {
-            <Card Tone="CardTone.Tint">
-                <div><MudIcon Icon="@Icons.Material.Outlined.Search" Size="Size.Small" Style="vertical-align: -3px" /> Looking for yourself? <strong>Tap your name</strong> and this device will keep you at the top. No sign-in needed.</div>
-            </Card>
         }
 
         <DataTable Label="Leaderboard">
@@ -142,10 +94,13 @@
             @foreach (var row in leaderboard)
             {
                 var thisRow = row;
+                // The entry this browser remembers (not one of the signed-in player's own) is a plain row, so its
+                // "Not me" button is not nested inside a row button; its name links to its picks once they are visible.
+                var rememberedOnly = IsRememberedOnly(row);
                 <TableRow Columns="@PhoneColumns" ColumnsWide="@WideColumns"
                           State="@RowStateFor(row)"
-                          OnClick="@(() => RowTappedAsync(thisRow))"
-                          AriaLabel="@RowLabel(row)">
+                          OnClick="@(rememberedOnly ? default : EventCallback.Factory.Create(this, () => RowTapped(thisRow)))"
+                          AriaLabel="@(rememberedOnly ? null : RowLabel(row))">
                     <TableCell Kind="CellKind.Rank">@row.Rank</TableCell>
                     <TableCell Kind="CellKind.Name">
                         @if (picksHidden)
@@ -157,7 +112,14 @@
                         }
                         else
                         {
-                            <span>@row.PlayerName</span>
+                            @if (rememberedOnly)
+                            {
+                                <span><a href="@($"entry/{row.Id}")" aria-label="@($"{row.PlayerName}, your entry on this device. Open its picks.")">@row.PlayerName</a></span>
+                            }
+                            else
+                            {
+                                <span>@row.PlayerName</span>
+                            }
                             @if (isPoolFinal && row.Rank <= 3)
                             {
                                 <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Style="@($"color: {TrophyColor(row.Rank)}")" Title="@TrophyTitle(row.Rank)" />
@@ -166,6 +128,12 @@
                             {
                                 <Badge>out</Badge>
                             }
+                        }
+                        @if (rememberedOnly)
+                        {
+                            <span class="bm-sr-only">, your entry on this device</span>
+                            <button type="button" class="bm-row-action" @onclick="ForgetAsync"
+                                    aria-label="@($"Not me: stop remembering {row.PlayerName} on this device")">Not me</button>
                         }
                     </TableCell>
                     <TableCell Kind="CellKind.Points">@row.Score</TableCell>
@@ -187,6 +155,20 @@
                         }
                     </TableCell>
                 </TableRow>
+                @if (pendingRow?.Id == row.Id)
+                {
+                    <div class="bm-row-confirm" role="row" aria-label="Is this you?">
+                        <div role="cell" class="bm-row-confirm-body">
+                            <span role="status">Is <strong>@row.PlayerName</strong> you?</span>
+                            <PrimaryButton OnClick="ConfirmPendingAsync">Yes, remember me</PrimaryButton>
+                            <SecondaryButton OnClick="CancelPending">No</SecondaryButton>
+                            @if (!picksHidden)
+                            {
+                                <a href="@($"entry/{row.Id}")">Just look at their picks</a>
+                            }
+                        </div>
+                    </div>
+                }
             }
         </DataTable>
 
@@ -436,15 +418,16 @@
         pinned = PinnedEntries.Find(leaderboard, remembered, signedInEntryIds);
     }
 
-    private bool IsTied(LeaderboardDto row) => leaderboard.Count(r => r.Rank == row.Rank) > 1;
+    private bool IsRememberedOnly(LeaderboardDto row) => remembered?.EntryId == row.Id && !signedInEntryIds.Contains(row.Id);
 
     private RowState RowStateFor(LeaderboardDto row) =>
         pendingRow?.Id == row.Id ? RowState.Pending
         : pinned.Rows.Any(r => r.Id == row.Id) ? RowState.Selected
         : RowState.Normal;
 
-    // A tap on someone else's row asks "Is this you?". A tap on one of your own rows opens its picks once they are visible.
-    private async Task RowTappedAsync(LeaderboardDto row)
+    // A tap on someone else's row asks "Is this you?" just under that row; a second tap closes it. A tap on one of your
+    // own rows opens its picks once they are visible.
+    private void RowTapped(LeaderboardDto row)
     {
         if (pinned.Rows.Any(r => r.Id == row.Id))
         {
@@ -452,8 +435,7 @@
             return;
         }
 
-        pendingRow = row;
-        await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
+        pendingRow = pendingRow?.Id == row.Id ? null : row;
     }
 
     private void CancelPending() => pendingRow = null;
@@ -465,7 +447,6 @@
         pendingRow = null;
         RefreshPinned();
         await MyEntryStore.SaveAsync(memory);
-        await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
     }
 
     private async Task ForgetAsync()
