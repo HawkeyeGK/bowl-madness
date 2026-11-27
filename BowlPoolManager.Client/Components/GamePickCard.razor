@@ -4,8 +4,8 @@
 
 @*
     One game in the pick editor (My Picks and the admin entry form): the bowl, its kickoff, and two team buttons.
-    The away team is listed first and the home team second, the same order the printed form and fast paper entry use
-    (key 1 and key 2). Built from the shared TeamPickButton; the only styles here lay the card out.
+    The away team is listed first and the home team second. The printed form and fast paper entry list a playoff game's
+    home team first instead (BlankFormSlots.HomeOnTop). Built from the shared TeamPickButton; the only styles here lay the card out.
 *@
 <section class="gp-card @(Cleared ? "gp-card--cleared" : null)" aria-label="@Game.BowlName">
     <div class="gp-head">

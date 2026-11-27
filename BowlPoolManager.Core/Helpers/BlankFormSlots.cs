@@ -31,6 +31,12 @@ namespace BowlPoolManager.Core.Helpers
             return (Slot(game, true, all, feeders, picks, winnerPick), Slot(game, false, all, feeders, picks, winnerPick));
         }
 
+        /// <summary>
+        /// True when the printed form lists the home team first: a playoff game puts its home team (the higher seed) on
+        /// top, and a regular bowl lists the away team first. Fast paper entry reads the form in this order.
+        /// </summary>
+        public static bool HomeOnTop(BowlGame game) => game.IsPlayoff;
+
         /// <summary>The entry's pick for a game, or null when there is none.</summary>
         public static string? PickFor(BowlGame game, IReadOnlyDictionary<string, string>? picks) =>
             picks != null && picks.TryGetValue(game.Id, out var pick) && !string.IsNullOrWhiteSpace(pick) ? pick : null;
