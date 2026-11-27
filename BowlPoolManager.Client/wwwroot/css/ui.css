@@ -41,8 +41,10 @@
 .bm-card-eyebrow { font-size: 14px; font-weight: 700; color: var(--bm-orange); text-transform: uppercase; letter-spacing: .6px; }
 
 /* ---------- Table (rows laid out on a grid so phone and desktop share markup) ---------- */
+/* Rows start their columns at the left edge, so when the columns are wider than the table it scrolls sideways.
+   A <button> row would otherwise centre them and hide the first column. */
 .bm-table { background: var(--bm-surface); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.2), 0 1px 1px rgba(0,0,0,.12); overflow-x: auto; }
-.bm-grid-row { display: grid; grid-template-columns: var(--bm-cols); align-items: center; column-gap: 4px; padding: 0 14px; min-width: 0; box-sizing: border-box; }
+.bm-grid-row { display: grid; grid-template-columns: var(--bm-cols); justify-content: start; align-items: center; column-gap: 4px; padding: 0 14px; min-width: 0; box-sizing: border-box; }
 @media (min-width: 900px) {
     .bm-grid-row { grid-template-columns: var(--bm-cols-wide, var(--bm-cols)); column-gap: 8px; padding: 0 16px; }
     .bm-table-inner { min-width: 760px; }
