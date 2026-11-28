@@ -1,0 +1,119 @@
+@page "/admin/season-setup"
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using System.Net.Http.Json
+@attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
+@inject HttpClient Http
+@inject ISeasonService SeasonService
+
+@* Release 2 group E: the football season setup steps in order, each with what the data shows and a link to its page.
+   Read-only: it reads the current season's games, pools and entries and writes nothing. The step logic is SeasonSetup (Core). *@
+
+<PageContainer Narrow="true">
+    <PageHeader Title="Season setup" Subtitle="@seasonName" />
+
+    @if (isLoading)
+    {
+        <LoadingIndicator Text="Checking the season..." />
+    }
+    else
+    {
+        @if (loadError != null)
+        {
+            <Notice Tone="NoticeTone.Error" Title="Could not read everything">
+                @loadError Steps below may show as not started.
+            </Notice>
+        }
+
+        <MudStack Spacing="3">
+            @for (var i = 0; i < steps.Count; i++)
+            {
+                var step = steps[i];
+                var number = i + 1;
+                <Card Tone="@(i == nextIndex ? CardTone.Tint : CardTone.Outlined)"
+                      Eyebrow="@(i == nextIndex ? $"Step {number} · next" : $"Step {number}")"
+                      Title="@step.Title">
+                    <MudStack Spacing="2">
+                        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                            @switch (step.State)
+                            {
+                                case SetupStepState.Done:
+                                    <Badge Tone="BadgeTone.Good">Done</Badge>
+                                    break;
+                                case SetupStepState.InProgress:
+                                    <Badge Tone="BadgeTone.Alert">Part done</Badge>
+                                    break;
+                                case SetupStepState.NotStarted:
+                                    <Badge>To do</Badge>
+                                    break;
+                            }
+                            <span>@step.Detail</span>
+                        </MudStack>
+                        <div>
+                            <SecondaryButton Href="@step.Href" Icon="@Icons.Material.Outlined.ArrowForward">@step.LinkText</SecondaryButton>
+                        </div>
+                    </MudStack>
+                </Card>
+            }
+        </MudStack>
+    }
+</PageContainer>
+
+@code {
+    private IReadOnlyList<SetupStep> steps = Array.Empty<SetupStep>();
+    private string? seasonName;
+    private string? loadError;
+    private bool isLoading = true;
+
+    // The first step the data does not show as done; Info steps (print, paper entries) are never "next".
+    private int nextIndex = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Season? season = null;
+        List<BowlGame> games = new();
+        List<BowlPool> pools = new();
+        List<BracketEntry> entries = new();
+
+        try
+        {
+            season = await SeasonService.GetCurrentSeasonAsync();
+            seasonName = season?.Name;
+
+            if (season != null)
+            {
+                var seasonId = Uri.EscapeDataString(season.Id);
+                var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={seasonId}");
+                var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={seasonId}");
+                var entriesTask = Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetEntries?seasonId={seasonId}");
+                // Each read stands alone, so one failure doesn't blank the steps the other reads support.
+                games = await ReadAsync(gamesTask, "games");
+                pools = await ReadAsync(poolsTask, "pools");
+                entries = await ReadAsync(entriesTask, "entries");
+            }
+        }
+        catch (Exception ex)
+        {
+            loadError = ex.Message;
+        }
+
+        steps = SeasonSetup.Build(season, games, pools, entries, DateTime.UtcNow);
+        nextIndex = steps.ToList().FindIndex(s => s.State is SetupStepState.NotStarted or SetupStepState.InProgress);
+        isLoading = false;
+    }
+
+    private async Task<List<T>> ReadAsync<T>(Task<List<T>?> read, string what)
+    {
+        try
+        {
+            return await read ?? new();
+        }
+        catch (Exception ex)
+        {
+            loadError = (loadError == null ? "" : loadError + " ") + $"Could not read the {what}: {ex.Message}.";
+            return new();
+        }
+    }
+}
