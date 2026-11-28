@@ -13,6 +13,7 @@ public static class NavIcons
         "picks" => Icons.Material.Outlined.Checklist,
         "history" => Icons.Material.Outlined.History,
         "print" => Icons.Material.Outlined.Print,
+        "rules" => Icons.Material.Outlined.MenuBook,
         "admin" => Icons.Material.Outlined.AdminPanelSettings,
         _ => Icons.Material.Outlined.Circle
     };
