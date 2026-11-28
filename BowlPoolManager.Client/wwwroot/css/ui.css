@@ -61,14 +61,15 @@ a.bm-row:hover, button.bm-row:hover { background: #F8F9FB; color: var(--bm-ink);
 a.bm-row--selected:hover, button.bm-row--selected:hover { background: var(--bm-orange-tint); }
 .bm-row--pending { background: #E8EEF7; }
 .bm-row--disabled { color: #6B7280; cursor: default; }
-/* A small action inside a row (Leaderboard "Not me"), and the strip that opens under a row ("Is this you?"). */
-.bm-row-action { flex: none; min-height: 40px; padding: 2px 10px; border: 1px solid var(--bm-line-strong); border-radius: 8px; background: #fff; color: var(--bm-navy); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
-.bm-row-action:hover { background: #F8F9FB; }
-/* On a phone the name, badges and "Not me" share a narrow column, so that one cell may wrap to a second line. */
-@media (max-width: 899.98px) { .bm-cell--name:has(.bm-row-action) { flex-wrap: wrap; row-gap: 4px; padding: 6px 0; } }
-.bm-row-confirm { background: #E8EEF7; border-bottom: 1px solid #EEF0F3; padding: 8px 14px 12px; }
-.bm-row-confirm-body { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 17px; }
-@media (min-width: 900px) { .bm-row-confirm { padding: 8px 16px 12px; } }
+/* A small text-style action inside a row (Leaderboard "Forget"), and the strip that opens under a row ("Remember", "See picks"). */
+.bm-row-action { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 6px; border: none; border-radius: 6px; background: transparent; color: var(--bm-navy); font: inherit; font-size: 14px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.bm-row-action:hover { background: rgba(0, 0, 0, 0.05); color: var(--bm-navy); }
+/* The name, badges and "Forget" share one column (narrow on a phone and on mid-width screens), so that one cell may
+   wrap to a second line rather than cut the name short. */
+.bm-cell--name:has(.bm-row-action) { flex-wrap: wrap; row-gap: 4px; padding: 6px 0; }
+.bm-row-confirm { background: #E8EEF7; border-bottom: 1px solid #EEF0F3; padding: 2px 8px 4px; }
+.bm-row-confirm-body { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; font-size: 17px; }
+@media (min-width: 900px) { .bm-row-confirm { padding: 2px 10px 4px; } }
 .bm-cell { min-width: 0; }
 .bm-cell--end { text-align: right; }
 .bm-cell--strong { font-weight: 700; }

@@ -18,10 +18,11 @@
 @*
     Release 2 reference page: the Leaderboard built only from the shared components in Client/Ui.
     Later pages copy this pattern. Logic that is not drawing lives in Core: StatusLineText, TopThreeRule, PoolPicker,
-    and for Find my entry: MyEntryMemory, PinnedEntries.
-    Your own rows are highlighted in the table; there is no separate card above it. Tapping someone else's name asks
-    "Is this you?" just under that row; a yes is remembered in this browser only (per pool), and that row gets a
-    "Not me" button. Signed-in players have their own entries highlighted without tapping.
+    and for Find my entry: MyEntryMemory, PinnedEntries, LeaderboardTap.
+    Your own rows are highlighted in the table; there is no separate card above it. With nothing remembered in the pool,
+    tapping a name opens a small strip under that row with "Remember" (and "See picks" once picks are visible). A
+    remembered entry is kept in this browser only (per pool) and its row gets a "Forget" button. Once one is remembered,
+    tapping another name opens its picks. Signed-in players have their own entries highlighted without tapping.
 *@
 
 <PageContainer>
@@ -72,7 +73,7 @@
         @if (pinned.RememberedMissing)
         {
             <Notice Tone="NoticeTone.Info" Title="This phone remembers an entry that is no longer in this pool.">
-                It may have been renamed, moved or deleted. Tap your name below to pick it again.
+                It may have been renamed, moved or deleted. Tap a name below to remember it again.
                 <SecondaryButton OnClick="ForgetAsync">Forget it</SecondaryButton>
             </Notice>
         }
@@ -95,12 +96,14 @@
             {
                 var thisRow = row;
                 // The entry this browser remembers (not one of the signed-in player's own) is a plain row, so its
-                // "Not me" button is not nested inside a row button; its name links to its picks once they are visible.
+                // "Forget" button is not nested inside a row button; its name links to its picks once they are visible.
+                // Rows a tap would do nothing on (before lock, once an entry is remembered) are plain rows too.
                 var rememberedOnly = IsRememberedOnly(row);
+                var tappable = !rememberedOnly && TapActionFor(row) != LeaderboardTapAction.None;
                 <TableRow Columns="@PhoneColumns" ColumnsWide="@WideColumns"
                           State="@RowStateFor(row)"
-                          OnClick="@(rememberedOnly ? default : EventCallback.Factory.Create(this, () => RowTapped(thisRow)))"
-                          AriaLabel="@(rememberedOnly ? null : RowLabel(row))">
+                          OnClick="@(tappable ? EventCallback.Factory.Create(this, () => RowTapped(thisRow)) : default)"
+                          AriaLabel="@(tappable ? RowLabel(row) : null)">
                     <TableCell Kind="CellKind.Rank">@row.Rank</TableCell>
                     <TableCell Kind="CellKind.Name">
                         @if (picksHidden)
@@ -133,7 +136,7 @@
                         {
                             <span class="bm-sr-only">, your entry on this device</span>
                             <button type="button" class="bm-row-action" @onclick="ForgetAsync"
-                                    aria-label="@($"Not me: stop remembering {row.PlayerName} on this device")">Not me</button>
+                                    aria-label="@($"Forget: stop remembering {row.PlayerName} on this device")">Forget</button>
                         }
                     </TableCell>
                     <TableCell Kind="CellKind.Points">@row.Score</TableCell>
@@ -157,14 +160,14 @@
                 </TableRow>
                 @if (pendingRow?.Id == row.Id)
                 {
-                    <div class="bm-row-confirm" role="row" aria-label="Is this you?">
+                    <div class="bm-row-confirm" role="row" aria-label="@($"Choices for {row.PlayerName}")">
                         <div role="cell" class="bm-row-confirm-body">
-                            <span role="status">Is <strong>@row.PlayerName</strong> you?</span>
-                            <PrimaryButton OnClick="ConfirmPendingAsync">Yes, remember me</PrimaryButton>
-                            <SecondaryButton OnClick="CancelPending">No</SecondaryButton>
-                            @if (!picksHidden)
+                            <button type="button" class="bm-row-action" @onclick="RememberPendingAsync"
+                                    aria-label="@($"Remember {row.PlayerName} on this device")">Remember</button>
+                            @if (PickVisibility.OnPublicPage(!picksHidden, false))
                             {
-                                <a href="@($"entry/{row.Id}")">Just look at their picks</a>
+                                <a class="bm-row-action" href="@($"entry/{row.Id}")"
+                                   aria-label="@($"See picks for {row.PlayerName}")">See picks</a>
                             }
                         </div>
                     </div>
@@ -177,7 +180,7 @@
             {
                 <div><MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Style="vertical-align: -3px" /> Picks are hidden until the pool locks, so names are not links yet.</div>
             }
-            <div>Tap a name to find your entry. Max = the most points still possible. "Out" means no longer able to finish in the top 3. Ties are broken by Max, then the pool's tiebreakers, then name.</div>
+            <div>@TapHint Max = the most points still possible. "Out" means no longer able to finish in the top 3. Ties are broken by Max, then the pool's tiebreakers, then name.</div>
         </div>
     }
 </PageContainer>
@@ -425,22 +428,30 @@
         : pinned.Rows.Any(r => r.Id == row.Id) ? RowState.Selected
         : RowState.Normal;
 
-    // A tap on someone else's row asks "Is this you?" just under that row; a second tap closes it. A tap on one of your
-    // own rows opens its picks once they are visible.
+    // An entry this browser remembers that is on this pool's leaderboard and has a Forget button: not one that has gone
+    // from the pool, and not one of the signed-in player's own entries (those rows have no Forget, so the visitor could
+    // otherwise never pick a different entry).
+    private bool HasRememberedRow => remembered != null && !pinned.RememberedMissing && !signedInEntryIds.Contains(remembered.EntryId);
+
+    private LeaderboardTapAction TapActionFor(LeaderboardDto row) =>
+        LeaderboardTap.For(pinned.Rows.Any(r => r.Id == row.Id), signedInEntryIds.Contains(row.Id), HasRememberedRow, !picksHidden);
+
+    // With nothing remembered, a tap opens the Remember strip under that row and a second tap closes it. Otherwise a tap
+    // opens the row's picks once they are visible.
     private void RowTapped(LeaderboardDto row)
     {
-        if (pinned.Rows.Any(r => r.Id == row.Id))
+        switch (TapActionFor(row))
         {
-            if (PickVisibility.OnPublicPage(!picksHidden, signedInEntryIds.Contains(row.Id))) Nav.NavigateTo($"entry/{row.Id}");
-            return;
+            case LeaderboardTapAction.OpenPicks:
+                Nav.NavigateTo($"entry/{row.Id}");
+                break;
+            case LeaderboardTapAction.ShowChoices:
+                pendingRow = pendingRow?.Id == row.Id ? null : row;
+                break;
         }
-
-        pendingRow = pendingRow?.Id == row.Id ? null : row;
     }
 
-    private void CancelPending() => pendingRow = null;
-
-    private async Task ConfirmPendingAsync()
+    private async Task RememberPendingAsync()
     {
         if (pendingRow == null || currentPool == null) return;
         memory.Remember(currentPool.Id, pendingRow.Id, pendingRow.PlayerName);
@@ -457,12 +468,25 @@
         await MyEntryStore.SaveAsync(memory);
     }
 
-    private string RowLabel(LeaderboardDto row) =>
-        pinned.Rows.Any(r => r.Id == row.Id)
-            ? $"{row.PlayerName}, your entry, rank {row.Rank}, {row.Score} points." + (PickVisibility.OnPublicPage(!picksHidden, signedInEntryIds.Contains(row.Id)) ? " Open its picks." : "")
-        : picksHidden
-            ? $"{row.PlayerName}, rank {row.Rank}, {row.Score} points. Tap to say this is you."
-            : $"{row.PlayerName}, rank {row.Rank}, {row.Score} points, up to {row.MaxPossible} possible. Tap to say this is you.";
+    private string RowLabel(LeaderboardDto row)
+    {
+        var action = TapActionFor(row) switch
+        {
+            LeaderboardTapAction.OpenPicks => " Open its picks.",
+            LeaderboardTapAction.ShowChoices => picksHidden ? " Tap to remember it on this device." : " Tap to remember it or see its picks.",
+            _ => ""
+        };
+        if (pinned.Rows.Any(r => r.Id == row.Id)) return $"{row.PlayerName}, your entry, rank {row.Rank}, {row.Score} points." + action;
+        return (picksHidden
+            ? $"{row.PlayerName}, rank {row.Rank}, {row.Score} points."
+            : $"{row.PlayerName}, rank {row.Rank}, {row.Score} points, up to {row.MaxPossible} possible.") + action;
+    }
+
+    // The first sentence of the note under the table.
+    private string TapHint =>
+        !HasRememberedRow ? "Tap a name to remember your entry on this device."
+        : picksHidden ? "Forget your entry to pick a different one."
+        : "Tap a name to see its picks. Forget your entry to pick a different one.";
 
     private static string TrophyColor(int rank) => rank switch { 1 => "#D4A017", 2 => "#8A8F98", _ => "#A9682B" };
     private static string TrophyTitle(int rank) => rank switch { 1 => "1st place - Gold", 2 => "2nd place - Silver", _ => "3rd place - Bronze" };
