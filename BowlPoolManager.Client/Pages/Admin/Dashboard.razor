@@ -5,7 +5,11 @@
 @attribute [Authorize(Roles = "SuperAdmin,Admin")]
 @inject HttpClient Http
 @inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Nav
 @using Microsoft.AspNetCore.Components.Authorization
+
+@* Each site shows its own sport's tiles: Football Admin on bowl-madness, Hoops Admin on hoops-madness, both on any other host (DashboardSports, Core).
+   Site Admin and Utilities serve both sports and show on both sites, except Score Feed, which is the football mock feed. *@
 
 <PageTitle>Admin Dashboard</PageTitle>
 
@@ -50,6 +54,8 @@
     </AuthorizeView>
 
     @* ===== FOOTBALL ADMIN ===== *@
+    @if (sports.Football)
+    {
     <div class="mb-2">
         <span class="text-uppercase fw-bold small text-muted">
             <i class="bi bi-trophy-fill me-1"></i> Football Admin
@@ -59,6 +65,17 @@
     <div class="row g-4 mb-5">
 
         <AuthorizeView Roles="SuperAdmin" Context="fa">
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <i class="bi bi-list-check display-4 text-primary mb-3"></i>
+                        <h5 class="card-title">Season Setup</h5>
+                        <p class="card-text text-muted small">Setup steps in order, and what is done.</p>
+                        <a href="admin/season-setup" class="btn btn-outline-primary stretched-link">Season Setup</a>
+                    </div>
+                </div>
+            </div>
 
             <div class="col-md-6 col-lg-3">
                 <div class="card h-100 shadow-sm border-0">
@@ -128,20 +145,12 @@
             </div>
         </div>
 
-        <div class="col-md-6 col-lg-3">
-            <div class="card h-100 shadow-sm border-0">
-                <div class="card-body text-center">
-                    <i class="bi bi-palette display-4 text-secondary mb-3"></i>
-                    <h5 class="card-title">Component Sheet</h5>
-                    <p class="card-text text-muted small">Every shared building block of the new look.</p>
-                    <a href="admin/components" class="btn btn-outline-secondary stretched-link">Component Sheet</a>
-                </div>
-            </div>
-        </div>
-
     </div>
+    }
 
     @* ===== HOOPS ADMIN ===== *@
+    @if (sports.Hoops)
+    {
     <AuthorizeView Roles="SuperAdmin,Admin" Context="ha">
         <div class="mb-2">
             <span class="text-uppercase fw-bold small text-muted">
@@ -245,9 +254,10 @@
 
         </div>
     </AuthorizeView>
+    }
 
     @* ===== UTILITIES ===== *@
-    <AuthorizeView Roles="SuperAdmin" Context="util">
+    <AuthorizeView Roles="SuperAdmin,Admin" Context="util">
         <div class="mb-2">
             <span class="text-uppercase fw-bold small text-muted">
                 <i class="bi bi-tools me-1"></i> Utilities
@@ -255,6 +265,19 @@
             <hr class="mt-1 mb-3" />
         </div>
         <div class="row g-4 mb-4">
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <i class="bi bi-palette display-4 text-secondary mb-3"></i>
+                        <h5 class="card-title">Component Sheet</h5>
+                        <p class="card-text text-muted small">Every shared building block of the new look.</p>
+                        <a href="admin/components" class="btn btn-outline-secondary stretched-link">Component Sheet</a>
+                    </div>
+                </div>
+            </div>
+
+            <AuthorizeView Roles="SuperAdmin" Context="utilSuperAdmin">
 
             <div class="col-md-6 col-lg-3">
                 <div class="card h-100 shadow-sm border-0">
@@ -300,6 +323,8 @@
                 </div>
             </div>
 
+            @if (sports.Football)
+            {
             <div class="col-md-6 col-lg-3">
                 <div class="card h-100 shadow-sm border-0">
                     <div class="card-body text-center">
@@ -310,6 +335,7 @@
                     </div>
                 </div>
             </div>
+            }
 
             @if (showTestData)
             {
@@ -325,6 +351,8 @@
                 </div>
             }
 
+            </AuthorizeView>
+
         </div>
     </AuthorizeView>
 
@@ -332,6 +360,7 @@
 
 @code {
     private bool showTestData;
+    private DashboardSports sports => DashboardSports.ForHost(new Uri(Nav.Uri).Host);
 
     // The Test Data tile shows only when the API says this is the test site (SuperAdmin only).
     protected override async Task OnInitializedAsync()
