@@ -44,9 +44,9 @@
         <EmptyState Title="Picks are hidden until the pool locks" Icon="@Icons.Material.Outlined.Lock">
             <ChildContent>Everyone's picks show here once picks lock, so nobody can copy another bracket.</ChildContent>
             <Action>
-                <AuthorizeView Roles="@Constants.Roles.SuperAdmin">
+                <AuthorizeView Roles="@EditRoles">
                     <Authorized>
-                        <SecondaryButton Href="@($"admin/entry/{entry.Id}")" Icon="@Icons.Material.Outlined.Edit">Edit picks (admin)</SecondaryButton>
+                        <SecondaryButton Href="@EditHref" Icon="@Icons.Material.Outlined.Edit">Edit picks (admin)</SecondaryButton>
                     </Authorized>
                 </AuthorizeView>
             </Action>
@@ -69,9 +69,9 @@
                     <MudText Typo="Typo.h4">@entry.TieBreakerPoints</MudText>
                 </MudStack>
             </MudStack>
-            <AuthorizeView Roles="@Constants.Roles.SuperAdmin">
+            <AuthorizeView Roles="@EditRoles">
                 <Authorized>
-                    <div><SecondaryButton Href="@($"admin/entry/{entry.Id}")" Icon="@Icons.Material.Outlined.Edit">Edit picks (admin)</SecondaryButton></div>
+                    <div><SecondaryButton Href="@EditHref" Icon="@Icons.Material.Outlined.Edit">Edit picks (admin)</SecondaryButton></div>
                 </Authorized>
             </AuthorizeView>
         </Card>
@@ -110,6 +110,13 @@
     private BowlPool? currentPool;
     private DateTime lastUpdate = DateTime.MinValue;
 
+    // Admins may edit any entry (business rules section 1), so the admin edit link shows to Admins and SuperAdmins.
+    // The season goes with it so the admin form reads the entry from its own season.
+    private const string EditRoles = Constants.Roles.SuperAdmin + "," + Constants.Roles.Admin;
+    private string EditHref => entry == null
+        ? "admin/entries"
+        : $"admin/entry/{Uri.EscapeDataString(entry.Id)}?seasonId={Uri.EscapeDataString(entry.SeasonId)}";
+
     private string BackHref => entry == null ? "leaderboard" : $"leaderboard?poolId={Uri.EscapeDataString(entry.PoolId)}";
 
     private string? StatusText => currentPool == null
@@ -121,21 +128,36 @@
     {
         try
         {
-            var currentSeason = await SeasonService.GetCurrentSeasonAsync();
-            currentSeasonId = currentSeason?.Id ?? "";
+            var seasons = await SeasonService.GetSeasonsAsync();
+            currentSeasonId = CurrentSeason.Pick(seasons)?.Id ?? "";
 
+            // The current season's games and pools load alongside the entry; most links are to this season's entries.
             var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={currentSeasonId}");
-            var entryTask = FetchEntryAsync();
+            var entryTask = FindEntryAsync(CurrentSeason.EntryLookupOrder(seasons));
             var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={currentSeasonId}");
-            var myEntriesTask = FetchMyEntryIdsAsync();
+            var myEntriesTask = FetchMyEntryIdsAsync(currentSeasonId);
             await Task.WhenAll(gamesTask, entryTask, poolsTask, myEntriesTask);
 
             var allGames = await gamesTask ?? new();
             var allPools = await poolsTask ?? new();
+            var myEntryIds = await myEntriesTask;
 
             // The server hides other players' picks until the pool locks.
             entry = await entryTask;
-            isOwnEntry = entry != null && (await myEntriesTask).Contains(entry.Id);
+
+            // An entry from another season (an old link) is shown with its own season's games and pool (issue 138).
+            if (entry != null && !string.IsNullOrEmpty(entry.SeasonId) && entry.SeasonId != currentSeasonId)
+            {
+                var seasonGamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={Uri.EscapeDataString(entry.SeasonId)}");
+                var seasonPoolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={Uri.EscapeDataString(entry.SeasonId)}");
+                var seasonMineTask = FetchMyEntryIdsAsync(entry.SeasonId);
+                await Task.WhenAll(seasonGamesTask, seasonPoolsTask, seasonMineTask);
+                allGames = await seasonGamesTask ?? new();
+                allPools = await seasonPoolsTask ?? new();
+                myEntryIds = await seasonMineTask;
+            }
+
+            isOwnEntry = entry != null && myEntryIds.Contains(entry.Id);
 
             if (entry != null)
             {
@@ -173,14 +195,14 @@
     // A pool that cannot be found is treated as not locked, so only the owner sees the picks.
     private bool poolLocked => currentPool != null && DateTime.UtcNow > currentPool.LockDate;
 
-    private async Task<HashSet<string>> FetchMyEntryIdsAsync()
+    private async Task<HashSet<string>> FetchMyEntryIdsAsync(string seasonId)
     {
         try
         {
             var auth = await AuthStateProvider.GetAuthenticationStateAsync();
             if (auth.User.Identity?.IsAuthenticated == true)
             {
-                var mine = await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyEntries?seasonId={currentSeasonId}") ?? new();
+                var mine = await Http.GetFromJsonAsync<List<BracketEntry>>($"api/GetMyEntries?seasonId={Uri.EscapeDataString(seasonId)}") ?? new();
                 return mine.Select(e => e.Id).ToHashSet();
             }
         }
@@ -188,11 +210,17 @@
         return new();
     }
 
-    // One entry by id. A missing entry (404) leaves the page on its "not found" view.
-    private async Task<BracketEntry?> FetchEntryAsync()
+    // One entry by id. The link carries no season, so each season is tried in turn (current first), always passing
+    // the season as the partition key. Not found in any season leaves the page on its "not found" view.
+    private async Task<BracketEntry?> FindEntryAsync(List<string> seasonIds)
     {
-        var response = await Http.GetAsync($"api/GetEntry?id={Uri.EscapeDataString(EntryId)}&seasonId={currentSeasonId}");
-        return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<BracketEntry>() : null;
+        foreach (var seasonId in seasonIds)
+        {
+            var response = await Http.GetAsync($"api/GetEntry?id={Uri.EscapeDataString(EntryId)}&seasonId={Uri.EscapeDataString(seasonId)}");
+            if (response.IsSuccessStatusCode) return await response.Content.ReadFromJsonAsync<BracketEntry>();
+            if (response.StatusCode != System.Net.HttpStatusCode.NotFound) return null;
+        }
+        return null;
     }
 
     private record Section(string Title, List<BowlGame> Games);

@@ -176,17 +176,61 @@ namespace BowlPoolManager.Tests.Api
             _saved.Should().BeEmpty();
         }
 
-        [Fact]
-        public async Task CheckAndRefreshScoresAsync_ShouldMarkInProgress_WhenKickoffIsWithin15MinutesAndFeedStillSaysScheduled()
+        // Owner decision 2026-11-28 (issue 138): the feed decides when a linked game is live. Near or past kickoff,
+        // a game the feed still lists as Scheduled stays Scheduled (it may be postponed).
+        [Theory]
+        [InlineData(-5)]
+        [InlineData(10)]
+        [InlineData(-180)]
+        public async Task CheckAndRefreshScoresAsync_ShouldStayScheduled_WhenFeedStillSaysScheduledAroundKickoff(int minutesFromKickoff)
         {
             var game = Local();
-            game.StartTime = DateTime.UtcNow.AddMinutes(-5);
+            game.StartTime = DateTime.UtcNow.AddMinutes(minutesFromKickoff);
             await Feed(FeedGameStatus.Scheduled, "Home State", null, "Away Tech", null);
 
             await _service.CheckAndRefreshScoresAsync(new List<BowlGame> { game });
 
-            game.Status.Should().Be(GameStatus.InProgress);
-            game.GameDetail.Should().Be("In Progress");
+            game.Status.Should().Be(GameStatus.Scheduled);
+            _saved.Should().BeEmpty();
+        }
+
+        // A game the old clock rule marked In Progress goes back to Scheduled while the feed says it has not started.
+        [Fact]
+        public async Task CheckAndRefreshScoresAsync_ShouldResetToScheduled_WhenInProgressButFeedSaysScheduled()
+        {
+            var game = Local();
+            game.StartTime = DateTime.UtcNow.AddHours(-2);
+            game.Status = GameStatus.InProgress;
+            game.GameDetail = "In Progress";
+            await Feed(FeedGameStatus.Scheduled, "Home State", null, "Away Tech", null);
+
+            await _service.CheckAndRefreshScoresAsync(new List<BowlGame> { game });
+
+            game.Status.Should().Be(GameStatus.Scheduled);
+            game.GameDetail.Should().BeNull();
+            _saved.Should().Contain(game);
+        }
+
+        // Issue 138: a batch shares one partition key, so updates for games of two seasons go in one batch per season.
+        [Fact]
+        public async Task CheckAndRefreshScoresAsync_ShouldSaveOneBatchPerSeason_WhenGamesSpanTwoSeasons()
+        {
+            var batches = new List<(List<BowlGame> Games, string SeasonId)>();
+            _repo.Setup(r => r.UpdateGamesAsBatchAsync(It.IsAny<List<BowlGame>>(), It.IsAny<string>()))
+                .Callback((List<BowlGame> games, string seasonId) => batches.Add((games.ToList(), seasonId)))
+                .Returns(Task.CompletedTask);
+
+            var thisYear = Local("g1", "100");
+            var lastYear = Local("g2", "200");
+            lastYear.SeasonId = "season-0";
+            await Feed(FeedGameStatus.InProgress, "Home State", 7, "Away Tech", 0, id: "100");
+            await Feed(FeedGameStatus.InProgress, "Home State", 3, "Away Tech", 0, id: "200");
+
+            await _service.CheckAndRefreshScoresAsync(new List<BowlGame> { thisYear, lastYear });
+
+            batches.Should().HaveCount(2);
+            batches.Should().ContainSingle(b => b.SeasonId == "season-1").Which.Games.Should().OnlyContain(g => g.SeasonId == "season-1");
+            batches.Should().ContainSingle(b => b.SeasonId == "season-0").Which.Games.Should().OnlyContain(g => g.SeasonId == "season-0");
         }
 
         // #133. A final whose team names do not match the link is marked Final with no scores,

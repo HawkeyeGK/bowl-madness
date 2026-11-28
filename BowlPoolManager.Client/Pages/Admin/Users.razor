@@ -3,6 +3,7 @@
 @using BowlPoolManager.Core
 @using Microsoft.AspNetCore.Authorization
 @using System.Net.Http.Json
+@using BowlPoolManager.Client.Helpers
 @attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
 @inject HttpClient Http
 
@@ -106,15 +107,21 @@
 </div>
 
 @inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthStateProvider
 
 @code {
     private List<UserProfile>? users;
     private bool isLoading = true;
+    private string? myUserId;
 
     protected override async Task OnInitializedAsync()
     {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        myUserId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         await LoadUsers();
     }
+
+    private bool IsMe(UserProfile user) => !string.IsNullOrEmpty(myUserId) && user.Id == myUserId;
 
     private async Task LoadUsers()
     {
@@ -136,6 +143,15 @@
 
     private async Task ToggleUser(UserProfile user)
     {
+        // Disabling your own account signs you out of everything, so it asks first. The server refuses it outright
+        // when you are the last active SuperAdmin (issue 138).
+        if (!user.IsDisabled && IsMe(user))
+        {
+            bool confirmedSelf = await JS.InvokeAsync<bool>("confirm",
+                "You are about to disable your own account. You will be signed out and lose access to the site. Continue?");
+            if (!confirmedSelf) return;
+        }
+
         bool originalState = user.IsDisabled;
         user.IsDisabled = !user.IsDisabled;
 
@@ -145,13 +161,13 @@
             if (!response.IsSuccessStatusCode)
             {
                 user.IsDisabled = originalState;
-                Console.WriteLine("Failed to toggle status");
+                await JS.InvokeVoidAsync("alert", $"Failed to change {user.DisplayName}'s status: {await ApiErrorText.FromAsync(response)}");
             }
         }
         catch (Exception ex)
         {
-             user.IsDisabled = originalState;
-            Console.WriteLine($"Error: {ex.Message}");
+            user.IsDisabled = originalState;
+            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
         }
     }
 
@@ -169,8 +185,12 @@
     {
         if (user.AppRole == newRole) return;
 
-        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to change {user.DisplayName}'s role to {newRole}?");
-        
+        // Lowering your own role takes away your access to the SuperAdmin pages at once, so the question says so.
+        var question = IsMe(user) && user.AppRole == Constants.Roles.SuperAdmin
+            ? $"You are about to change your own role to {newRole}. You will lose SuperAdmin access, including this page. Continue?"
+            : $"Are you sure you want to change {user.DisplayName}'s role to {newRole}?";
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", question);
+
         if (!confirmed) return;
 
         var originalRole = user.AppRole;
@@ -182,8 +202,7 @@
             if (!response.IsSuccessStatusCode)
             {
                  user.AppRole = originalRole;
-                 string msg = await response.Content.ReadAsStringAsync();
-                 await JS.InvokeVoidAsync("alert", $"Failed to update role: {msg}");
+                 await JS.InvokeVoidAsync("alert", $"Failed to update role: {await ApiErrorText.FromAsync(response)}");
             }
         }
         catch (Exception ex)

@@ -3,6 +3,7 @@
 @using BowlPoolManager.Core
 
 @using BowlPoolManager.Client.Services
+@using BowlPoolManager.Client.Helpers
 @using Microsoft.AspNetCore.Authorization
 @using System.Net.Http.Json
 @using System.Text.Json
@@ -480,7 +481,7 @@
         }
         else
         {
-            Console.WriteLine("Invalid Date/Time entered.");
+            saveError = "The game was not saved. The kickoff is not a valid date and time.";
             return;
         }
 
@@ -497,14 +498,13 @@
             else
             {
                 Console.WriteLine($"[Game Admin] Game save failed: {response.StatusCode}");
-                saveError = response.StatusCode == System.Net.HttpStatusCode.BadRequest
-                    ? $"The game was not saved. {await response.Content.ReadAsStringAsync()}"
-                    : $"The game was not saved ({(int)response.StatusCode}).";
+                saveError = $"The game was not saved. {await ApiErrorText.FromAsync(response)}";
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[Game Admin] Error saving game: {ex.Message}");
+            saveError = $"The game was not saved. {ex.Message}";
         }
     }
 
@@ -513,6 +513,7 @@
         var confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete '{game.BowlName}'? This action cannot be undone.");
         if (!confirmed) return;
 
+        saveError = null;
         try
         {
             var response = await Http.DeleteAsync($"api/DeleteGame/{game.Id}?seasonId={game.SeasonId}");
@@ -523,11 +524,15 @@
             else
             {
                 Console.WriteLine($"[Game Admin] Game delete failed: {response.StatusCode}");
+                saveError = $"'{game.BowlName}' was not deleted. {await ApiErrorText.FromAsync(response)}";
+                // The message shows in the form at the top of the page.
+                await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[Game Admin] Error deleting game: {ex.Message}");
+            saveError = $"'{game.BowlName}' was not deleted. {ex.Message}";
         }
     }
 }

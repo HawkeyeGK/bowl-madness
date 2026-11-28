@@ -83,8 +83,15 @@ namespace BowlPoolManager.Tests.Api
         public static HttpRequestData Request(Tier tier, string query = "", object? body = null) =>
             Request(IdFor(tier), query, body);
 
+        /// <summary>Fake Functions request whose body is exactly <paramref name="rawBody"/> (for malformed JSON).</summary>
+        public static HttpRequestData RequestWithRawBody(Tier tier, string rawBody) =>
+            BuildRequest(IdFor(tier), "", Encoding.UTF8.GetBytes(rawBody), null);
+
         /// <summary>Fake Functions request. A null userId means no x-ms-client-principal header.</summary>
-        public static HttpRequestData Request(string? userId, string query = "", object? body = null, string? userDetails = null)
+        public static HttpRequestData Request(string? userId, string query = "", object? body = null, string? userDetails = null) =>
+            BuildRequest(userId, query, body == null ? Array.Empty<byte>() : JsonSerializer.SerializeToUtf8Bytes(body), userDetails);
+
+        private static HttpRequestData BuildRequest(string? userId, string query, byte[] rawBody, string? userDetails)
         {
             var services = new ServiceCollection();
             services.AddOptions<WorkerOptions>().Configure(o => o.Serializer = new JsonObjectSerializer());
@@ -101,8 +108,7 @@ namespace BowlPoolManager.Tests.Api
             var url = new Uri("https://localhost/api/test" + query);
             requestMock.Setup(r => r.Url).Returns(url);
             requestMock.Setup(r => r.Query).Returns(System.Web.HttpUtility.ParseQueryString(url.Query));
-            var bodyBytes = body == null ? Array.Empty<byte>() : JsonSerializer.SerializeToUtf8Bytes(body);
-            requestMock.Setup(r => r.Body).Returns(new MemoryStream(bodyBytes));
+            requestMock.Setup(r => r.Body).Returns(new MemoryStream(rawBody));
 
             var responseMock = new Mock<HttpResponseData>(ctx);
             responseMock.SetupProperty(r => r.StatusCode);
