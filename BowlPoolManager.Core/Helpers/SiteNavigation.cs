@@ -41,7 +41,10 @@ namespace BowlPoolManager.Core.Helpers
                 };
         }
 
-        /// <summary>Links that are not tabs: the phone menu, and the desktop bar after the tabs.</summary>
+        /// <summary>
+        /// Links that are not tabs: the phone menu, and the desktop bar after the tabs.
+        /// Rules is football only until hoops gets its own rules (Phase 3).
+        /// </summary>
         public static IReadOnlyList<NavItem> MenuLinks(Sport sport) => sport == Sport.Basketball
             ? new[]
             {
@@ -51,7 +54,8 @@ namespace BowlPoolManager.Core.Helpers
             : new[]
             {
                 new NavItem("history", "History", "archives"),
-                new NavItem("print", "Print Bracket", "print-bracket")
+                new NavItem("print", "Print Bracket", "print-bracket"),
+                new NavItem("rules", "Rules", "rules")
             };
     }
 }

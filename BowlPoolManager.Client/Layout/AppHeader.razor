@@ -8,7 +8,7 @@
     <div class="bm-header-bar">
         <a class="bm-brand" href="@HomeHref">@SiteNavigation.SiteName(Sport)</a>
 
-        @* Wide screens: the four main links, then History and Print Bracket, then Admin for admins. *@
+        @* Wide screens: the four main links, then History, Print Bracket and Rules, then Admin for admins. *@
         <nav class="bm-topnav bm-only-wide" aria-label="Main">
             @foreach (var item in SiteNavigation.Tabs(Sport, NeedsPicks).Concat(SiteNavigation.MenuLinks(Sport)))
             {
