@@ -62,6 +62,14 @@
     {
         <LoadingIndicator Text="Loading the standings..." />
     }
+    else if (loadFailed)
+    {
+        @* A failed load is not an empty pool (issue 138). *@
+        <EmptyState Title="The standings did not load" Icon="@Icons.Material.Outlined.CloudOff">
+            <ChildContent>Something went wrong reaching the server. Check your connection and try again.</ChildContent>
+            <Action><PrimaryButton OnClick="@(() => Nav.NavigateTo(Nav.Uri, forceLoad: true))">Try again</PrimaryButton></Action>
+        </EmptyState>
+    }
     else if (leaderboard == null || !leaderboard.Any())
     {
         <EmptyState Title="No entries yet" Icon="@Icons.Material.Outlined.EmojiEvents">
@@ -280,6 +288,7 @@
         catch (Exception ex)
         {
             Console.WriteLine($"Error loading leaderboard: {ex.Message}");
+            loadFailed = true;
         }
         finally
         {
@@ -322,6 +331,8 @@
 
     // Counts loads so a slow answer for a pool the visitor has already left cannot overwrite the newer one.
     private int loadVersion;
+    // True when the pools or the standings failed to load, so the page does not claim the pool has no entries.
+    private bool loadFailed;
 
     private async Task LoadLeaderboardForPool(string poolId)
     {
@@ -334,6 +345,7 @@
             );
 
             if (version != loadVersion) return;
+            loadFailed = false;
 
             if (response != null)
             {
@@ -360,6 +372,7 @@
         catch (Exception ex)
         {
             Console.WriteLine($"Error fetching leaderboard: {ex.Message}");
+            if (version == loadVersion) loadFailed = true;
         }
     }
 

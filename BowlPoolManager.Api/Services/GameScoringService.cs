@@ -67,7 +67,6 @@ namespace BowlPoolManager.Api.Services
 
             var apiGames = await _scoreFeed.GetScoreboardAsync();
             var batchUpdates = new List<BowlGame>(); // Collect all updates here
-            string? seasonId = linkedGames.FirstOrDefault()?.SeasonId; // Assumes all games in list share seasonId
 
             foreach (var localGame in linkedGames)
             {
@@ -127,8 +126,17 @@ namespace BowlPoolManager.Api.Services
                     localGame.Status = GameStatus.Final;
                     localGame.GameDetail = "Final";
                 }
-                else if (apiGame.Status == FeedGameStatus.InProgress || apiGame.Status == FeedGameStatus.Final || 
-                        (DateTime.UtcNow >= localGame.StartTime.AddMinutes(-15)))
+                else if (apiGame.Status == FeedGameStatus.Scheduled)
+                {
+                    // The feed decides when a linked game is live (owner decision 2026-11-28, issue 138). A game the
+                    // feed has not started is Scheduled, so a postponed game does not stay In Progress.
+                    if (localGame.Status == GameStatus.InProgress)
+                    {
+                        localGame.Status = GameStatus.Scheduled;
+                        localGame.GameDetail = null;
+                    }
+                }
+                else
                 {
                     localGame.Status = GameStatus.InProgress;
 
@@ -159,10 +167,12 @@ namespace BowlPoolManager.Api.Services
                 }
             }
 
-            if (batchUpdates.Any() && !string.IsNullOrEmpty(seasonId))
+            // One batch per season: a batch shares one partition key, so a game list that spans seasons would make a
+            // single batch throw and the refresh retry on every request (issue 138).
+            foreach (var seasonBatch in batchUpdates.Where(g => !string.IsNullOrEmpty(g.SeasonId)).GroupBy(g => g.SeasonId))
             {
-                _logger.LogInformation($"Scores updated. Saving {batchUpdates.Count} games in a transaction.");
-                await _gameRepo.UpdateGamesAsBatchAsync(batchUpdates, seasonId);
+                _logger.LogInformation("Scores updated. Saving {Count} games of season {SeasonId} in a transaction.", seasonBatch.Count(), seasonBatch.Key);
+                await _gameRepo.UpdateGamesAsBatchAsync(seasonBatch.ToList(), seasonBatch.Key);
             }
         }
 

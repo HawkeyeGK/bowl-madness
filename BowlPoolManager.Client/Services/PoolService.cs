@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using BowlPoolManager.Client.Helpers;
 using BowlPoolManager.Core.Domain;
 
 namespace BowlPoolManager.Client.Services
@@ -49,46 +50,41 @@ namespace BowlPoolManager.Client.Services
             }
         }
 
+        // The write methods throw HttpRequestException carrying the server's message when the server refuses,
+        // so the admin page can show why (issue 138).
         public async Task<BowlPool?> CreatePoolAsync(BowlPool pool)
         {
             var response = await _http.PostAsJsonAsync("api/CreatePool", pool);
-            if (response.IsSuccessStatusCode)
-            {
-                return await response.Content.ReadFromJsonAsync<BowlPool>();
-            }
-            return null;
+            await ApiErrorText.EnsureSuccessAsync(response);
+            return await response.Content.ReadFromJsonAsync<BowlPool>();
         }
 
         public async Task<BowlPool?> UpdatePoolAsync(BowlPool pool)
         {
             var response = await _http.PutAsJsonAsync("api/UpdatePool", pool);
-            if (response.IsSuccessStatusCode)
-            {
-                return await response.Content.ReadFromJsonAsync<BowlPool>();
-            }
-            return null;
+            await ApiErrorText.EnsureSuccessAsync(response);
+            return await response.Content.ReadFromJsonAsync<BowlPool>();
         }
 
         public async Task<bool> DeletePoolAsync(string poolId)
         {
             var response = await _http.DeleteAsync($"api/DeletePool/{poolId}");
-            return response.IsSuccessStatusCode;
+            await ApiErrorText.EnsureSuccessAsync(response);
+            return true;
         }
 
         public async Task<BowlPool?> ToggleConclusionAsync(string poolId)
         {
             var response = await _http.PostAsync($"api/Pools/{poolId}/ToggleConclusion", null);
-            if (response.IsSuccessStatusCode)
-            {
-                return await response.Content.ReadFromJsonAsync<BowlPool>();
-            }
-            return null;
+            await ApiErrorText.EnsureSuccessAsync(response);
+            return await response.Content.ReadFromJsonAsync<BowlPool>();
         }
 
         public async Task<bool> ArchivePoolAsync(string poolId)
         {
             var response = await _http.PostAsync($"api/ArchivePool/{poolId}", null);
-            return response.IsSuccessStatusCode;
+            await ApiErrorText.EnsureSuccessAsync(response);
+            return true;
         }
 
         public async Task<PoolArchive?> GetArchiveAsync(string poolId)

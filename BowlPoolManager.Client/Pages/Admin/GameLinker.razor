@@ -1,5 +1,8 @@
 @page "/admin/linker"
+@using BowlPoolManager.Core
 @using BowlPoolManager.Core.Domain
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = Constants.Roles.SuperAdmin)]
 @using BowlPoolManager.Core.Dtos
 @using BowlPoolManager.Client.Services
 @inject ISeasonService SeasonService
