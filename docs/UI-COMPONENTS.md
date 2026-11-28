@@ -14,7 +14,7 @@ Where things live:
 | Component styles | `Client/wwwroot/css/ui.css` |
 | Fonts (shipped, no CDN) | `Client/wwwroot/fonts/` (OFL licences in `LICENSES.txt`) |
 | Frame: `MainLayout`, `AppHeader` | `Client/Layout/` |
-| Logic that is not drawing | `Core/Helpers`: `SiteNavigation`, `StatusLineText`, `TopThreeRule`, `PoolPicker`; group B adds `MyEntryMemory`, `PinnedEntries`, `PlaceText`, `ScoresGrouping`, `ScoreGameText`, `GameSlots`, `PickLine`, `PickOutcomes`, `PickSplit`, `PickVisibility`, `ApRank` (xUnit tests in `Tests/Core`) |
+| Logic that is not drawing | `Core/Helpers`: `SiteNavigation`, `StatusLineText`, `TopThreeRule`, `PoolPicker`; group B adds `MyEntryMemory`, `PinnedEntries`, `PlaceText`, `ScoresGrouping`, `ScoreGameText`, `GameSlots`, `PickLine`, `PickOutcomes`, `PickSplit`, `PickVisibility`, `ApRank`; group E adds `PathToVictory` (xUnit tests in `Tests/Core`) |
 
 ## Rules every page follows
 - Wrap the page in `PageContainer` and start with `PageHeader`. The browser tab title comes from `PageHeader`; do not add a `PageTitle`.

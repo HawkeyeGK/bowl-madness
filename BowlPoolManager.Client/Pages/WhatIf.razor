@@ -1,17 +1,18 @@
 @page "/what-if"
+@implements IDisposable
 @using BowlPoolManager.Core.Domain
 @using BowlPoolManager.Core
 @using BowlPoolManager.Core.Helpers
 @using BowlPoolManager.Client.Services
 
 @using Microsoft.AspNetCore.Components.Authorization
-@using Microsoft.JSInterop
+@using MudBlazor
 @inject ISeasonService SeasonService
 @inject HttpClient Http
-@inject IJSRuntime JSRuntime
 @inject AuthenticationStateProvider AuthStateProvider
-
-<PageTitle>Path to Victory</PageTitle>
+@inject NavigationManager Nav
+@inject PoolSelection PoolSelection
+@inject MyEntryStore MyEntryStore
 
 @using BowlPoolManager.Client.Components
 @using BowlPoolManager.Client.Helpers
@@ -22,7 +23,7 @@
         display: block;
         width: 100%;
         max-width: 100%;
-        height: calc(100vh - 190px); 
+        height: calc(100vh - 240px); /* the page header and the view tabs sit above it */
         overflow: auto; 
         border: 1px solid #dee2e6;
         background-color: white;
@@ -193,48 +194,50 @@
     }
 </style>
 
-<div class="container-fluid mt-3 px-4">
-    <div class="d-flex justify-content-between align-items-end mb-3 d-print-none">
-        
-        @* LEFT SIDE: Title + Pool Selector *@
-        <div class="d-flex flex-column gap-2">
-            <div class="d-flex align-items-center gap-3">
-                <h1 class="h3 fw-bold mb-0"><i class="bi bi-signpost-split-fill text-primary"></i> Path to Victory</h1>
+@*
+    Release 2 group E: the default view is "Who can still win, and what has to happen" (owner decisions 2026-11-28:
+    contenders are the entries that can still finish top 3, each with the open picks where it differs from the leader
+    ("can win" when its score plus those games' points reaches the leader's score; your own out entry is marked "You"),
+    three shown and the rest one tap away; the full grid is the second tab, ?view=grid). Both views draw only
+    BracketSimulator's output; the summary lines come from PathToVictory (Core). Only locked pools are listed
+    (PathToVictory.ShowsPool), so no picks show before lock.
+*@
+<div class="container-fluid mt-3 px-3 px-md-4">
+    <PageHeader Title="Path to Victory" Subtitle="@SelectedPool?.Name">
+        <Actions>
+            <PoolSwitcher Mode="PoolSwitcherMode.Segmented" />
+        </Actions>
+    </PageHeader>
+
+    @if (!isLoading && poolList.Any())
+    {
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 my-3 no-print">
+            <div class="bm-segmented" role="group" aria-label="View">
+                <button type="button" aria-pressed="@(ShowGrid ? "false" : "true")" @onclick="() => ShowViewAsync(false)">Who can win</button>
+                <button type="button" aria-pressed="@(ShowGrid ? "true" : "false")" @onclick="() => ShowViewAsync(true)">Full grid</button>
             </div>
 
-            @* POOL SELECTOR *@
-            @if(poolList.Count > 1)
+            @if (ShowGrid)
             {
-                <div class="d-flex align-items-center gap-2">
-                    <span class="text-muted small fw-bold">Pool:</span>
-                    <select class="form-select form-select-sm shadow-sm" style="width: auto; min-width: 200px;" @onchange="OnPoolChanged">
-                        @foreach(var pool in poolList)
-                        {
-                            <option value="@pool.Id" selected="@(pool.Id == selectedPoolId)">@pool.Name</option>
-                        }
-                    </select>
+                <div class="d-flex gap-2">
+                    @if (HasActiveSimulation && !isPrintView)
+                    {
+                        <button class="btn btn-outline-danger btn-sm" @onclick="ResetSimulation">
+                            <i class="bi bi-arrow-counterclockwise"></i> Reset to Reality
+                        </button>
+                    }
+
+                    <button class="btn btn-sm @(isPrintView ? "btn-secondary" : "btn-outline-secondary") d-print-none"
+                            @onclick="() => isPrintView = !isPrintView">
+                        <i class="bi @(isPrintView ? "bi-table" : "bi-printer")"></i>
+                        @(isPrintView ? "Exit Print View" : "Printer Friendly View")
+                    </button>
                 </div>
             }
         </div>
+    }
 
-        @* RIGHT SIDE: Actions *@
-        <div class="d-flex gap-2">
-             @if (HasActiveSimulation && !isPrintView)
-             {
-                <button class="btn btn-outline-danger btn-sm" @onclick="ResetSimulation">
-                    <i class="bi bi-arrow-counterclockwise"></i> Reset to Reality
-                </button>
-             }
-             
-             <button class="btn btn-sm @(isPrintView ? "btn-secondary" : "btn-outline-secondary") d-print-none" 
-                     @onclick="() => isPrintView = !isPrintView">
-                 <i class="bi @(isPrintView ? "bi-table" : "bi-printer")"></i> 
-                 @(isPrintView ? "Exit Print View" : "Printer Friendly View")
-             </button>
-        </div>
-    </div>
-    
-    @if (isPrintView)
+    @if (ShowGrid && isPrintView)
     {
         <div class="d-print-none alert alert-info py-2 mb-3">
             <i class="bi bi-info-circle-fill me-2"></i>
@@ -244,17 +247,113 @@
 
     @if (isLoading)
     {
-        <div class="d-flex justify-content-center py-5">
-            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
-        </div>
+        <LoadingIndicator Text="Loading Path to Victory..." />
     }
     else if (!poolList.Any())
     {
-        <div class="text-center py-5">
-            <i class="bi bi-hourglass-split display-1 text-secondary opacity-50"></i>
-            <h2 class="mt-3 text-secondary">Awaiting Kickoff</h2>
-            <p class="lead text-muted">Path to Victory unlocks when the first pool of the season opens.</p>
-        </div>
+        <EmptyState Title="Awaiting Kickoff" Icon="@Icons.Material.Outlined.HourglassEmpty">
+            <ChildContent>Path to Victory unlocks when the first pool of the season opens.</ChildContent>
+        </EmptyState>
+    }
+    else if (!ShowGrid)
+    {
+        @if (HasActiveSimulation)
+        {
+            <Notice Tone="NoticeTone.Tip" Title="Includes the winners you chose on the full grid.">
+                <SecondaryButton OnClick="ResetSimulation" Icon="@Icons.Material.Outlined.Undo">Reset to real results</SecondaryButton>
+            </Notice>
+        }
+
+        @if (!summary.Contenders.Any())
+        {
+            <EmptyState Title="No entries yet" Icon="@Icons.Material.Outlined.EmojiEvents">
+                <ChildContent>No entries found for <strong>@(SelectedPool?.Name ?? "this pool")</strong>.</ChildContent>
+            </EmptyState>
+        }
+        else
+        {
+            <h2 class="bm-section-title">Still in the running (@summary.Contenders.Count)</h2>
+            <MudGrid Spacing="3" Class="mt-1">
+                @foreach (var line in summary.Contenders)
+                {
+                    var id = line.Row.Entry.Id;
+                    var mine = myEntryIds.Contains(id);
+                    var expanded = expandedIds.Contains(id);
+                    <MudItem xs="12" md="6" lg="4">
+                        <Card Tone="@(mine ? CardTone.Highlight : CardTone.Default)" Eyebrow="@(mine ? "You" : null)"
+                              AriaLabel="@($"{line.Row.Entry.PlayerName}, place {line.Row.Rank}")">
+                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                <div style="min-width: 0">
+                                    <span>@line.Row.Rank.</span>
+                                    <strong>@line.Row.Entry.PlayerName</strong>
+                                    @if (line.CanWin)
+                                    {
+                                        <span class="ms-1"><Badge Tone="BadgeTone.Good">can win</Badge></span>
+                                    }
+                                </div>
+                                <div class="text-end text-nowrap">
+                                    <strong>@line.Row.Score pts</strong>
+                                    <div class="bm-note">max @line.Row.MaxPossible</div>
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrEmpty(line.GapText))
+                            {
+                                <div>@line.GapText</div>
+                            }
+                            @if (line.Swings.Any())
+                            {
+                                <div>
+                                    <div class="bm-note">@line.SwingsLabel:</div>
+                                    <ul class="mb-0 ps-3">
+                                        @foreach (var swing in expanded ? line.Swings : line.Swings.Take(line.ShownByDefault))
+                                        {
+                                            <li>@swing.Text</li>
+                                        }
+                                    </ul>
+                                </div>
+                                @if (line.HiddenByDefault > 0)
+                                {
+                                    <div>
+                                        <SecondaryButton OnClick="() => ToggleExpanded(id)">
+                                            @(expanded ? "Show fewer" : $"+ {line.HiddenByDefault} more")
+                                        </SecondaryButton>
+                                    </div>
+                                }
+                            }
+                            else if (!string.IsNullOrEmpty(line.NoSwingsText))
+                            {
+                                <div class="bm-note">@line.NoSwingsText</div>
+                            }
+                        </Card>
+                    </MudItem>
+                }
+            </MudGrid>
+
+            @if (summary.Out.Any())
+            {
+                <div class="mt-3">
+                    <SecondaryButton OnClick="() => showOut = !showOut">
+                        @OutButtonText
+                    </SecondaryButton>
+                </div>
+                @if (showOut)
+                {
+                    <ul class="list-unstyled mt-2 mb-0">
+                        @foreach (var row in summary.Out)
+                        {
+                            <li class="py-1">
+                                @row.Rank. @row.Entry.PlayerName · @row.Score pts <span class="bm-note">· max @row.MaxPossible</span>
+                                @if (myEntryIds.Contains(row.Entry.Id))
+                                {
+                                    <Badge Tone="BadgeTone.Good">You</Badge>
+                                }
+                                <Badge>out</Badge>
+                            </li>
+                        }
+                    </ul>
+                }
+            }
+        }
     }
     else if (isPrintView)
     {
@@ -470,6 +569,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        PoolSelection.Changed += OnPoolSelectionChanged;
+
         try
         {
             // 0. Fetch Current Season
@@ -487,8 +588,8 @@
             var allPools = await poolsTask ?? new();
             var myEntries = await myEntriesTask;
 
-            // 1. Filter Pools (Active Season Only AND Open)
-            poolList = allPools.Where(p => !p.IsArchived && DateTime.UtcNow >= p.LockDate).ToList();
+            // 1. Only pools that have locked: both views draw every entry's picks (BUSINESS-RULES section 3).
+            poolList = allPools.Where(p => PathToVictory.ShowsPool(p, DateTime.UtcNow)).ToList();
 
             // The entries endpoint wants a season and a pool, so ask once per open pool.
             var entryLists = await Task.WhenAll(poolList.Select(p =>
@@ -507,35 +608,16 @@
                     teamLookup[g.TeamAway] = g.AwayTeamInfo;
             }
 
-            // 4. Determine Current Pool (Smart Default Logic)
-            BowlPool? targetPool = null;
+            // 4. Which pool first: address, then this browser's last choice, then the newest entry, then the first pool.
+            var latestEntry = myEntries.OrderByDescending(e => e.CreatedOn).FirstOrDefault();
+            selectedPoolId = PoolPicker.Pick(poolList.Select(p => p.Id).ToList(), QueryPoolId,
+                string.IsNullOrEmpty(QueryPoolId) ? await PoolSelection.GetSavedIdAsync() : null, latestEntry?.PoolId) ?? "";
+            PoolSelection.Show(poolList.Select(p => new PoolChoice(p.Id, p.Name)).ToList(), selectedPoolId);
 
-            if (!string.IsNullOrEmpty(QueryPoolId))
-                targetPool = poolList.FirstOrDefault(p => p.Id == QueryPoolId);
+            // Entries to mark "You": the signed-in player's own, and the one this browser remembers per pool.
+            signedInEntryIds = myEntries.Select(e => e.Id).ToHashSet();
+            memory = await MyEntryStore.LoadAsync();
 
-            if (targetPool == null)
-            {
-                try
-                {
-                    var savedPoolId = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "lastSelectedPoolId");
-                    if (!string.IsNullOrEmpty(savedPoolId))
-                        targetPool = poolList.FirstOrDefault(p => p.Id == savedPoolId);
-                }
-                catch { }
-            }
-
-            if (targetPool == null && myEntries.Any())
-            {
-                var lastEntry = myEntries.OrderByDescending(e => e.CreatedOn).FirstOrDefault();
-                if (lastEntry != null)
-                    targetPool = poolList.FirstOrDefault(p => p.Id == lastEntry.PoolId);
-            }
-
-            if (targetPool == null && poolList.Any())
-                targetPool = poolList.First();
-
-            selectedPoolId = targetPool?.Id ?? "";
-            
             UpdateFilteredEntries();
         }
         catch (Exception ex)
@@ -560,15 +642,54 @@
     }
 
     // --- FILTERING LOGIC ---
-    
-    private async Task OnPoolChanged(ChangeEventArgs e)
+
+    // The visitor tapped a pool in the header or the page switcher (PoolSelection saves the choice in this browser).
+    private void OnPoolSelectionChanged() => _ = InvokeAsync(() =>
     {
-        selectedPoolId = e.Value?.ToString() ?? "";
-        if (!string.IsNullOrEmpty(selectedPoolId))
-        {
-            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "lastSelectedPoolId", selectedPoolId);
-        }
+        var poolId = PoolSelection.CurrentId ?? "";
+        if (poolId == selectedPoolId || poolList.All(p => p.Id != poolId)) return;
+        selectedPoolId = poolId;
+        expandedIds.Clear();
         UpdateFilteredEntries();
+    });
+
+    public void Dispose()
+    {
+        PoolSelection.Changed -= OnPoolSelectionChanged;
+        PoolSelection.Clear();
+    }
+
+    // --- VIEW: "Who can win" (default) or the full grid (?view=grid) ---
+
+    [SupplyParameterFromQuery(Name = "view")]
+    public string? QueryView { get; set; }
+
+    private bool ShowGrid => string.Equals(QueryView, "grid", StringComparison.OrdinalIgnoreCase);
+
+    // The address keeps the tab, so Back returns to the other one.
+    private Task ShowViewAsync(bool grid)
+    {
+        if (grid != ShowGrid)
+            Nav.NavigateTo(Nav.GetUriWithQueryParameter("view", grid ? "grid" : null));
+        return Task.CompletedTask;
+    }
+
+    private PathToVictoryView summary = new();
+    private readonly HashSet<string> expandedIds = new();
+    private bool showOut;
+    private HashSet<string> signedInEntryIds = new();
+    private MyEntryMemory memory = new();
+    private HashSet<string> myEntryIds = new();
+
+    private BowlPool? SelectedPool => poolList.FirstOrDefault(p => p.Id == selectedPoolId);
+
+    private string OutButtonText => (showOut ? "Hide: " : "") + (summary.Out.Count == 1
+        ? "1 entry can't finish top 3"
+        : $"{summary.Out.Count} entries can't finish top 3");
+
+    private void ToggleExpanded(string entryId)
+    {
+        if (!expandedIds.Remove(entryId)) expandedIds.Add(entryId);
     }
 
     private void UpdateFilteredEntries()
@@ -602,6 +723,10 @@
         var pool = poolList.FirstOrDefault(p => p.Id == selectedPoolId);
         _sim = BracketSimulator.Run(games, filteredEntries, pool, _userSimulations);
         projectedStandings = _sim.Rows;
+        summary = PathToVictory.Summarize(_sim, games);
+
+        myEntryIds = signedInEntryIds.ToHashSet();
+        if (memory.Get(selectedPoolId) is { } remembered) myEntryIds.Add(remembered.EntryId);
         StateHasChanged();
     }
 

@@ -129,7 +129,7 @@ If the go/no-go fails, production stays on Phase 1.1 for the bowl season, and Re
 4. Rules page (#34).
 5. #138 items that fall on pages this release rebuilt.
 
-**Progress:** [ ] path to victory view [ ] season checklist [ ] dashboard [ ] rules page [ ] #138 [ ] reviews [ ] test site check [ ] merged
+**Progress:** [x] path to victory view [ ] season checklist [ ] dashboard [ ] rules page [ ] #138 [ ] reviews [ ] test site check [ ] merged
 
 ---
 
