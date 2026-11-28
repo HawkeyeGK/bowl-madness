@@ -102,6 +102,11 @@ a:hover { color: var(--bm-orange); }
     .bm-topnav { gap: 0; margin-left: 4px; font-size: 16px; }
     .bm-topnav a { padding: 10px 9px; }
 }
+/* Just over 900 px a signed-in admin has eight links plus Log out: closer links still fit on one line. */
+@media (min-width: 900px) and (max-width: 999.98px) {
+    .bm-brand { font-size: 22px; }
+    .bm-topnav a { padding: 10px 5px; }
+}
 @media (min-width: 900px) and (max-width: 1259.98px) {
     .bm-header-hello { display: none !important; }
 }

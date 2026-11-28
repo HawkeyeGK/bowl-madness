@@ -1,0 +1,246 @@
+@page "/rules"
+@implements IDisposable
+@using BowlPoolManager.Core.Domain
+@using BowlPoolManager.Core.Helpers
+@using BowlPoolManager.Client.Services
+@using MudBlazor
+@inject ISeasonService SeasonService
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject ISiteContext SiteContext
+@inject PoolSelection PoolSelection
+
+@*
+    The player-facing rules (issue 34, Release 2 group E). Football only: hoops gets its own rules in Phase 3, so on the
+    hoops site this page says so and has no menu link. Every rule here comes from docs/BUSINESS-RULES.md; the lock time,
+    points and tiebreakers come live from the selected pool (RulesText in Core). With no pool the text stays general.
+    Entry fee, paying, prizes and where to hand in a paper form are not in the business rules: the page points to the
+    pool organizer (owner decision, 2026-11-28).
+*@
+
+<PageContainer>
+    <PageHeader Title="Rules" Subtitle="@currentPool?.Name">
+        <Actions>
+            <PoolSwitcher Mode="PoolSwitcherMode.Segmented" />
+        </Actions>
+    </PageHeader>
+
+    @if (isHoops)
+    {
+        <EmptyState Title="Hoops rules are coming" Icon="@Icons.Material.Outlined.MenuBook">
+            <ChildContent>The rules for Hoops Madness aren't on the site yet. Ask your pool organizer if you have a question.</ChildContent>
+            <Action><SecondaryButton Href="hoops/leaderboard">Go to the leaderboard</SecondaryButton></Action>
+        </EmptyState>
+    }
+    else if (isLoading)
+    {
+        <LoadingIndicator Text="Loading the rules..." />
+    }
+    else
+    {
+        <Card Tone="CardTone.Tint">
+            Pick the winner of every game in your pool. Each correct pick earns that game's points. Most points wins.
+        </Card>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="6">
+                <Card Title="Making your picks">
+                    <ul>
+                        <li>Sign in and go to <a href="mypicks">My Picks</a> (it says Enter Picks until you have an entry). Type the invite code you were given.</li>
+                        <li>Tap the team you think will win each game. You can save part-way and finish later.</li>
+                        <li>Playoff picks build on each other: a later-round pick has to be one of the two teams your earlier picks send there. If you change an earlier pick, the later picks that depended on it are cleared, and the page tells you which.</li>
+                        <li>Give your entry a name, up to 60 characters. No two entries in a pool can have the same name.</li>
+                        <li>Fill in the tiebreaker.</li>
+                    </ul>
+                </Card>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <Card Title="When picks lock">
+                    <ul>
+                        <li>@(currentPool == null ? "Each pool has a lock time, shown on My Picks and the Leaderboard." : RulesText.LockLine(currentPool.LockDate, DateTime.UtcNow)) All times on this site are Central time (CT).</li>
+                        <li>Until then you can change your picks, your tiebreaker and your entry name as often as you like, or delete your entry.</li>
+                        <li>After the lock, no new entries can be made, and picks and tiebreakers can't change. You can still rename your entry until the pool is closed at the end of the season.</li>
+                    </ul>
+                </Card>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <Card Title="Scoring">
+                    <ul>
+                        <li>A correct pick earns the game's points once the game is final. Games can't end in a tie.</li>
+                        @if (pointLines.Count > 0)
+                        {
+                            <li>
+                                Points in this pool:
+                                <ul>
+                                    @foreach (var line in pointLines)
+                                    {
+                                        <li>@line.Label: @line.Points</li>
+                                    }
+                                </ul>
+                            </li>
+                        }
+                        else
+                        {
+                            <li>Each game's points are shown on <a href="results">Scores</a> and on My Picks.</li>
+                        }
+                        <li><strong>Max</strong> is your points now plus every point you can still win: your picks in games not played yet, as long as that team hasn't already lost.</li>
+                        <li>Scores update during games. Games not linked to the live score feed are updated by hand, so they may take a little longer.</li>
+                    </ul>
+                </Card>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <Card Title="Tiebreakers">
+                    <ul>
+                        <li>Entries are ranked by points, then Max, then the pool's tiebreakers.</li>
+                        @if (tieBreakers.Count > 0)
+                        {
+                            <li>
+                                This pool's tiebreakers, in order:
+                                <ol>
+                                    @foreach (var tieBreaker in tieBreakers)
+                                    {
+                                        <li>@tieBreaker</li>
+                                    }
+                                </ol>
+                            </li>
+                        }
+                        else
+                        {
+                            <li>Each pool uses one or both of these: the number of correct picks, and how close your tiebreaker guess is to the total points scored in the pool's tiebreaker game.</li>
+                        }
+                        <li>Entries still tied after all of that share the place (1, 2, 2, 4) and are listed by name. The prize for a shared place is split evenly.</li>
+                    </ul>
+                </Card>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <Card Title="Who wins">
+                    <ul>
+                        <li>The top 3 places win. "Out" next to a name on the Leaderboard means that entry can no longer finish in the top 3.</li>
+                        <li>Trophies (gold, silver and bronze) appear once every game that can still change anyone's points has been played.</li>
+                    </ul>
+                </Card>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <Card Title="Seeing other people's picks">
+                    <ul>
+                        <li>Before the lock, nobody can see your picks except you and the site admins. The Leaderboard shows only names and points.</li>
+                        <li>Once the pool locks, everyone can see everyone's picks. Tap a name on the Leaderboard, or use Print all picks.</li>
+                        <li>After the lock, Scores also shows how many entries picked each team.</li>
+                    </ul>
+                </Card>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <Card Title="Find my entry">
+                    <ul>
+                        <li>You don't have to sign in to follow along. On the <a href="">Leaderboard</a>, tap your name and choose <strong>Remember</strong>. Your row is highlighted from then on.</li>
+                        <li>This is saved on this phone or computer only, one entry per pool. Tap <strong>Forget</strong> to clear it; to remember a different entry, forget this one first.</li>
+                        <li>Remembering an entry is not signing in. It doesn't let you change anything, and it doesn't show picks before the lock.</li>
+                        <li>If you sign in, your own entries are highlighted without tapping.</li>
+                    </ul>
+                </Card>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <Card Title="Paper entries">
+                    <ul>
+                        <li>Don't want to use the site? Print a blank form (<a href="print-bracket">Print blank form</a>), fill it in, and hand it to your pool organizer. An admin types it in for you.</li>
+                        <li>You don't need an account for a paper entry. It shows on the Leaderboard under the entry name on your form.</li>
+                    </ul>
+                </Card>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <Card Title="Paying">
+                    <ul>
+                        <li>Only the site admins mark an entry as paid.</li>
+                        <li>Ask your pool organizer about the entry fee, how to pay, and the prizes.</li>
+                    </ul>
+                </Card>
+            </MudItem>
+        </MudGrid>
+    }
+</PageContainer>
+
+@code {
+    private bool isLoading = true;
+    private bool isHoops;
+    private List<BowlPool> pools = new();
+    private List<BowlGame> seasonGames = new();
+    private BowlPool? currentPool;
+    private IReadOnlyList<RoundPointsLine> pointLines = Array.Empty<RoundPointsLine>();
+    private IReadOnlyList<string> tieBreakers = Array.Empty<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SiteContext.InitializeAsync();
+        if (SiteContext.ActiveSport == Sport.Basketball)
+        {
+            isHoops = true;
+            isLoading = false;
+            return;
+        }
+
+        PoolSelection.Changed += OnPoolSelectionChanged;
+
+        try
+        {
+            var season = await SeasonService.GetCurrentSeasonAsync();
+            var seasonId = season?.Id ?? "";
+
+            var poolsTask = Http.GetFromJsonAsync<List<BowlPool>>($"api/GetPools?seasonId={seasonId}");
+            var gamesTask = Http.GetFromJsonAsync<List<BowlGame>>($"api/GetGames?seasonId={seasonId}");
+            await Task.WhenAll(poolsTask, gamesTask);
+
+            pools = (await poolsTask ?? new()).Where(p => !p.IsArchived).ToList();
+            seasonGames = await gamesTask ?? new();
+
+            var chosenId = PoolPicker.Pick(pools.Select(p => p.Id).ToList(), null, await PoolSelection.GetSavedIdAsync(), null);
+            PoolSelection.Show(pools.Select(p => new PoolChoice(p.Id, p.Name)).ToList(), chosenId);
+            ShowPool(pools.FirstOrDefault(p => p.Id == chosenId));
+        }
+        catch (Exception ex)
+        {
+            // The general text still shows; only the pool's own values are missing.
+            Console.WriteLine($"Error loading the rules page: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowPool(BowlPool? pool)
+    {
+        currentPool = pool;
+        if (pool == null)
+        {
+            pointLines = Array.Empty<RoundPointsLine>();
+            tieBreakers = Array.Empty<string>();
+            return;
+        }
+
+        var poolGames = PoolGames.Of(pool, seasonGames);
+        pointLines = RulesText.PointsByRound(poolGames);
+        tieBreakers = RulesText.TieBreakers(pool, poolGames);
+    }
+
+    private void OnPoolSelectionChanged() => _ = InvokeAsync(() =>
+    {
+        var chosen = pools.FirstOrDefault(p => p.Id == PoolSelection.CurrentId);
+        if (chosen == null || chosen.Id == currentPool?.Id) return;
+        ShowPool(chosen);
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        PoolSelection.Changed -= OnPoolSelectionChanged;
+        PoolSelection.Clear();
+    }
+}
