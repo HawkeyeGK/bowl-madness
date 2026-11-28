@@ -9,6 +9,7 @@ disagree, this document is the intent and the code is the bug.
 
 - Roles are Player (the default), Admin and SuperAdmin. Each includes the one below it. The first SuperAdmin is the email named in the `BootstrapAdminEmail` setting.
 - Only a SuperAdmin changes roles or disables accounts.
+- The site always keeps at least one active SuperAdmin. The server refuses a role change or a disable that would leave none, including a SuperAdmin lowering or disabling their own account. The Users page asks again before you lower or disable your own account. *(Owner decision, 2026-11-28)*
 - A disabled user is treated exactly like an unauthenticated user, on every endpoint. *(Owner decision)* The one exception: a disabled user who asks for their own profile is told the account is disabled (403), so the site can say so before signing them out.
 - Every rule is enforced by the API function itself. The site routing file protects only the admin pages, so hiding a button is never a protection.
 
@@ -71,6 +72,7 @@ The same rules apply to football and hoops.
 *Source: `Api/Services/GameScoringService.cs`, `HoopsGameScoringService.cs`.*
 
 - Scores refresh lazily when games are read; games not linked to the feed are updated by hand.
+- **Live status follows the feed.** A linked game is In Progress only when the feed says it is. While the feed lists it as Scheduled it is Scheduled, so a postponed game does not show as live. *(Owner decision, 2026-11-28)*
 - When a game goes final, its winner fills the next game's slot and cascades; a game that is no longer final resets that slot.
 - When a game's winner advances, it fills the slot of the next game as follows: with two feeding games, the earlier kickoff goes to home; with one, the winner fills the slot that does not already hold a seeded team.
 - **Mock score feed.** A SuperAdmin can switch football scores between Live (College Football Data) and Mock (games edited on the Score Feed page). It works on the test site and on production. While Mock is on, the site shows and scores the mock's results for linked games, for every visitor, and real scores are not applied. The Score Feed page shows a warning while Mock is on; no other page does. There is no automatic block (for example after a pool locks). The default, when nothing is stored, is Live. The test-data reset sets it back to Live. Switching to Mock first shows which linked games of the current season it could change (and their names), and the admin must type MOCK to confirm; the server enforces the same confirmation.
@@ -84,6 +86,8 @@ The same rules apply to football and hoops.
 *Source: `Core/Domain/Season.cs`, `Api/Repositories/SeasonRepository.cs`, `Client/Services/SeasonService.cs`.*
 
 - One season is current for both sports. Per-sport seasons are an acceptable later change.
+- When no season is marked current, the pages use the newest season by year. *(Owner decision, 2026-11-28)*
+- An entry link carries no season, so Entry details looks the entry up in the current season first, then in each other season, and shows it with its own season's games and pool. *(Owner decision, 2026-11-28)*
 - **The "2026" quirk.** Some hoops pools and their entries carry the season as the year text "2026" instead of the season's ID. Hoops pools are therefore always requested without a season filter, and an entry is always requested with its own stored season, never the current one. The intended end state is a single ID format.
 
 ## 7. Time zones

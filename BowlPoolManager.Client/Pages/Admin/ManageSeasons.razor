@@ -47,6 +47,11 @@
                     </div>
                 </div>
 
+                @if (!string.IsNullOrEmpty(saveError))
+                {
+                    <div class="alert alert-danger" role="alert">@saveError</div>
+                }
+
                 <div class="text-end">
                     @if (isEditing)
                     {
@@ -113,6 +118,7 @@
     private List<Season>? seasons;
     private Season currentSeason = new Season();
     private bool isEditing = false;
+    private string? saveError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -135,6 +141,7 @@
     private void ResetForm()
     {
         currentSeason = new Season();
+        saveError = null;
         // Since we are resetting, we need a new GUID for the implicit Id, 
         // though the constructor of Season now handles that.
         isEditing = false;
@@ -148,7 +155,18 @@
         // Id is already a GUID from the constructor or loaded from DB.
         // We just need to make sure SeasonId is set (which is bound to the form).
         
-        await SeasonService.UpsertSeasonAsync(currentSeason);
+        saveError = null;
+        try
+        {
+            await SeasonService.UpsertSeasonAsync(currentSeason);
+        }
+        catch (Exception ex)
+        {
+            // The form keeps what the admin typed, so they can fix it and save again.
+            saveError = $"The season was not saved. {ex.Message}";
+            return;
+        }
+
         ResetForm();
         await LoadSeasons();
     }

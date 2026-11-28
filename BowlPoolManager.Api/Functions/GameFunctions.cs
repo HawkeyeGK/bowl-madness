@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using BowlPoolManager.Api.Services;
 using BowlPoolManager.Api.Services.ScoreFeed;
 using BowlPoolManager.Core.Domain;
+using BowlPoolManager.Core.Dtos;
 using BowlPoolManager.Core.Helpers;
 using BowlPoolManager.Api.Helpers;
 using System.Text.Json;
@@ -139,28 +140,108 @@ namespace BowlPoolManager.Api.Functions
              var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
              if (!authResult.IsValid) return authResult.ErrorResponse!;
 
-             var game = await JsonSerializer.DeserializeAsync<BowlGame>(req.Body);
-
-             // A game cannot be Final without two scores and a winner: games cannot end tied (issue 133).
-             if (game != null && game.Status == GameStatus.Final
-                 && (game.TeamHomeScore == null || game.TeamAwayScore == null || game.TeamHomeScore == game.TeamAwayScore))
+             try
              {
-                 var badRequest = req.CreateResponse(HttpStatusCode.BadRequest);
-                 await badRequest.WriteStringAsync("A Final game needs both scores and a winner. Games cannot end tied.");
-                 return badRequest;
-             }
+                 // Input handling matches SaveHoopsGame: an unreadable or empty body, or a game without an id or
+                 // season (the partition key), is refused before anything is saved (issue 138).
+                 BowlGame? game;
+                 try
+                 {
+                     game = await JsonSerializer.DeserializeAsync<BowlGame>(req.Body);
+                 }
+                 catch (JsonException)
+                 {
+                     return await BadRequestAsync(req, "The game could not be read.");
+                 }
 
-             // AP rank is typed by hand: 1 to 25 or empty.
-             if (game != null && (!ApRank.IsValid(game.HomeApRank) || !ApRank.IsValid(game.AwayApRank)))
+                 if (game == null || string.IsNullOrEmpty(game.Id) || string.IsNullOrEmpty(game.SeasonId))
+                     return await BadRequestAsync(req, "A game needs an id and a season.");
+
+                 var resultProblem = ResultProblem(game.Status, game.TeamHomeScore, game.TeamAwayScore);
+                 if (resultProblem != null) return await BadRequestAsync(req, resultProblem);
+
+                 // AP rank is typed by hand: 1 to 25 or empty.
+                 if (!ApRank.IsValid(game.HomeApRank) || !ApRank.IsValid(game.AwayApRank))
+                     return await BadRequestAsync(req, $"An AP rank must be a number from 1 to {ApRank.Max}, or empty.");
+
+                 await _scoringService.ProcessGameUpdateAsync(game);
+                 return req.CreateResponse(HttpStatusCode.OK);
+             }
+             catch (Exception ex)
              {
-                 var badRank = req.CreateResponse(HttpStatusCode.BadRequest);
-                 await badRank.WriteStringAsync($"An AP rank must be a number from 1 to {ApRank.Max}, or empty.");
-                 return badRank;
+                 _logger.LogError(ex, "SaveGame failed.");
+                 return req.CreateResponse(HttpStatusCode.InternalServerError);
              }
+        }
 
-             if (game != null) await _scoringService.ProcessGameUpdateAsync(game);
-             
-             return req.CreateResponse(HttpStatusCode.OK);
+        /// <summary>
+        /// The Game Results page's save: only the status and the two scores. They are applied to the stored game, so
+        /// fields the score feed or another admin changed since the page loaded are not overwritten (issue 138).
+        /// </summary>
+        [Function("SaveGameResult")]
+        public async Task<HttpResponseData> SaveGameResult([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+        {
+            var authResult = await SecurityHelper.ValidateSuperAdminAsync(req, _userRepo);
+            if (!authResult.IsValid) return authResult.ErrorResponse!;
+
+            try
+            {
+                GameResultUpdate? update;
+                try
+                {
+                    update = await JsonSerializer.DeserializeAsync<GameResultUpdate>(req.Body);
+                }
+                catch (JsonException)
+                {
+                    return await BadRequestAsync(req, "The result could not be read.");
+                }
+
+                if (update == null || string.IsNullOrEmpty(update.GameId) || string.IsNullOrEmpty(update.SeasonId))
+                    return await BadRequestAsync(req, "A result needs a game id and a season.");
+
+                if (!Enum.IsDefined(update.Status))
+                    return await BadRequestAsync(req, "The game status is not valid.");
+
+                var resultProblem = ResultProblem(update.Status, update.TeamHomeScore, update.TeamAwayScore);
+                if (resultProblem != null) return await BadRequestAsync(req, resultProblem);
+
+                var games = await _gameRepo.GetGamesAsync(update.SeasonId);
+                var game = games.FirstOrDefault(g => string.Equals(g.Id, update.GameId, StringComparison.OrdinalIgnoreCase));
+                if (game == null)
+                {
+                    var notFound = req.CreateResponse(HttpStatusCode.NotFound);
+                    await notFound.WriteStringAsync("The game was not found in that season.");
+                    return notFound;
+                }
+
+                game.Status = update.Status;
+                game.TeamHomeScore = update.TeamHomeScore;
+                game.TeamAwayScore = update.TeamAwayScore;
+
+                await _scoringService.ProcessGameUpdateAsync(game);
+
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(game);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SaveGameResult failed.");
+                return req.CreateResponse(HttpStatusCode.InternalServerError);
+            }
+        }
+
+        // A game cannot be Final without two scores and a winner: games cannot end tied (issue 133).
+        private static string? ResultProblem(GameStatus status, int? homeScore, int? awayScore) =>
+            status == GameStatus.Final && (homeScore == null || awayScore == null || homeScore == awayScore)
+                ? "A Final game needs both scores and a winner. Games cannot end tied."
+                : null;
+
+        private static async Task<HttpResponseData> BadRequestAsync(HttpRequestData req, string message)
+        {
+            var badRequest = req.CreateResponse(HttpStatusCode.BadRequest);
+            await badRequest.WriteStringAsync(message);
+            return badRequest;
         }
 
         [Function("DeleteGame")]

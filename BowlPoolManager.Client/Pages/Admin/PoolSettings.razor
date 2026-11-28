@@ -25,6 +25,14 @@
         </button>
     </div>
 
+    @if (!string.IsNullOrEmpty(pageError))
+    {
+        <div class="alert alert-danger alert-dismissible" role="alert">
+            @pageError
+            <button type="button" class="btn-close" aria-label="Close" @onclick="() => pageError = null"></button>
+        </div>
+    }
+
     @if (isLoading)
     {
         <div class="d-flex justify-content-center">
@@ -133,7 +141,7 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">@(string.IsNullOrEmpty(editingPool.Id) ? "Create" : "Edit") Pool</h5>
+                    <h5 class="modal-title">@(isNewPool ? "Create" : "Edit") Pool</h5>
                     <button type="button" class="btn-close" @onclick="CloseModal"></button>
                 </div>
                 <EditForm Model="editingPool" OnValidSubmit="SavePool">
@@ -233,13 +241,17 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Invite Code</label>
-                            <InputText @bind-Value="editingPool.InviteCode" class="form-control" placeholder="Secret password" />
+                            <InputText @bind-Value="editingPool.InviteCode" class="form-control" placeholder="Invite code" />
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Lock Date (Central Time)</label>
                             <InputText type="datetime-local" class="form-control" @bind-Value="lockDateString" />
                             <div class="form-text">Picks cannot be changed after this time.</div>
                         </div>
+                        @if (!string.IsNullOrEmpty(saveError))
+                        {
+                            <div class="alert alert-danger mb-0" role="alert">@saveError</div>
+                        }
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
@@ -260,6 +272,8 @@
     private bool showModal = false;
     private bool isNewPool = false;
     private string lockDateString = "";
+    private string? pageError;
+    private string? saveError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -402,17 +416,20 @@
     {
         showModal = false;
         editingPool = null;
+        saveError = null;
     }
 
     private async Task SavePool()
     {
         if (editingPool == null) return;
+        saveError = null;
         if (DateTime.TryParse(lockDateString, out DateTime parsedLocal))
         {
             editingPool.LockDate = DateTimeHelper.FromCentral(parsedLocal);
         }
-        else 
+        else
         {
+            saveError = "The lock date is not a valid date and time.";
             return;
         }
 
@@ -422,57 +439,56 @@
             editingPool.Season = year;
         }
 
-        // Logic split: Create vs Update
-        BowlPool? result;
-        if (string.IsNullOrEmpty(editingPool.Id))
+        // A new pool always has a GUID Id, so isNewPool (not an empty Id) says whether this is a create. Create is
+        // where the server checks the invite code and that the lock date is in the future.
+        try
         {
-             result = await PoolService.CreatePoolAsync(editingPool);
+            if (isNewPool)
+                await PoolService.CreatePoolAsync(editingPool);
+            else
+                await PoolService.UpdatePoolAsync(editingPool);
         }
-        else
+        catch (Exception ex)
         {
-             result = await PoolService.UpdatePoolAsync(editingPool);
+            saveError = $"The pool was not saved. {ex.Message}";
+            return;
         }
-        
-        if (result != null)
-        {
-            showModal = false;
-            await LoadPools();
-        }
+
+        CloseModal();
+        await LoadPools();
     }
 
     private async Task DeletePool(BowlPool pool)
     {
-        if (!await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to DELETE '{pool.Name}'? This cannot be undone."))
+        // Deleting a pool deletes its entries (business rules section 2). Games are shared and stay.
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete '{pool.Name}' and all of its entries? Every bracket in this pool is deleted too. The games stay. This cannot be undone."))
         {
             return;
         }
 
-        isLoading = true;
-        var success = await PoolService.DeletePoolAsync(pool.Id);
-        if (success)
-        {
-            await LoadPools();
-        }
-        else
-        {
-             await JS.InvokeVoidAsync("alert", "Failed to delete pool.");
-             isLoading = false;
-        }
+        await RunPoolActionAsync(() => PoolService.DeletePoolAsync(pool.Id), $"'{pool.Name}' was not deleted.");
     }
 
     private async Task ToggleConclusion(BowlPool pool)
     {
+        await RunPoolActionAsync(() => PoolService.ToggleConclusionAsync(pool.Id),
+            pool.IsConcluded ? $"'{pool.Name}' was not reopened." : $"'{pool.Name}' was not concluded.");
+    }
+
+    // Runs a pool action, then reloads the list; a refusal shows the server's message above the table (issue 138).
+    private async Task RunPoolActionAsync(Func<Task> action, string failurePrefix)
+    {
+        pageError = null;
         isLoading = true;
-        var updatedPool = await PoolService.ToggleConclusionAsync(pool.Id);
-        if (updatedPool != null)
+        try
         {
-            await LoadPools();
+            await action();
         }
-        else 
+        catch (Exception ex)
         {
-             // Handle error
-             isLoading = false;
+            pageError = $"{failurePrefix} {ex.Message}";
         }
+        await LoadPools();
     }
 
     private async Task ArchivePool(BowlPool pool)
@@ -486,16 +502,6 @@
             return;
         }
 
-        isLoading = true;
-        var success = await PoolService.ArchivePoolAsync(pool.Id);
-        if (success)
-        {
-            await LoadPools();
-        }
-        else
-        {
-            isLoading = false;
-            // Maybe show toast error
-        }
+        await RunPoolActionAsync(() => PoolService.ArchivePoolAsync(pool.Id), $"'{pool.Name}' was not archived.");
     }
 }

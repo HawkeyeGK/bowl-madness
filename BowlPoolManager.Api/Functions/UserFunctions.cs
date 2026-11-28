@@ -134,6 +134,14 @@ namespace BowlPoolManager.Api.Functions
                     return req.CreateResponse(HttpStatusCode.NotFound);
                 }
 
+                if (SuperAdminGuard.RemovesAnActiveSuperAdmin(targetUser, targetUser.AppRole, !targetUser.IsDisabled)
+                    && SuperAdminGuard.LeavesNoActiveSuperAdmin(await _userRepo.GetUsersAsync(), targetUser, targetUser.AppRole, !targetUser.IsDisabled))
+                {
+                    var refused = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await refused.WriteStringAsync(SuperAdminGuard.Refusal);
+                    return refused;
+                }
+
                 targetUser.IsDisabled = !targetUser.IsDisabled;
 
                 // Use Repo
@@ -183,6 +191,14 @@ namespace BowlPoolManager.Api.Functions
                 if (targetUser == null)
                 {
                     return req.CreateResponse(HttpStatusCode.NotFound);
+                }
+
+                if (SuperAdminGuard.RemovesAnActiveSuperAdmin(targetUser, newRole, targetUser.IsDisabled)
+                    && SuperAdminGuard.LeavesNoActiveSuperAdmin(await _userRepo.GetUsersAsync(), targetUser, newRole, targetUser.IsDisabled))
+                {
+                    var refused = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await refused.WriteStringAsync(SuperAdminGuard.Refusal);
+                    return refused;
                 }
 
                 targetUser.AppRole = newRole;

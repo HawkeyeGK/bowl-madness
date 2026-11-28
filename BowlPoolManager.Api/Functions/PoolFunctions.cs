@@ -16,12 +16,14 @@ namespace BowlPoolManager.Api.Functions
         // Replaced ICosmosDbService with specific repos
         private readonly IPoolRepository _poolRepo;
         private readonly IUserRepository _userRepo;
+        private readonly IEntryRepository _entryRepo;
 
-        public PoolFunctions(ILoggerFactory loggerFactory, IPoolRepository poolRepo, IUserRepository userRepo)
+        public PoolFunctions(ILoggerFactory loggerFactory, IPoolRepository poolRepo, IUserRepository userRepo, IEntryRepository entryRepo)
         {
             _logger = loggerFactory.CreateLogger<PoolFunctions>();
             _poolRepo = poolRepo;
             _userRepo = userRepo;
+            _entryRepo = entryRepo;
         }
 
         [Function("CreatePool")]
@@ -53,7 +55,9 @@ namespace BowlPoolManager.Api.Functions
                     return badReq;
                 }
 
-                if (string.IsNullOrEmpty(pool.Id) && pool.LockDate < DateTime.UtcNow)
+                // A new pool's lock date must be in the future (business rules section 2). The admin page sends only
+                // new pools here; edits go to UpdatePool. A new BowlPool always carries a GUID, so Id cannot tell them apart.
+                if (pool.LockDate < DateTime.UtcNow)
                 {
                     var badReq = req.CreateResponse(HttpStatusCode.BadRequest);
                     await badReq.WriteStringAsync("Lock Date must be in the future.");
@@ -116,7 +120,22 @@ namespace BowlPoolManager.Api.Functions
             if (!authResult.IsValid) return authResult.ErrorResponse!;
 
             if (string.IsNullOrEmpty(poolId)) return req.CreateResponse(HttpStatusCode.BadRequest);
-            
+
+            var pool = await _poolRepo.GetPoolAsync(poolId);
+            if (pool == null)
+            {
+                var notFound = req.CreateResponse(HttpStatusCode.NotFound);
+                await notFound.WriteStringAsync("The pool was not found. It may already have been deleted.");
+                return notFound;
+            }
+
+            // Deleting a pool deletes its entries (business rules section 2, issue 106). Entries go first, so a failure
+            // part way leaves the pool in place and the delete can be run again. Games are shared between pools and stay.
+            var entries = await _entryRepo.GetEntriesAsync(seasonId: pool.SeasonId, poolId: poolId);
+            foreach (var entry in entries)
+                await _entryRepo.DeleteEntryAsync(entry.Id, entry.SeasonId);
+            _logger.LogInformation("DeletePool: deleted {Count} entries for pool '{PoolId}'.", entries.Count, poolId);
+
             await _poolRepo.DeletePoolAsync(poolId);
             return req.CreateResponse(HttpStatusCode.OK);
         }

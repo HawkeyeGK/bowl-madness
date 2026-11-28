@@ -1,5 +1,7 @@
 using System.Net.Http.Json;
+using BowlPoolManager.Client.Helpers;
 using BowlPoolManager.Core.Domain;
+using BowlPoolManager.Core.Helpers;
 
 namespace BowlPoolManager.Client.Services
 {
@@ -26,24 +28,17 @@ namespace BowlPoolManager.Client.Services
             }
         }
 
+        // The season marked current, else the newest by year (CurrentSeason.Pick; issue 138).
         public async Task<Season?> GetCurrentSeasonAsync()
         {
-            var seasons = await GetSeasonsAsync();
-            // Return season marked IsCurrent, or the latest one by ID as fallback
-            return seasons.FirstOrDefault(s => s.IsCurrent) ?? seasons.OrderByDescending(s => s.Id).FirstOrDefault();
+            return CurrentSeason.Pick(await GetSeasonsAsync());
         }
 
+        // Throws HttpRequestException carrying the server's message when the save is refused (issue 138).
         public async Task UpsertSeasonAsync(Season season)
         {
-            try
-            {
-                await _http.PostAsJsonAsync("api/Seasons", season);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error saving season: {ex.Message}");
-                throw;
-            }
+            var response = await _http.PostAsJsonAsync("api/Seasons", season);
+            await ApiErrorText.EnsureSuccessAsync(response);
         }
     }
 }

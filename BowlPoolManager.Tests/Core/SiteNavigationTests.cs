@@ -50,10 +50,11 @@ namespace BowlPoolManager.Tests.Core
         }
 
         [Fact]
-        public void MenuLinks_ShouldBeHistoryAndPrintBracket_PerSport()
+        public void MenuLinks_ShouldIncludeRulesOnlyForFootball_PerSport()
         {
+            // Hoops gets its own rules in Phase 3; until then the hoops site has no Rules link (issue 34).
             SiteNavigation.MenuLinks(Sport.Football).Select(t => (t.Label, t.Href))
-                .Should().Equal(("History", "archives"), ("Print Bracket", "print-bracket"));
+                .Should().Equal(("History", "archives"), ("Print Bracket", "print-bracket"), ("Rules", "rules"));
             SiteNavigation.MenuLinks(Sport.Basketball).Select(t => (t.Label, t.Href))
                 .Should().Equal(("History", "hoops/archives"), ("Print Bracket", "hoops/print-bracket"));
         }

@@ -22,14 +22,16 @@ namespace BowlPoolManager.Tests.Api
         {
             public Mock<IPoolRepository> Pools = new();
             public Mock<IUserRepository> Users = EndpointKit.Users();
+            public Mock<IEntryRepository> Entries = new();
             public BowlPool Pool = new() { Id = "pool-1", SeasonId = "season-1", Name = "Family", InviteCode = "code", LockDate = DateTime.UtcNow.AddDays(7) };
 
             public Fixture()
             {
                 Pools.Setup(p => p.GetPoolAsync(It.IsAny<string>())).ReturnsAsync(Pool);
+                Entries.Setup(e => e.GetEntriesAsync(It.IsAny<string?>(), It.IsAny<string?>())).ReturnsAsync(new List<BracketEntry>());
             }
 
-            public PoolFunctions Build() => new(new NullLoggerFactory(), Pools.Object, Users.Object);
+            public PoolFunctions Build() => new(new NullLoggerFactory(), Pools.Object, Users.Object, Entries.Object);
         }
 
         private static BowlPool NewPool() => new()
@@ -135,6 +137,85 @@ namespace BowlPoolManager.Tests.Api
 
             EndpointKit.Status(result).Should().Be(403);
             f.Pools.Verify(p => p.DeletePoolAsync(It.IsAny<string>()), Times.Never);
+            f.Entries.Verify(e => e.DeleteEntryAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        }
+
+        // Business rules section 2 and issue 106: deleting a pool deletes its entries, each with its own partition key.
+        [Fact]
+        public async Task DeletePool_ShouldDeleteThePoolsEntries_WhenSuperAdmin()
+        {
+            var f = new Fixture();
+            f.Entries.Setup(e => e.GetEntriesAsync(It.IsAny<string?>(), It.IsAny<string?>())).ReturnsAsync(new List<BracketEntry>
+            {
+                new() { Id = "e1", PoolId = "pool-1", SeasonId = "season-1" },
+                new() { Id = "e2", PoolId = "pool-1", SeasonId = "season-1" }
+            });
+
+            var result = await f.Build().DeletePool(EndpointKit.Request(Tier.SuperAdmin), "pool-1");
+
+            EndpointKit.Status(result).Should().Be(200);
+            f.Entries.Verify(e => e.GetEntriesAsync("season-1", "pool-1"), Times.Once);
+            f.Entries.Verify(e => e.DeleteEntryAsync("e1", "season-1"), Times.Once);
+            f.Entries.Verify(e => e.DeleteEntryAsync("e2", "season-1"), Times.Once);
+            f.Pools.Verify(p => p.DeletePoolAsync("pool-1"), Times.Once);
+        }
+
+        [Fact]
+        public async Task DeletePool_ShouldKeepThePool_WhenDeletingAnEntryFails()
+        {
+            var f = new Fixture();
+            f.Entries.Setup(e => e.GetEntriesAsync(It.IsAny<string?>(), It.IsAny<string?>())).ReturnsAsync(new List<BracketEntry>
+            {
+                new() { Id = "e1", PoolId = "pool-1", SeasonId = "season-1" }
+            });
+            f.Entries.Setup(e => e.DeleteEntryAsync(It.IsAny<string>(), It.IsAny<string>())).ThrowsAsync(new InvalidOperationException("boom"));
+
+            var act = async () => await f.Build().DeletePool(EndpointKit.Request(Tier.SuperAdmin), "pool-1");
+
+            await act.Should().ThrowAsync<InvalidOperationException>();
+            f.Pools.Verify(p => p.DeletePoolAsync(It.IsAny<string>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task DeletePool_ShouldReturn404AndDeleteNothing_WhenThePoolDoesNotExist()
+        {
+            var f = new Fixture();
+            f.Pools.Setup(p => p.GetPoolAsync(It.IsAny<string>())).ReturnsAsync((BowlPool?)null);
+
+            var result = await f.Build().DeletePool(EndpointKit.Request(Tier.SuperAdmin), "missing");
+
+            EndpointKit.Status(result).Should().Be(404);
+            f.Entries.Verify(e => e.DeleteEntryAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+            f.Pools.Verify(p => p.DeletePoolAsync(It.IsAny<string>()), Times.Never);
+        }
+
+        // Business rules section 2: a new pool's lock date must be in the future. A new BowlPool always has a GUID Id,
+        // so the check cannot depend on an empty Id.
+        [Fact]
+        public async Task CreatePool_ShouldRefuseAndSaveNothing_WhenTheLockDateIsInThePast()
+        {
+            var f = new Fixture();
+            var pool = NewPool();
+            pool.LockDate = DateTime.UtcNow.AddDays(-1);
+
+            var result = await f.Build().CreatePool(EndpointKit.Request(Tier.SuperAdmin, body: pool));
+
+            EndpointKit.Status(result).Should().Be(400);
+            EndpointKit.BodyText(result).Should().Contain("Lock Date");
+            f.Pools.Verify(p => p.AddPoolAsync(It.IsAny<BowlPool>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task CreatePool_ShouldRefuseAndSaveNothing_WhenTheInviteCodeIsMissing()
+        {
+            var f = new Fixture();
+            var pool = NewPool();
+            pool.InviteCode = " ";
+
+            var result = await f.Build().CreatePool(EndpointKit.Request(Tier.SuperAdmin, body: pool));
+
+            EndpointKit.Status(result).Should().Be(400);
+            f.Pools.Verify(p => p.AddPoolAsync(It.IsAny<BowlPool>()), Times.Never);
         }
 
         [Fact]
